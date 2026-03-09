@@ -1,104 +1,63 @@
-<p align="right">
-   <strong>中文</strong> | <a href="./README.en.md">English</a>
-</p>
+# ATSFlare
 
-<p align="center">
-  <a href="https://github.com/songquanpeng/gin-template"><img src="https://raw.githubusercontent.com/songquanpeng/gin-template/main/web/public/logo.png" width="150" height="150" alt="gin-template logo"></a>
-</p>
+ATSFlare 是一个面向内部使用的 Nginx 反向代理控制面 MVP。
 
-<div align="center">
+当前版本只覆盖以下闭环：
 
-# Gin 项目模板
+- 管理端维护反代规则
+- Server 生成并激活配置版本
+- Agent 拉取激活版本并写入独立 Nginx 路由配置文件
+- Agent 执行 `nginx -t` 和 `nginx -s reload`
+- Server 展示节点状态和最近一次应用结果
 
-_✨ 用于 Gin & React 项目的模板 ✨_
+不包含多租户、WAF、限流、Redis、对象存储、复杂缓存策略等平台化能力。
 
-</div>
+## 仓库结构
 
-<p align="center">
-  <a href="https://raw.githubusercontent.com/songquanpeng/gin-template/main/LICENSE">
-    <img src="https://img.shields.io/github/license/songquanpeng/gin-template?color=brightgreen" alt="license">
-  </a>
-  <a href="https://github.com/songquanpeng/gin-template/releases/latest">
-    <img src="https://img.shields.io/github/v/release/songquanpeng/gin-template?color=brightgreen&include_prereleases" alt="release">
-  </a>
-  <a href="https://hub.docker.com/repository/docker/justsong/gin-template">
-    <img src="https://img.shields.io/docker/pulls/justsong/gin-template?color=brightgreen" alt="docker pull">
-  </a>
-  <a href="https://github.com/songquanpeng/gin-template/releases/latest">
-    <img src="https://img.shields.io/github/downloads/songquanpeng/gin-template/total?color=brightgreen&include_prereleases" alt="release">
-  </a>
-  <a href="https://goreportcard.com/report/github.com/songquanpeng/gin-template">
-    <img src="https://goreportcard.com/badge/github.com/songquanpeng/gin-template" alt="GoReportCard">
-  </a>
-</p>
+- `atsf_server`: Gin + GORM + SQLite 的控制中心，包含管理端 API、Agent API 和 Web 管理台
+- `atsf_agent`: Go 单体 Agent，负责注册、心跳、同步配置、写入 Nginx 路由文件并 reload
+- `docs`: 设计、开发规范、开发计划和部署联调文档
 
-<p align="center">
-  <a href="https://github.com/songquanpeng/gin-template/releases">程序下载</a>
-  ·
-  <a href="https://github.com/songquanpeng/gin-template#部署">部署教程</a>
-  ·
-  <a href="https://github.com/songquanpeng/gin-template/issues">意见反馈</a>
-  ·
-  <a href="https://gin-template.vercel.app/">在线演示</a>
-</p>
+接手前请先阅读：
 
-## 功能
-+ [x] 内置用户管理
-+ [x] 内置文件管理
-+ [x] [GitHub 开放授权](https://github.com/settings/applications/new)
-+ [x] 微信公众号授权（需要 [wechat-server](https://github.com/songquanpeng/wechat-server)）
-+ [x] 邮箱验证以及通过邮件进行密码重置
-+ [x] 请求频率限制
-+ [x] 静态文件缓存
-+ [x] 移动端适配
-+ [x] 基于令牌的鉴权
-+ [x] 使用 GitHub Actions 自动打包可执行文件与 Docker 镜像
-+ [x] Cloudflare Turnstile 用户校验
+1. [docs/design.md](/Users/ryan/DEV/Go/ATSFlare/docs/design.md)
+2. [docs/development-guidelines.md](/Users/ryan/DEV/Go/ATSFlare/docs/development-guidelines.md)
+3. [docs/development-plan.md](/Users/ryan/DEV/Go/ATSFlare/docs/development-plan.md)
 
-## 部署
-### 基于 Docker 进行部署
-执行：`docker run --name gin-template -d --restart always -p 3000:3000 -v /home/ubuntu/data/gin-template:/data justsong/gin-template`
+## 当前功能状态
 
-数据将会保存在宿主机的 `/home/ubuntu/data/gin-template` 目录。
+- Phase 1: Server 数据层与发布闭环，已完成
+- Phase 2: Agent API 与节点状态，已完成
+- Phase 3: Agent 本体最小闭环，已完成
+- Phase 4: 管理端页面，已完成
+- Phase 5: 部署与联调文档，已完成
 
-### 手动部署
-1. 从 [GitHub Releases](https://github.com/songquanpeng/gin-template/releases/latest) 下载可执行文件或者从源码编译：
-   ```shell
-   git clone https://github.com/songquanpeng/gin-template.git
-   cd gin-template/web
-   npm install
-   npm run build
-   cd ..
-   go mod download
-   go build -ldflags "-s -w" -o gin-template
-   ````
-2. 运行：
-   ```shell
-   chmod u+x gin-template
-   ./gin-template --port 3000 --log-dir ./logs
-   ```
-3. 访问 [http://localhost:3000/](http://localhost:3000/) 并登录。初始账号用户名为 `root`，密码为 `123456`。
+## 快速开始
 
-更加详细的部署教程[参见此处](https://iamazing.cn/page/how-to-deploy-a-website)。
+最小运行步骤见：
 
-## 配置
-系统本身开箱即用。
+- [docs/deployment.md](/Users/ryan/DEV/Go/ATSFlare/docs/deployment.md)
 
-你可以通过设置环境变量或者命令行参数进行配置。
+如果只想快速验证测试：
 
-等到系统启动后，使用 `root` 用户登录系统并做进一步的配置。
+```bash
+cd atsf_server && GOCACHE=/tmp/atsflare-go-cache go test ./...
+cd atsf_agent && GOCACHE=/tmp/atsflare-go-cache go test ./...
+cd atsf_server/web && npm run build
+```
 
-### 环境变量
-1. `REDIS_CONN_STRING`：设置之后将使用 Redis 作为请求频率限制的存储，而非使用内存存储。
-   + 例子：`REDIS_CONN_STRING=redis://default:redispw@localhost:49153`
-2. `SESSION_SECRET`：设置之后将使用固定的会话密钥，这样系统重新启动后已登录用户的 cookie 将依旧有效。
-   + 例子：`SESSION_SECRET=random_string`
-3. `SQL_DSN`：设置之后将使用指定数据库而非 SQLite。
-   + 例子：`SQL_DSN=root:123456@tcp(localhost:3306)/gin-template`
+## 默认约束
 
-### 命令行参数
-1. `--port <port_number>`: 指定服务器监听的端口号，默认为 `3000`。
-   + 例子：`--port 3000`
-2. `--log-dir <log_dir>`: 指定日志文件夹，如果没有设置，日志将不会被保存。
-   + 例子：`--log-dir ./logs`
-3. `--version`: 打印系统版本号并退出。
+- Server 默认使用 SQLite
+- 不配置 `REDIS_CONN_STRING`
+- Agent 鉴权使用 `X-Agent-Token`
+- 第一版只管理独立生成的 Nginx 路由配置文件
+
+## 后续工作
+
+当前 MVP 已可支撑最小闭环。下一阶段优先项通常包括：
+
+- 补充 systemd 服务示例
+- 增加真实环境联调记录
+- 优化前端交互和表单校验
+- 增加更多 Agent 侧集成测试
