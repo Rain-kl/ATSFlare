@@ -21,6 +21,30 @@ const headerButtons = [
     icon: 'home',
   },
   {
+    name: '规则',
+    to: '/proxy-route',
+    icon: 'sitemap',
+    admin: true,
+  },
+  {
+    name: '版本',
+    to: '/config-version',
+    icon: 'history',
+    admin: true,
+  },
+  {
+    name: '节点',
+    to: '/node',
+    icon: 'server',
+    admin: true,
+  },
+  {
+    name: '记录',
+    to: '/apply-log',
+    icon: 'tasks',
+    admin: true,
+  },
+  {
     name: '文件',
     to: '/file',
     icon: 'file',

@@ -16,6 +16,10 @@ import PasswordResetConfirm from './components/PasswordResetConfirm';
 import { UserContext } from './context/User';
 import { StatusContext } from './context/Status';
 import File from './pages/File';
+import ProxyRoute from './pages/ProxyRoute';
+import ConfigVersion from './pages/ConfigVersion';
+import Node from './pages/Node';
+import ApplyLog from './pages/ApplyLog';
 
 const Home = lazy(() => import('./pages/Home'));
 const About = lazy(() => import('./pages/About'));
@@ -70,6 +74,38 @@ function App() {
           <Suspense fallback={<Loading></Loading>}>
             <Home />
           </Suspense>
+        }
+      />
+      <Route
+        path='/proxy-route'
+        element={
+          <PrivateRoute>
+            <ProxyRoute />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path='/config-version'
+        element={
+          <PrivateRoute>
+            <ConfigVersion />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path='/node'
+        element={
+          <PrivateRoute>
+            <Node />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path='/apply-log'
+        element={
+          <PrivateRoute>
+            <ApplyLog />
+          </PrivateRoute>
         }
       />
       <Route
@@ -170,7 +206,7 @@ function App() {
           </Suspense>
         }
       />
-      <Route path='*' element={NotFound} />
+      <Route path='*' element={<NotFound />} />
     </Routes>
   );
 }
