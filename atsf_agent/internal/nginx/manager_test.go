@@ -81,14 +81,11 @@ func TestDockerExecutorStartsContainerWhenMissing(t *testing.T) {
 		t.Fatalf("Test failed: %v", err)
 	}
 
-	if len(runner.calls) != 3 {
-		t.Fatalf("expected 3 calls, got %d", len(runner.calls))
+	if len(runner.calls) != 1 {
+		t.Fatalf("expected 1 call, got %d", len(runner.calls))
 	}
-	if runner.calls[1].args[0] != "run" {
-		t.Fatalf("expected docker run on second call, got %#v", runner.calls[1])
-	}
-	if runner.calls[2].args[0] != "exec" {
-		t.Fatalf("expected docker exec on third call, got %#v", runner.calls[2])
+	if runner.calls[0].args[0] != "run" || runner.calls[0].args[1] != "--rm" {
+		t.Fatalf("expected docker run --rm for test, got %#v", runner.calls[0])
 	}
 }
 
@@ -113,17 +110,17 @@ func TestDockerExecutorStartsStoppedContainer(t *testing.T) {
 		t.Fatalf("Reload failed: %v", err)
 	}
 
-	if len(runner.calls) != 4 {
-		t.Fatalf("expected 4 calls, got %d", len(runner.calls))
+	if len(runner.calls) != 3 {
+		t.Fatalf("expected 3 calls, got %d", len(runner.calls))
+	}
+	if runner.calls[0].args[0] != "inspect" {
+		t.Fatalf("expected docker inspect on first call, got %#v", runner.calls[0])
 	}
 	if runner.calls[1].args[0] != "rm" {
 		t.Fatalf("expected docker rm on second call, got %#v", runner.calls[1])
 	}
 	if runner.calls[2].args[0] != "run" {
 		t.Fatalf("expected docker run on third call, got %#v", runner.calls[2])
-	}
-	if runner.calls[3].args[0] != "exec" {
-		t.Fatalf("expected docker exec on fourth call, got %#v", runner.calls[3])
 	}
 }
 

@@ -64,10 +64,17 @@ type DockerExecutor struct {
 }
 
 func (e *DockerExecutor) Test(ctx context.Context) error {
-	if err := e.EnsureRuntime(ctx, false); err != nil {
-		return err
-	}
-	output, err := e.Runner.Run(ctx, e.DockerBinary, "exec", e.ContainerName, "nginx", "-t")
+	output, err := e.Runner.Run(
+		ctx,
+		e.DockerBinary,
+		"run",
+		"--rm",
+		"-v",
+		fmt.Sprintf("%s:/etc/nginx/conf.d", e.RouteConfigDir),
+		e.Image,
+		"nginx",
+		"-t",
+	)
 	if err != nil {
 		return fmt.Errorf("docker nginx -t failed: %w: %s", err, string(output))
 	}
@@ -75,14 +82,7 @@ func (e *DockerExecutor) Test(ctx context.Context) error {
 }
 
 func (e *DockerExecutor) Reload(ctx context.Context) error {
-	if err := e.EnsureRuntime(ctx, false); err != nil {
-		return err
-	}
-	output, err := e.Runner.Run(ctx, e.DockerBinary, "exec", e.ContainerName, "nginx", "-s", "reload")
-	if err != nil {
-		return fmt.Errorf("docker nginx reload failed: %w: %s", err, string(output))
-	}
-	return nil
+	return e.EnsureRuntime(ctx, true)
 }
 
 func (e *DockerExecutor) EnsureRuntime(ctx context.Context, recreate bool) error {
