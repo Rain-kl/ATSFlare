@@ -149,11 +149,15 @@ func NewExecutor(options ExecutorOptions) Executor {
 			Runner: runner,
 		}
 	}
+	routeConfigDir := filepath.Dir(options.RouteConfigPath)
+	if absDir, err := filepath.Abs(routeConfigDir); err == nil {
+		routeConfigDir = absDir
+	}
 	return &DockerExecutor{
 		DockerBinary:   options.DockerBinary,
 		ContainerName:  options.ContainerName,
 		Image:          options.Image,
-		RouteConfigDir: filepath.Dir(options.RouteConfigPath),
+		RouteConfigDir: routeConfigDir,
 		Runner:         runner,
 	}
 }

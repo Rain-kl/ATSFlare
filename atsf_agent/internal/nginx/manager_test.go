@@ -5,6 +5,7 @@ import (
 	"errors"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -110,5 +111,25 @@ func TestDockerExecutorStartsStoppedContainer(t *testing.T) {
 	}
 	if runner.calls[2].args[0] != "exec" {
 		t.Fatalf("expected docker exec on third call, got %#v", runner.calls[2])
+	}
+}
+
+func TestNewExecutorUsesAbsoluteDockerMountPath(t *testing.T) {
+	executor := NewExecutor(ExecutorOptions{
+		DockerBinary:    "docker",
+		ContainerName:   "atsflare-nginx",
+		Image:           "nginx:stable-alpine",
+		RouteConfigPath: "./data/etc/nginx/conf.d/atsflare_routes.conf",
+	})
+
+	dockerExecutor, ok := executor.(*DockerExecutor)
+	if !ok {
+		t.Fatal("expected docker executor")
+	}
+	if !filepath.IsAbs(dockerExecutor.RouteConfigDir) {
+		t.Fatalf("expected absolute route config dir, got %s", dockerExecutor.RouteConfigDir)
+	}
+	if !strings.HasSuffix(dockerExecutor.RouteConfigDir, filepath.Clean("data/etc/nginx/conf.d")) {
+		t.Fatalf("unexpected route config dir: %s", dockerExecutor.RouteConfigDir)
 	}
 }
