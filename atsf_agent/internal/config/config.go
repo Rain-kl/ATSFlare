@@ -8,6 +8,11 @@ import (
 	"time"
 )
 
+const (
+	defaultDockerRouteConfigRelativePath = "etc/nginx/conf.d/atsflare_routes.conf"
+	defaultDockerStateRelativePath       = "var/lib/atsflare/agent-state.json"
+)
+
 type Config struct {
 	ServerURL          string        `json:"server_url"`
 	AgentToken         string        `json:"agent_token"`
@@ -19,6 +24,7 @@ type Config struct {
 	NginxContainerName string        `json:"nginx_container_name"`
 	NginxDockerImage   string        `json:"nginx_docker_image"`
 	DockerBinary       string        `json:"docker_binary"`
+	DataDir            string        `json:"data_dir"`
 	RouteConfigPath    string        `json:"route_config_path"`
 	StatePath          string        `json:"state_path"`
 	HeartbeatInterval  time.Duration `json:"heartbeat_interval"`
@@ -35,22 +41,17 @@ func Load(path string) (*Config, error) {
 	if err = json.Unmarshal(data, cfg); err != nil {
 		return nil, err
 	}
-	applyDefaults(cfg)
+	applyDefaults(cfg, filepath.Dir(path))
 	if err = validate(cfg); err != nil {
 		return nil, err
 	}
 	return cfg, nil
 }
 
-func applyDefaults(cfg *Config) {
+func applyDefaults(cfg *Config, baseDir string) {
+	baseDir = filepath.Clean(baseDir)
 	if cfg.AgentVersion == "" {
 		cfg.AgentVersion = "dev"
-	}
-	if cfg.RouteConfigPath == "" {
-		cfg.RouteConfigPath = filepath.Clean("./atsflare_routes.conf")
-	}
-	if cfg.StatePath == "" {
-		cfg.StatePath = filepath.Clean("./atsf_agent_state.json")
 	}
 	if cfg.NginxContainerName == "" {
 		cfg.NginxContainerName = "atsflare-nginx"
@@ -60,6 +61,20 @@ func applyDefaults(cfg *Config) {
 	}
 	if cfg.DockerBinary == "" {
 		cfg.DockerBinary = "docker"
+	}
+	if cfg.DataDir == "" {
+		cfg.DataDir = filepath.Join(baseDir, "data")
+	}
+	if cfg.NginxPath == "" {
+		cfg.RouteConfigPath = filepath.Join(cfg.DataDir, defaultDockerRouteConfigRelativePath)
+		cfg.StatePath = filepath.Join(cfg.DataDir, defaultDockerStateRelativePath)
+	} else {
+		if cfg.RouteConfigPath == "" {
+			cfg.RouteConfigPath = filepath.Join(cfg.DataDir, defaultDockerRouteConfigRelativePath)
+		}
+		if cfg.StatePath == "" {
+			cfg.StatePath = filepath.Join(cfg.DataDir, defaultDockerStateRelativePath)
+		}
 	}
 	if cfg.HeartbeatInterval <= 0 {
 		cfg.HeartbeatInterval = 30 * time.Second

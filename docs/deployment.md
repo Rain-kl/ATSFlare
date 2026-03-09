@@ -70,11 +70,9 @@ go run .
   "node_ip": "10.0.0.8",
   "agent_version": "0.1.0",
   "nginx_version": "1.25.5",
-  "nginx_path": "/opt/nginx/sbin/nginx",
+  "data_dir": "./data",
   "nginx_container_name": "atsflare-nginx",
   "nginx_docker_image": "nginx:stable-alpine",
-  "route_config_path": "/etc/nginx/conf.d/atsflare_routes.conf",
-  "state_path": "/var/lib/atsflare/agent-state.json",
   "heartbeat_interval": 30000000000,
   "sync_interval": 30000000000,
   "request_timeout": 10000000000
@@ -85,10 +83,13 @@ go run .
 
 - 时间字段单位是纳秒，因为当前实现直接使用 Go 的 `time.Duration` JSON 反序列化
 - `agent_token` 必须与 Server 侧 `AGENT_TOKEN` 完全一致
-- `route_config_path` 只应指向 ATSFlare 独立管理的路由文件
-- `nginx_path` 用于显式指定独立 Nginx 可执行文件路径
-- 如果未指定 `nginx_path`，Agent 会尝试通过 Docker 启动独立 Nginx 容器
+- 生成资源默认统一落在 `./data`
+- 如果未指定 `nginx_path`，Agent 会自动使用以下固定路径：
+  - `./data/etc/nginx/conf.d/atsflare_routes.conf`
+  - `./data/var/lib/atsflare/agent-state.json`
+- 如果希望修改保存位置，可通过 `data_dir` 统一覆盖生成资源目录
 - Docker 模式默认使用 `nginx_container_name` 和 `nginx_docker_image`
+- `nginx_path` 仅在独立 Nginx 路径模式下使用；此时如有需要，仍可单独覆盖 `route_config_path` 和 `state_path`
 
 ### 3.2 启动 Agent
 

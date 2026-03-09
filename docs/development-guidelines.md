@@ -50,6 +50,7 @@ Agent 放在 `atsf_agent`，使用 Go 单体程序开发。
 * 优先调用独立 Nginx，不依赖系统全局 Nginx
 * 支持通过 `nginx_path` 显式指定独立 Nginx 可执行文件
 * 未指定 `nginx_path` 时，默认通过 Docker 启动独立 Nginx 容器
+* Agent 生成资源默认统一放在 `./data`，可通过 `data_dir` 统一覆盖
 * 负责本机 Nginx 路由配置写入、校验、reload、状态上报
 
 ### 2.3 Nginx 配置边界
