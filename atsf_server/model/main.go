@@ -1,9 +1,9 @@
 package model
 
 import (
+	"github.com/glebarez/sqlite"
 	"gin-template/common"
 	"gorm.io/driver/mysql"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"os"
 )
