@@ -2,6 +2,7 @@ package main
 
 import (
 	"embed"
+	"fmt"
 	"gin-template/common"
 	"gin-template/middleware"
 	"gin-template/model"
@@ -68,8 +69,17 @@ func main() {
 	if port == "" {
 		port = strconv.Itoa(*common.Port)
 	}
+	common.SysLog(fmt.Sprintf("server config: port=%s gin_mode=%s sqlite_path=%s redis_enabled=%t upload_path=%s log_dir=%s agent_token_configured=%t node_offline_threshold=%s", port, gin.Mode(), common.SQLitePath, common.RedisEnabled, common.UploadPath, valueOrDefault(*common.LogDir, "stdout"), common.AgentToken != "", common.NodeOfflineThreshold))
+	common.SysLog(fmt.Sprintf("server listening on :%s", port))
 	err = server.Run(":" + port)
 	if err != nil {
 		log.Println(err)
 	}
+}
+
+func valueOrDefault(value string, fallback string) string {
+	if value == "" {
+		return fallback
+	}
+	return value
 }

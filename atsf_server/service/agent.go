@@ -62,16 +62,19 @@ type NodeView struct {
 }
 
 func RegisterNode(payload AgentNodePayload) (*model.Node, error) {
+	common.SysLog("agent register request received: node_id=" + strings.TrimSpace(payload.NodeID) + " name=" + strings.TrimSpace(payload.Name) + " ip=" + strings.TrimSpace(payload.IP))
 	return upsertNode(payload)
 }
 
 func HeartbeatNode(payload AgentNodePayload) (*model.Node, error) {
+	common.SysLog("agent heartbeat received: node_id=" + strings.TrimSpace(payload.NodeID) + " current_version=" + strings.TrimSpace(payload.CurrentVersion))
 	return upsertNode(payload)
 }
 
 func GetActiveConfigForAgent() (*AgentConfigResponse, error) {
 	version, err := model.GetActiveConfigVersion()
 	if err != nil {
+		common.SysError("agent requested active config but no active version is available")
 		return nil, err
 	}
 	var supportFiles []SupportFile
@@ -80,6 +83,7 @@ func GetActiveConfigForAgent() (*AgentConfigResponse, error) {
 			return nil, err
 		}
 	}
+	common.SysLog("agent fetched active config: version=" + version.Version + " checksum=" + version.Checksum)
 	return &AgentConfigResponse{
 		Version:        version.Version,
 		Checksum:       version.Checksum,
@@ -104,6 +108,7 @@ func ReportApplyLog(payload ApplyLogPayload) (*model.ApplyLog, error) {
 	if payload.Result != ApplyResultOK && payload.Result != ApplyResultFailed {
 		return nil, errors.New("result 仅支持 success 或 failed")
 	}
+	common.SysLog("agent apply log received: node_id=" + payload.NodeID + " version=" + payload.Version + " result=" + payload.Result)
 
 	log := &model.ApplyLog{
 		NodeID:    payload.NodeID,
@@ -133,6 +138,11 @@ func ReportApplyLog(payload ApplyLogPayload) (*model.ApplyLog, error) {
 	if err != nil {
 		return nil, err
 	}
+	if payload.Result == ApplyResultOK {
+		common.SysLog("agent apply reported success: node_id=" + payload.NodeID + " version=" + payload.Version)
+	} else {
+		common.SysError("agent apply reported failure: node_id=" + payload.NodeID + " version=" + payload.Version + " message=" + payload.Message)
+	}
 	return log, nil
 }
 
@@ -143,6 +153,16 @@ func ListNodeViews() ([]*NodeView, error) {
 	}
 	views := make([]*NodeView, 0, len(nodes))
 	for _, node := range nodes {
+		computedStatus := computeNodeStatus(node.LastSeenAt)
+		if node.Status != computedStatus {
+			if computedStatus == NodeStatusOffline {
+				common.SysError("node offline: node_id=" + node.NodeID + " name=" + node.Name + " ip=" + node.IP + " last_seen_at=" + node.LastSeenAt.Format(time.RFC3339))
+			} else {
+				common.SysLog("node online: node_id=" + node.NodeID + " name=" + node.Name + " ip=" + node.IP)
+			}
+			_ = model.DB.Model(node).Update("status", computedStatus).Error
+			node.Status = computedStatus
+		}
 		view := &NodeView{
 			ID:             node.ID,
 			NodeID:         node.NodeID,
@@ -150,7 +170,7 @@ func ListNodeViews() ([]*NodeView, error) {
 			IP:             node.IP,
 			AgentVersion:   node.AgentVersion,
 			NginxVersion:   node.NginxVersion,
-			Status:         computeNodeStatus(node.LastSeenAt),
+			Status:         computedStatus,
 			CurrentVersion: node.CurrentVersion,
 			LastSeenAt:     node.LastSeenAt,
 			LastError:      node.LastError,
@@ -203,6 +223,10 @@ func upsertNode(payload AgentNodePayload) (*model.Node, error) {
 			NodeID: payload.NodeID,
 		}
 	}
+	previousStatus := node.Status
+	previousIP := node.IP
+	previousVersion := node.CurrentVersion
+	previousAgentVersion := node.AgentVersion
 	node.Name = payload.Name
 	node.IP = payload.IP
 	node.AgentVersion = payload.AgentVersion
@@ -215,10 +239,16 @@ func upsertNode(payload AgentNodePayload) (*model.Node, error) {
 		if err = model.DB.Create(node).Error; err != nil {
 			return nil, err
 		}
+		common.SysLog("node online: node_id=" + node.NodeID + " name=" + node.Name + " ip=" + node.IP + " agent_version=" + node.AgentVersion)
 		return node, nil
 	}
 	if err = model.DB.Model(node).Select("name", "ip", "agent_version", "nginx_version", "status", "current_version", "last_seen_at", "last_error").Updates(node).Error; err != nil {
 		return nil, err
+	}
+	if previousStatus != NodeStatusOnline {
+		common.SysLog("node online: node_id=" + node.NodeID + " name=" + node.Name + " ip=" + node.IP + " agent_version=" + node.AgentVersion)
+	} else if previousIP != node.IP || previousVersion != node.CurrentVersion || previousAgentVersion != node.AgentVersion {
+		common.SysLog("node metadata updated: node_id=" + node.NodeID + " ip=" + previousIP + "->" + node.IP + " agent_version=" + previousAgentVersion + "->" + node.AgentVersion + " current_version=" + previousVersion + "->" + node.CurrentVersion)
 	}
 	return node, nil
 }

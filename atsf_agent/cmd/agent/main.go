@@ -24,6 +24,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	log.Printf("agent config loaded: server=%s node=%s ip=%s heartbeat_interval=%s sync_interval=%s route_config=%s cert_dir=%s", cfg.ServerURL, cfg.NodeName, cfg.NodeIP, cfg.HeartbeatInterval, cfg.SyncInterval, cfg.RouteConfigPath, cfg.CertDir)
 
 	client := httpclient.New(cfg.ServerURL, cfg.AgentToken, cfg.RequestTimeout)
 	stateStore := state.NewStore(cfg.StatePath)
@@ -49,8 +50,10 @@ func main() {
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
+	log.Printf("agent process started")
 
 	if err = runner.Run(ctx); err != nil && err != context.Canceled {
 		log.Fatal(err)
 	}
+	log.Printf("agent process stopped")
 }

@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -41,18 +42,22 @@ type PathExecutor struct {
 }
 
 func (e *PathExecutor) Test(ctx context.Context) error {
+	log.Printf("running nginx test with binary: %s", e.Path)
 	output, err := e.Runner.Run(ctx, e.Path, "-t")
 	if err != nil {
 		return fmt.Errorf("nginx -t failed: %w: %s", err, string(output))
 	}
+	log.Printf("nginx test succeeded with binary: %s", e.Path)
 	return nil
 }
 
 func (e *PathExecutor) Reload(ctx context.Context) error {
+	log.Printf("running nginx reload with binary: %s", e.Path)
 	output, err := e.Runner.Run(ctx, e.Path, "-s", "reload")
 	if err != nil {
 		return fmt.Errorf("nginx reload failed: %w: %s", err, string(output))
 	}
+	log.Printf("nginx reload succeeded with binary: %s", e.Path)
 	return nil
 }
 
@@ -71,6 +76,7 @@ type DockerExecutor struct {
 }
 
 func (e *DockerExecutor) Test(ctx context.Context) error {
+	log.Printf("running docker nginx test: container=%s image=%s", e.ContainerName, e.Image)
 	output, err := e.Runner.Run(
 		ctx,
 		e.DockerBinary,
@@ -87,6 +93,7 @@ func (e *DockerExecutor) Test(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("docker nginx -t failed: %w: %s", err, string(output))
 	}
+	log.Printf("docker nginx test succeeded: container=%s", e.ContainerName)
 	return nil
 }
 
@@ -95,6 +102,7 @@ func (e *DockerExecutor) Reload(ctx context.Context) error {
 }
 
 func (e *DockerExecutor) EnsureRuntime(ctx context.Context, recreate bool) error {
+	log.Printf("ensuring docker nginx runtime: container=%s recreate=%t", e.ContainerName, recreate)
 	output, err := e.Runner.Run(ctx, e.DockerBinary, "inspect", "-f", "{{.State.Running}}", e.ContainerName)
 	if err == nil {
 		if recreate {
@@ -104,6 +112,7 @@ func (e *DockerExecutor) EnsureRuntime(ctx context.Context, recreate bool) error
 			return e.runContainer(ctx)
 		}
 		if strings.TrimSpace(string(output)) == "true" {
+			log.Printf("docker nginx runtime already healthy: container=%s", e.ContainerName)
 			return nil
 		}
 		if err := e.removeContainer(ctx); err != nil {
@@ -115,6 +124,7 @@ func (e *DockerExecutor) EnsureRuntime(ctx context.Context, recreate bool) error
 }
 
 func (e *DockerExecutor) removeContainer(ctx context.Context) error {
+	log.Printf("removing docker nginx container: container=%s", e.ContainerName)
 	output, err := e.Runner.Run(ctx, e.DockerBinary, "rm", "-f", e.ContainerName)
 	if err != nil {
 		text := string(output)
@@ -123,10 +133,12 @@ func (e *DockerExecutor) removeContainer(ctx context.Context) error {
 		}
 		return fmt.Errorf("docker rm nginx failed: %w: %s", err, text)
 	}
+	log.Printf("docker nginx container removed: container=%s", e.ContainerName)
 	return nil
 }
 
 func (e *DockerExecutor) runContainer(ctx context.Context) error {
+	log.Printf("starting docker nginx container: container=%s image=%s", e.ContainerName, e.Image)
 	runArgs := []string{
 		"run", "-d",
 		"--name", e.ContainerName,
@@ -140,6 +152,7 @@ func (e *DockerExecutor) runContainer(ctx context.Context) error {
 	if runErr != nil {
 		return fmt.Errorf("docker run nginx failed: %w: %s", runErr, string(runOutput))
 	}
+	log.Printf("docker nginx container started: container=%s", e.ContainerName)
 	return nil
 }
 
@@ -151,27 +164,33 @@ type Manager struct {
 }
 
 func (m *Manager) Apply(ctx context.Context, content string, supportFiles []protocol.SupportFile) error {
+	log.Printf("nginx apply started: route_config=%s support_files=%d", m.RouteConfigPath, len(supportFiles))
 	backup, err := m.backup()
 	if err != nil {
 		return err
 	}
 	if err = m.writeSupportFiles(supportFiles); err != nil {
+		log.Printf("writing support files failed, restoring backup: error=%v", err)
 		_ = m.restore(backup)
 		return err
 	}
 	renderedContent := m.renderConfig(content)
 	if err = os.WriteFile(m.RouteConfigPath, []byte(renderedContent), 0o644); err != nil {
+		log.Printf("writing nginx route config failed, restoring backup: error=%v", err)
 		_ = m.restore(backup)
 		return err
 	}
 	if err = m.Executor.Test(ctx); err != nil {
+		log.Printf("nginx test failed after config write, restoring backup: error=%v", err)
 		_ = m.restore(backup)
 		return err
 	}
 	if err = m.Executor.Reload(ctx); err != nil {
+		log.Printf("nginx reload failed after config write, restoring backup: error=%v", err)
 		_ = m.restore(backup)
 		return err
 	}
+	log.Printf("nginx apply completed successfully: route_config=%s", m.RouteConfigPath)
 	return nil
 }
 
@@ -179,6 +198,7 @@ func (m *Manager) EnsureRuntime(ctx context.Context, recreate bool) error {
 	if m.Executor == nil {
 		return errors.New("executor 未配置")
 	}
+	log.Printf("nginx ensure runtime requested: recreate=%t", recreate)
 	return m.Executor.EnsureRuntime(ctx, recreate)
 }
 
@@ -201,7 +221,9 @@ func (m *Manager) CurrentChecksum() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return bundleChecksum(normalized, files), nil
+	result := bundleChecksum(normalized, files)
+	log.Printf("nginx current checksum calculated: route_config=%s checksum=%s support_files=%d", m.RouteConfigPath, result, len(files))
+	return result, nil
 }
 
 type ExecutorOptions struct {
@@ -272,6 +294,7 @@ func (m *Manager) backup() (*backupState, error) {
 		return nil, err
 	}
 	state.Files = files
+	log.Printf("nginx backup captured: route_exists=%t support_files=%d", state.RouteExisted, len(state.Files))
 	return state, nil
 }
 
@@ -279,6 +302,7 @@ func (m *Manager) restore(state *backupState) error {
 	if state == nil {
 		return nil
 	}
+	log.Printf("restoring nginx backup: route_existed=%t support_files=%d", state.RouteExisted, len(state.Files))
 	if state.RouteExisted {
 		if err := os.WriteFile(m.RouteConfigPath, state.RouteData, 0o644); err != nil {
 			return err
@@ -304,6 +328,7 @@ func (m *Manager) restore(state *backupState) error {
 			return err
 		}
 	}
+	log.Printf("nginx backup restored")
 	return nil
 }
 
@@ -311,6 +336,7 @@ func (m *Manager) writeSupportFiles(supportFiles []protocol.SupportFile) error {
 	if m.CertDir == "" {
 		return nil
 	}
+	log.Printf("writing nginx support files: cert_dir=%s count=%d", m.CertDir, len(supportFiles))
 	if err := os.RemoveAll(m.CertDir); err != nil && !os.IsNotExist(err) {
 		return err
 	}
@@ -326,6 +352,7 @@ func (m *Manager) writeSupportFiles(supportFiles []protocol.SupportFile) error {
 			return err
 		}
 	}
+	log.Printf("nginx support files written: cert_dir=%s count=%d", m.CertDir, len(supportFiles))
 	return nil
 }
 
