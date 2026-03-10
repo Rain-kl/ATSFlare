@@ -45,3 +45,4 @@ go.work.sum
 *.log
 
 .DS_Store
+.codex-cache
