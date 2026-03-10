@@ -197,3 +197,46 @@ func TestSavePersistsMillisecondsAndOmitsRuntimeVersions(t *testing.T) {
 		t.Fatalf("unexpected request timeout: %#v", decoded["request_timeout"])
 	}
 }
+
+func TestInitialAuthToken(t *testing.T) {
+	tests := []struct {
+		name           string
+		agentToken     string
+		discoveryToken string
+		expected       string
+	}{
+		{
+			name:           "prefer agent token",
+			agentToken:     "agent-token",
+			discoveryToken: "discovery-token",
+			expected:       "agent-token",
+		},
+		{
+			name:           "fallback to discovery token",
+			agentToken:     "   ",
+			discoveryToken: "discovery-token",
+			expected:       "discovery-token",
+		},
+		{
+			name:           "nil config returns empty string",
+			agentToken:     "",
+			discoveryToken: "",
+			expected:       "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var cfg *Config
+			if tt.name != "nil config returns empty string" {
+				cfg = &Config{
+					AgentToken:     tt.agentToken,
+					DiscoveryToken: tt.discoveryToken,
+				}
+			}
+			if token := cfg.InitialAuthToken(); token != tt.expected {
+				t.Fatalf("unexpected initial auth token: %q", token)
+			}
+		})
+	}
+}

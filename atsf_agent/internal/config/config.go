@@ -157,6 +157,16 @@ func validate(cfg *Config) error {
 	return nil
 }
 
+func (cfg *Config) InitialAuthToken() string {
+	if cfg == nil {
+		return ""
+	}
+	if token := strings.TrimSpace(cfg.AgentToken); token != "" {
+		return token
+	}
+	return strings.TrimSpace(cfg.DiscoveryToken)
+}
+
 func (cfg *Config) Save() error {
 	if cfg == nil {
 		return errors.New("config 不能为空")
