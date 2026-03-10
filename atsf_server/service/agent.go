@@ -14,6 +14,7 @@ import (
 const (
 	NodeStatusOnline  = "online"
 	NodeStatusOffline = "offline"
+	NodeStatusPending = "pending"
 	ApplyResultOK     = "success"
 	ApplyResultFailed = "failed"
 )
@@ -48,6 +49,8 @@ type NodeView struct {
 	NodeID             string     `json:"node_id"`
 	Name               string     `json:"name"`
 	IP                 string     `json:"ip"`
+	DiscoveryToken     string     `json:"discovery_token,omitempty"`
+	Pending            bool       `json:"pending"`
 	AgentVersion       string     `json:"agent_version"`
 	NginxVersion       string     `json:"nginx_version"`
 	Status             string     `json:"status"`
@@ -61,14 +64,61 @@ type NodeView struct {
 	UpdatedAt          time.Time  `json:"updated_at"`
 }
 
-func RegisterNode(payload AgentNodePayload) (*model.Node, error) {
-	common.SysLog("agent register request received: node_id=" + strings.TrimSpace(payload.NodeID) + " name=" + strings.TrimSpace(payload.Name) + " ip=" + strings.TrimSpace(payload.IP))
-	return upsertNode(payload)
+func RegisterNode(node *model.Node, payload AgentNodePayload) (*AgentRegistrationResponse, error) {
+	common.SysLog("agent discovery register request received: name=" + strings.TrimSpace(payload.Name) + " ip=" + strings.TrimSpace(payload.IP))
+	payload.Name = strings.TrimSpace(payload.Name)
+	payload.IP = strings.TrimSpace(payload.IP)
+	payload.AgentVersion = strings.TrimSpace(payload.AgentVersion)
+	payload.NginxVersion = strings.TrimSpace(payload.NginxVersion)
+	payload.CurrentVersion = strings.TrimSpace(payload.CurrentVersion)
+	payload.LastError = strings.TrimSpace(payload.LastError)
+	if node == nil {
+		return nil, errors.New("节点不存在")
+	}
+	if payload.IP == "" {
+		return nil, errors.New("ip 不能为空")
+	}
+	if payload.AgentVersion == "" {
+		return nil, errors.New("agent_version 不能为空")
+	}
+	agentToken, err := newRandomToken()
+	if err != nil {
+		return nil, err
+	}
+	applyNodeRuntime(node, payload, true)
+	node.AgentToken = agentToken
+	node.DiscoveryToken = ""
+	if err = node.Update(); err != nil {
+		return nil, err
+	}
+	common.SysLog("agent discovery register succeeded: node_id=" + node.NodeID + " name=" + node.Name)
+	return &AgentRegistrationResponse{
+		NodeID:     node.NodeID,
+		AgentToken: node.AgentToken,
+		Name:       node.Name,
+	}, nil
 }
 
-func HeartbeatNode(payload AgentNodePayload) (*model.Node, error) {
-	common.SysLog("agent heartbeat received: node_id=" + strings.TrimSpace(payload.NodeID) + " current_version=" + strings.TrimSpace(payload.CurrentVersion))
-	return upsertNode(payload)
+func HeartbeatNode(node *model.Node, payload AgentNodePayload) (*model.Node, error) {
+	common.SysLog("agent heartbeat received: node_id=" + node.NodeID + " current_version=" + strings.TrimSpace(payload.CurrentVersion))
+	payload.NodeID = node.NodeID
+	payload.Name = strings.TrimSpace(payload.Name)
+	payload.IP = strings.TrimSpace(payload.IP)
+	payload.AgentVersion = strings.TrimSpace(payload.AgentVersion)
+	payload.NginxVersion = strings.TrimSpace(payload.NginxVersion)
+	payload.CurrentVersion = strings.TrimSpace(payload.CurrentVersion)
+	payload.LastError = strings.TrimSpace(payload.LastError)
+	if payload.IP == "" {
+		return nil, errors.New("ip 不能为空")
+	}
+	if payload.AgentVersion == "" {
+		return nil, errors.New("agent_version 不能为空")
+	}
+	applyNodeRuntime(node, payload, true)
+	if err := model.DB.Model(node).Select("ip", "agent_version", "nginx_version", "status", "current_version", "last_seen_at", "last_error").Updates(node).Error; err != nil {
+		return nil, err
+	}
+	return node, nil
 }
 
 func GetActiveConfigForAgent() (*AgentConfigResponse, error) {
@@ -153,30 +203,18 @@ func ListNodeViews() ([]*NodeView, error) {
 	}
 	views := make([]*NodeView, 0, len(nodes))
 	for _, node := range nodes {
-		computedStatus := computeNodeStatus(node.LastSeenAt)
+		computedStatus := computeNodeStatus(node)
 		if node.Status != computedStatus {
 			if computedStatus == NodeStatusOffline {
 				common.SysError("node offline: node_id=" + node.NodeID + " name=" + node.Name + " ip=" + node.IP + " last_seen_at=" + node.LastSeenAt.Format(time.RFC3339))
-			} else {
+			} else if computedStatus == NodeStatusOnline {
 				common.SysLog("node online: node_id=" + node.NodeID + " name=" + node.Name + " ip=" + node.IP)
 			}
 			_ = model.DB.Model(node).Update("status", computedStatus).Error
 			node.Status = computedStatus
 		}
-		view := &NodeView{
-			ID:             node.ID,
-			NodeID:         node.NodeID,
-			Name:           node.Name,
-			IP:             node.IP,
-			AgentVersion:   node.AgentVersion,
-			NginxVersion:   node.NginxVersion,
-			Status:         computedStatus,
-			CurrentVersion: node.CurrentVersion,
-			LastSeenAt:     node.LastSeenAt,
-			LastError:      node.LastError,
-			CreatedAt:      node.CreatedAt,
-			UpdatedAt:      node.UpdatedAt,
-		}
+		view := buildNodeView(node)
+		view.Status = computedStatus
 		if log, err := model.GetLatestApplyLog(node.NodeID); err == nil {
 			view.LatestApplyResult = log.Result
 			view.LatestApplyMessage = log.Message
@@ -192,72 +230,20 @@ func ListApplyLogs(nodeID string) ([]*model.ApplyLog, error) {
 }
 
 func upsertNode(payload AgentNodePayload) (*model.Node, error) {
-	now := time.Now()
-	payload.NodeID = strings.TrimSpace(payload.NodeID)
-	payload.Name = strings.TrimSpace(payload.Name)
-	payload.IP = strings.TrimSpace(payload.IP)
-	payload.AgentVersion = strings.TrimSpace(payload.AgentVersion)
-	payload.NginxVersion = strings.TrimSpace(payload.NginxVersion)
-	payload.CurrentVersion = strings.TrimSpace(payload.CurrentVersion)
-	payload.LastError = strings.TrimSpace(payload.LastError)
-	if payload.NodeID == "" {
-		return nil, errors.New("node_id 不能为空")
-	}
-	if payload.Name == "" {
-		return nil, errors.New("name 不能为空")
-	}
-	if payload.IP == "" {
-		return nil, errors.New("ip 不能为空")
-	}
-	if payload.AgentVersion == "" {
-		return nil, errors.New("agent_version 不能为空")
-	}
-
-	node := &model.Node{}
-	err := model.DB.Where("node_id = ?", payload.NodeID).First(node).Error
-	if err != nil {
-		if !errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, err
-		}
-		node = &model.Node{
-			NodeID: payload.NodeID,
-		}
-	}
-	previousStatus := node.Status
-	previousIP := node.IP
-	previousVersion := node.CurrentVersion
-	previousAgentVersion := node.AgentVersion
-	node.Name = payload.Name
-	node.IP = payload.IP
-	node.AgentVersion = payload.AgentVersion
-	node.NginxVersion = payload.NginxVersion
-	node.Status = NodeStatusOnline
-	node.CurrentVersion = payload.CurrentVersion
-	node.LastSeenAt = now
-	node.LastError = payload.LastError
-	if node.ID == 0 {
-		if err = model.DB.Create(node).Error; err != nil {
-			return nil, err
-		}
-		common.SysLog("node online: node_id=" + node.NodeID + " name=" + node.Name + " ip=" + node.IP + " agent_version=" + node.AgentVersion)
-		return node, nil
-	}
-	if err = model.DB.Model(node).Select("name", "ip", "agent_version", "nginx_version", "status", "current_version", "last_seen_at", "last_error").Updates(node).Error; err != nil {
-		return nil, err
-	}
-	if previousStatus != NodeStatusOnline {
-		common.SysLog("node online: node_id=" + node.NodeID + " name=" + node.Name + " ip=" + node.IP + " agent_version=" + node.AgentVersion)
-	} else if previousIP != node.IP || previousVersion != node.CurrentVersion || previousAgentVersion != node.AgentVersion {
-		common.SysLog("node metadata updated: node_id=" + node.NodeID + " ip=" + previousIP + "->" + node.IP + " agent_version=" + previousAgentVersion + "->" + node.AgentVersion + " current_version=" + previousVersion + "->" + node.CurrentVersion)
-	}
-	return node, nil
+	return nil, errors.New("不再支持匿名自动注册")
 }
 
-func computeNodeStatus(lastSeenAt time.Time) string {
-	if lastSeenAt.IsZero() {
+func computeNodeStatus(node *model.Node) string {
+	if node == nil {
 		return NodeStatusOffline
 	}
-	if time.Since(lastSeenAt) > common.NodeOfflineThreshold {
+	if strings.TrimSpace(node.AgentToken) == "" && strings.TrimSpace(node.DiscoveryToken) != "" {
+		return NodeStatusPending
+	}
+	if node.LastSeenAt.IsZero() {
+		return NodeStatusOffline
+	}
+	if time.Since(node.LastSeenAt) > common.NodeOfflineThreshold {
 		return NodeStatusOffline
 	}
 	return NodeStatusOnline

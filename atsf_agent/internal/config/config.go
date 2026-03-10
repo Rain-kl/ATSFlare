@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	"errors"
+	"net"
 	"os"
 	pathpkg "path"
 	"path/filepath"
@@ -20,6 +21,7 @@ const (
 type Config struct {
 	ServerURL          string        `json:"server_url"`
 	AgentToken         string        `json:"agent_token"`
+	DiscoveryToken     string        `json:"discovery_token"`
 	NodeName           string        `json:"node_name"`
 	NodeIP             string        `json:"node_ip"`
 	AgentVersion       string        `json:"agent_version"`
@@ -36,6 +38,7 @@ type Config struct {
 	HeartbeatInterval  time.Duration `json:"heartbeat_interval"`
 	SyncInterval       time.Duration `json:"sync_interval"`
 	RequestTimeout     time.Duration `json:"request_timeout"`
+	configPath         string
 }
 
 func Load(path string) (*Config, error) {
@@ -47,6 +50,7 @@ func Load(path string) (*Config, error) {
 	if err = json.Unmarshal(data, cfg); err != nil {
 		return nil, err
 	}
+	cfg.configPath = path
 	applyDefaults(cfg, filepath.Dir(path))
 	if err = validate(cfg); err != nil {
 		return nil, err
@@ -70,6 +74,12 @@ func applyDefaults(cfg *Config, baseDir string) {
 	}
 	if cfg.DataDir == "" {
 		cfg.DataDir = filepath.Join(baseDir, "data")
+	}
+	if cfg.NodeName == "" {
+		cfg.NodeName = detectHostname()
+	}
+	if cfg.NodeIP == "" {
+		cfg.NodeIP = detectNodeIP()
 	}
 	if cfg.NginxPath == "" {
 		cfg.RouteConfigPath = joinManagedPath(cfg.DataDir, defaultDockerRouteConfigRelativePath)
@@ -137,8 +147,8 @@ func validate(cfg *Config) error {
 	if cfg.ServerURL == "" {
 		return errors.New("server_url 不能为空")
 	}
-	if cfg.AgentToken == "" {
-		return errors.New("agent_token 不能为空")
+	if strings.TrimSpace(cfg.AgentToken) == "" && strings.TrimSpace(cfg.DiscoveryToken) == "" {
+		return errors.New("agent_token 和 discovery_token 不能同时为空")
 	}
 	if cfg.NodeName == "" {
 		return errors.New("node_name 不能为空")
@@ -147,4 +157,53 @@ func validate(cfg *Config) error {
 		return errors.New("node_ip 不能为空")
 	}
 	return nil
+}
+
+func (cfg *Config) Save() error {
+	if cfg == nil {
+		return errors.New("config 不能为空")
+	}
+	if cfg.configPath == "" {
+		return errors.New("config path 未初始化")
+	}
+	data, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(cfg.configPath, data, 0o644)
+}
+
+func detectHostname() string {
+	host, err := os.Hostname()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(host)
+}
+
+func detectNodeIP() string {
+	interfaces, err := net.Interfaces()
+	if err != nil {
+		return ""
+	}
+	for _, iface := range interfaces {
+		if iface.Flags&net.FlagUp == 0 || iface.Flags&net.FlagLoopback != 0 {
+			continue
+		}
+		addrs, err := iface.Addrs()
+		if err != nil {
+			continue
+		}
+		for _, addr := range addrs {
+			ipNet, ok := addr.(*net.IPNet)
+			if !ok || ipNet.IP == nil || ipNet.IP.IsLoopback() {
+				continue
+			}
+			ipv4 := ipNet.IP.To4()
+			if ipv4 != nil {
+				return ipv4.String()
+			}
+		}
+	}
+	return ""
 }

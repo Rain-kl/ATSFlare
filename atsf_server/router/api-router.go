@@ -99,6 +99,9 @@ func SetApiRouter(router *gin.Engine) {
 		nodeRoute.Use(middleware.AdminAuth())
 		{
 			nodeRoute.GET("/", controller.GetNodes)
+			nodeRoute.POST("/", controller.CreateNode)
+			nodeRoute.PUT("/:id", controller.UpdateNode)
+			nodeRoute.DELETE("/:id", controller.DeleteNode)
 		}
 		applyLogRoute := apiRouter.Group("/apply-logs")
 		applyLogRoute.Use(middleware.AdminAuth())
@@ -106,12 +109,19 @@ func SetApiRouter(router *gin.Engine) {
 			applyLogRoute.GET("/", controller.GetApplyLogs)
 		}
 		agentRoute := apiRouter.Group("/agent")
-		agentRoute.Use(middleware.AgentAuth())
 		{
-			agentRoute.POST("/nodes/register", controller.AgentRegister)
-			agentRoute.POST("/nodes/heartbeat", controller.AgentHeartbeat)
-			agentRoute.GET("/config-versions/active", controller.AgentGetActiveConfig)
-			agentRoute.POST("/apply-logs", controller.AgentReportApplyLog)
+			discoveryRoute := agentRoute.Group("/")
+			discoveryRoute.Use(middleware.AgentDiscoveryAuth())
+			{
+				discoveryRoute.POST("/nodes/register", controller.AgentRegister)
+			}
+			authorizedRoute := agentRoute.Group("/")
+			authorizedRoute.Use(middleware.AgentAuth())
+			{
+				authorizedRoute.POST("/nodes/heartbeat", controller.AgentHeartbeat)
+				authorizedRoute.GET("/config-versions/active", controller.AgentGetActiveConfig)
+				authorizedRoute.POST("/apply-logs", controller.AgentReportApplyLog)
+			}
 		}
 	}
 }

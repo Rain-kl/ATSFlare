@@ -16,6 +16,12 @@ type NodePayload struct {
 	LastError      string `json:"last_error"`
 }
 
+type RegisterNodeResponse struct {
+	NodeID     string `json:"node_id"`
+	AgentToken string `json:"agent_token"`
+	Name       string `json:"name"`
+}
+
 type ApplyLogPayload struct {
 	NodeID  string `json:"node_id"`
 	Version string `json:"version"`

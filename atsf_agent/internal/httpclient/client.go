@@ -29,9 +29,17 @@ func New(baseURL string, token string, timeout time.Duration) *Client {
 	}
 }
 
-func (c *Client) RegisterNode(ctx context.Context, payload protocol.NodePayload) error {
+func (c *Client) RegisterNode(ctx context.Context, payload protocol.NodePayload) (*protocol.RegisterNodeResponse, error) {
 	log.Printf("http register node request: node_id=%s current_version=%s", payload.NodeID, payload.CurrentVersion)
-	return c.postJSON(ctx, "/api/agent/nodes/register", payload, nil)
+	resp := protocol.APIResponse[protocol.RegisterNodeResponse]{}
+	if err := c.postJSON(ctx, "/api/agent/nodes/register", payload, &resp); err != nil {
+		return nil, err
+	}
+	if !resp.Success {
+		return nil, errors.New(resp.Message)
+	}
+	log.Printf("http register node response: node_id=%s", resp.Data.NodeID)
+	return &resp.Data, nil
 }
 
 func (c *Client) Heartbeat(ctx context.Context, payload protocol.NodePayload) error {
@@ -54,6 +62,11 @@ func (c *Client) GetActiveConfig(ctx context.Context) (*protocol.ActiveConfigRes
 func (c *Client) ReportApplyLog(ctx context.Context, payload protocol.ApplyLogPayload) error {
 	log.Printf("http report apply log request: node_id=%s version=%s result=%s", payload.NodeID, payload.Version, payload.Result)
 	return c.postJSON(ctx, "/api/agent/apply-logs", payload, nil)
+}
+
+func (c *Client) SetToken(token string) {
+	c.token = strings.TrimSpace(token)
+	log.Printf("http client token updated")
 }
 
 func (c *Client) getJSON(ctx context.Context, path string, target any) error {

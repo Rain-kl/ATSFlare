@@ -7,8 +7,8 @@ type Node struct {
 	NodeID         string    `json:"node_id" gorm:"uniqueIndex;size:64;not null"`
 	Name           string    `json:"name" gorm:"size:128;not null"`
 	IP             string    `json:"ip" gorm:"size:64;not null"`
-	AgentToken     string    `json:"-" gorm:"size:128;uniqueIndex"`
-	DiscoveryToken string    `json:"-" gorm:"size:128;uniqueIndex"`
+	AgentToken     string    `json:"-" gorm:"size:128;index"`
+	DiscoveryToken string    `json:"-" gorm:"size:128;index"`
 	AgentVersion   string    `json:"agent_version" gorm:"size:64;not null"`
 	NginxVersion   string    `json:"nginx_version" gorm:"size:64"`
 	Status         string    `json:"status" gorm:"size:16;not null;default:'offline'"`

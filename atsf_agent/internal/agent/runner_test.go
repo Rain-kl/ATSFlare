@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"errors"
+	"os"
 	"path/filepath"
 	"sync"
 	"testing"
@@ -18,15 +19,17 @@ type fakeHeartbeatService struct {
 	registerCalls  int
 	heartbeatCalls int
 	registerErr    error
+	registerResp   *protocol.RegisterNodeResponse
 	heartbeatErrs  []error
 	onHeartbeat    func(int)
+	lastToken      string
 }
 
-func (f *fakeHeartbeatService) Register(ctx context.Context, payload protocol.NodePayload) error {
+func (f *fakeHeartbeatService) Register(ctx context.Context, payload protocol.NodePayload) (*protocol.RegisterNodeResponse, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.registerCalls++
-	return f.registerErr
+	return f.registerResp, f.registerErr
 }
 
 func (f *fakeHeartbeatService) Heartbeat(ctx context.Context, payload protocol.NodePayload) error {
@@ -43,6 +46,12 @@ func (f *fakeHeartbeatService) Heartbeat(ctx context.Context, payload protocol.N
 		onHeartbeat(callIndex)
 	}
 	return err
+}
+
+func (f *fakeHeartbeatService) SetToken(token string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.lastToken = token
 }
 
 type fakeSyncService struct {
@@ -90,6 +99,7 @@ func TestRunnerKeepsHeartbeatWhenStartupSyncFails(t *testing.T) {
 	}
 	runner := &Runner{
 		Config: &config.Config{
+			AgentToken:        "agent-token",
 			NodeName:          "edge-01",
 			NodeIP:            "10.0.0.8",
 			AgentVersion:      "0.1.0",
@@ -106,8 +116,8 @@ func TestRunnerKeepsHeartbeatWhenStartupSyncFails(t *testing.T) {
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("expected context cancellation, got %v", err)
 	}
-	if heartbeatService.registerCalls != 1 {
-		t.Fatalf("expected 1 register call, got %d", heartbeatService.registerCalls)
+	if heartbeatService.registerCalls != 0 {
+		t.Fatalf("expected no discovery register call, got %d", heartbeatService.registerCalls)
 	}
 	if heartbeatService.heartbeatCalls < 2 {
 		t.Fatalf("expected heartbeat loop to continue, got %d heartbeat calls", heartbeatService.heartbeatCalls)
@@ -140,6 +150,7 @@ func TestRunnerDoesNotExitOnHeartbeatOrSyncError(t *testing.T) {
 	}
 	runner := &Runner{
 		Config: &config.Config{
+			AgentToken:        "agent-token",
 			NodeName:          "edge-01",
 			NodeIP:            "10.0.0.8",
 			AgentVersion:      "0.1.0",
@@ -156,8 +167,8 @@ func TestRunnerDoesNotExitOnHeartbeatOrSyncError(t *testing.T) {
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("expected context cancellation, got %v", err)
 	}
-	if heartbeatService.registerCalls != 1 {
-		t.Fatalf("expected register attempt, got %d", heartbeatService.registerCalls)
+	if heartbeatService.registerCalls != 0 {
+		t.Fatalf("expected no register attempt, got %d", heartbeatService.registerCalls)
 	}
 	if syncService.syncOnceCalls == 0 {
 		t.Fatal("expected sync loop to continue after heartbeat/register errors")
@@ -168,5 +179,74 @@ func TestRunnerDoesNotExitOnHeartbeatOrSyncError(t *testing.T) {
 	}
 	if snapshot.LastError != "nginx reload failed" {
 		t.Fatalf("expected sync error to be recorded, got %q", snapshot.LastError)
+	}
+}
+
+func TestRunnerDiscoveryRegisterUpdatesTokenAndNodeID(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	stateStore := state.NewStore(filepath.Join(t.TempDir(), "state.json"))
+	heartbeatService := &fakeHeartbeatService{
+		registerResp: &protocol.RegisterNodeResponse{
+			NodeID:     "node-server-assigned",
+			AgentToken: "agent-token-issued",
+			Name:       "edge-01",
+		},
+		onHeartbeat: func(callCount int) {
+			if callCount >= 1 {
+				cancel()
+			}
+		},
+	}
+	syncService := &fakeSyncService{}
+	configPath := filepath.Join(t.TempDir(), "agent.json")
+	if err := os.WriteFile(configPath, []byte(`{"server_url":"http://127.0.0.1:3000","discovery_token":"discovery-token","node_name":"edge-01","node_ip":"10.0.0.8"}`), 0o644); err != nil {
+		t.Fatalf("failed to seed config file: %v", err)
+	}
+	cfg, err := config.Load(configPath)
+	if err != nil {
+		t.Fatalf("failed to load config: %v", err)
+	}
+	runner := &Runner{
+		Config: &config.Config{
+			ServerURL:         cfg.ServerURL,
+			DiscoveryToken:    cfg.DiscoveryToken,
+			NodeName:          cfg.NodeName,
+			NodeIP:            cfg.NodeIP,
+			AgentVersion:      "0.1.0",
+			NginxVersion:      "1.25.5",
+			HeartbeatInterval: 10 * time.Millisecond,
+			SyncInterval:      20 * time.Millisecond,
+		},
+		StateStore:       stateStore,
+		HeartbeatService: heartbeatService,
+		SyncService:      syncService,
+	}
+	runner.Config = cfg
+	runner.Config.AgentVersion = "0.1.0"
+	runner.Config.NginxVersion = "1.25.5"
+	runner.Config.HeartbeatInterval = 10 * time.Millisecond
+	runner.Config.SyncInterval = 20 * time.Millisecond
+
+	err = runner.Run(ctx)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected context cancellation, got %v", err)
+	}
+	if heartbeatService.registerCalls == 0 {
+		t.Fatal("expected discovery register to be attempted")
+	}
+	if heartbeatService.lastToken != "agent-token-issued" {
+		t.Fatalf("expected client token to be updated, got %q", heartbeatService.lastToken)
+	}
+	snapshot, loadErr := stateStore.Load()
+	if loadErr != nil {
+		t.Fatalf("failed to load state: %v", loadErr)
+	}
+	if snapshot.NodeID != "node-server-assigned" {
+		t.Fatalf("expected node id to be replaced, got %q", snapshot.NodeID)
+	}
+	if runner.Config.AgentToken != "agent-token-issued" || runner.Config.DiscoveryToken != "" {
+		t.Fatal("expected config token rotation to complete")
 	}
 }

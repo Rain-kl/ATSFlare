@@ -2,6 +2,7 @@ package controller
 
 import (
 	"encoding/json"
+	"gin-template/model"
 	"gin-template/service"
 	"github.com/gin-gonic/gin"
 	"net/http"
@@ -16,7 +17,15 @@ func AgentRegister(c *gin.Context) {
 		})
 		return
 	}
-	node, err := service.RegisterNode(payload)
+	discoveryNode, ok := c.Get("discovery_node")
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"success": false,
+			"message": "无权进行此操作，Discovery Token 无效",
+		})
+		return
+	}
+	result, err := service.RegisterNode(discoveryNode.(*model.Node), payload)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
@@ -27,7 +36,7 @@ func AgentRegister(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "",
-		"data":    node,
+		"data":    result,
 	})
 }
 
@@ -40,7 +49,15 @@ func AgentHeartbeat(c *gin.Context) {
 		})
 		return
 	}
-	node, err := service.HeartbeatNode(payload)
+	authNode, ok := c.Get("agent_node")
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"success": false,
+			"message": "无权进行此操作，Agent Token 无效",
+		})
+		return
+	}
+	node, err := service.HeartbeatNode(authNode.(*model.Node), payload)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
@@ -79,6 +96,10 @@ func AgentReportApplyLog(c *gin.Context) {
 			"message": "无效的参数",
 		})
 		return
+	}
+	authNode, ok := c.Get("agent_node")
+	if ok {
+		payload.NodeID = authNode.(*model.Node).NodeID
 	}
 	log, err := service.ReportApplyLog(payload)
 	if err != nil {

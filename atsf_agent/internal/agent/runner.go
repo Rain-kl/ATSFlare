@@ -2,7 +2,9 @@ package agent
 
 import (
 	"context"
+	"errors"
 	"log"
+	"strings"
 	"time"
 
 	"atsflare-agent/internal/config"
@@ -11,8 +13,9 @@ import (
 )
 
 type HeartbeatService interface {
-	Register(ctx context.Context, payload protocol.NodePayload) error
+	Register(ctx context.Context, payload protocol.NodePayload) (*protocol.RegisterNodeResponse, error)
 	Heartbeat(ctx context.Context, payload protocol.NodePayload) error
+	SetToken(token string)
 }
 
 type SyncService interface {
@@ -33,21 +36,20 @@ func (r *Runner) Run(ctx context.Context) error {
 		return err
 	}
 	log.Printf("agent runner started: node_id=%s node=%s ip=%s", nodeID, r.Config.NodeName, r.Config.NodeIP)
-	if err = r.HeartbeatService.Register(ctx, r.nodePayload(nodeID)); err != nil {
-		log.Printf("agent register failed: %v", err)
-	} else {
-		log.Printf("agent register succeeded: node_id=%s", nodeID)
-	}
-	if err = r.SyncService.SyncOnStartup(ctx); err != nil {
-		r.recordSyncError(err)
-		log.Printf("agent startup sync failed: %v", err)
-	} else {
-		log.Printf("agent startup sync completed")
-	}
-	if err = r.HeartbeatService.Heartbeat(ctx, r.nodePayload(nodeID)); err != nil {
-		log.Printf("agent startup heartbeat failed: %v", err)
-	} else {
-		log.Printf("agent startup heartbeat succeeded: node_id=%s", nodeID)
+	if r.hasAgentToken() {
+		if err = r.SyncService.SyncOnStartup(ctx); err != nil {
+			r.recordSyncError(err)
+			log.Printf("agent startup sync failed: %v", err)
+		} else {
+			log.Printf("agent startup sync completed")
+		}
+		if err = r.HeartbeatService.Heartbeat(ctx, r.nodePayload(nodeID)); err != nil {
+			log.Printf("agent startup heartbeat failed: %v", err)
+		} else {
+			log.Printf("agent startup heartbeat succeeded: node_id=%s", nodeID)
+		}
+	} else if err = r.tryRegister(ctx, &nodeID); err != nil {
+		log.Printf("agent initial discovery register failed: %v", err)
 	}
 
 	heartbeatTicker := time.NewTicker(r.Config.HeartbeatInterval)
@@ -61,10 +63,19 @@ func (r *Runner) Run(ctx context.Context) error {
 			log.Printf("agent runner shutting down: %v", ctx.Err())
 			return ctx.Err()
 		case <-heartbeatTicker.C:
+			if !r.hasAgentToken() {
+				if err = r.tryRegister(ctx, &nodeID); err != nil {
+					log.Printf("agent discovery register failed: %v", err)
+				}
+				continue
+			}
 			if err = r.HeartbeatService.Heartbeat(ctx, r.nodePayload(nodeID)); err != nil {
 				log.Printf("agent heartbeat failed: %v", err)
 			}
 		case <-syncTicker.C:
+			if !r.hasAgentToken() {
+				continue
+			}
 			log.Printf("agent sync tick: node_id=%s", nodeID)
 			if err = r.SyncService.SyncOnce(ctx); err != nil {
 				r.recordSyncError(err)
@@ -74,6 +85,47 @@ func (r *Runner) Run(ctx context.Context) error {
 			}
 		}
 	}
+}
+
+func (r *Runner) hasAgentToken() bool {
+	return strings.TrimSpace(r.Config.AgentToken) != ""
+}
+
+func (r *Runner) tryRegister(ctx context.Context, nodeID *string) error {
+	if strings.TrimSpace(r.Config.DiscoveryToken) == "" {
+		return errors.New("agent_token 为空且未配置 discovery_token")
+	}
+	log.Printf("agent discovery registration started")
+	response, err := r.HeartbeatService.Register(ctx, r.nodePayload(*nodeID))
+	if err != nil {
+		return err
+	}
+	if response == nil || strings.TrimSpace(response.AgentToken) == "" || strings.TrimSpace(response.NodeID) == "" {
+		return errors.New("discovery register response 缺少 node_id 或 agent_token")
+	}
+	snapshot, err := r.StateStore.Load()
+	if err != nil {
+		return err
+	}
+	snapshot.NodeID = response.NodeID
+	if err = r.StateStore.Save(snapshot); err != nil {
+		return err
+	}
+	r.Config.AgentToken = response.AgentToken
+	r.Config.DiscoveryToken = ""
+	if err = r.Config.Save(); err != nil {
+		return err
+	}
+	r.HeartbeatService.SetToken(response.AgentToken)
+	*nodeID = response.NodeID
+	log.Printf("agent discovery registration succeeded: node_id=%s", response.NodeID)
+	if err = r.SyncService.SyncOnStartup(ctx); err != nil {
+		r.recordSyncError(err)
+		log.Printf("agent post-register startup sync failed: %v", err)
+	} else {
+		log.Printf("agent post-register startup sync completed")
+	}
+	return nil
 }
 
 func (r *Runner) recordSyncError(err error) {

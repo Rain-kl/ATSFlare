@@ -1,7 +1,7 @@
 package middleware
 
 import (
-	"gin-template/common"
+	"gin-template/service"
 	"github.com/gin-gonic/gin"
 	"net/http"
 )
@@ -9,15 +9,8 @@ import (
 func AgentAuth() func(c *gin.Context) {
 	return func(c *gin.Context) {
 		token := c.GetHeader("X-Agent-Token")
-		if common.AgentToken == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{
-				"success": false,
-				"message": "Agent Token 未配置",
-			})
-			c.Abort()
-			return
-		}
-		if token == "" || token != common.AgentToken {
+		node, err := service.AuthenticateAgentToken(token)
+		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{
 				"success": false,
 				"message": "无权进行此操作，Agent Token 无效",
@@ -25,6 +18,24 @@ func AgentAuth() func(c *gin.Context) {
 			c.Abort()
 			return
 		}
+		c.Set("agent_node", node)
+		c.Next()
+	}
+}
+
+func AgentDiscoveryAuth() func(c *gin.Context) {
+	return func(c *gin.Context) {
+		token := c.GetHeader("X-Agent-Token")
+		node, err := service.AuthenticateDiscoveryToken(token)
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"success": false,
+				"message": "无权进行此操作，Discovery Token 无效",
+			})
+			c.Abort()
+			return
+		}
+		c.Set("discovery_node", node)
 		c.Next()
 	}
 }

@@ -11,6 +11,7 @@ import (
 	"gin-template/common"
 	"gin-template/model"
 	"gin-template/router"
+	"gin-template/service"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
@@ -199,8 +200,20 @@ func TestPhase1HTTPSAndCertificateImportLifecycle(t *testing.T) {
 	if !strings.Contains(version.SupportFilesJSON, ".crt") || !strings.Contains(version.SupportFilesJSON, ".key") {
 		t.Fatal("expected support files json to contain certificate artifacts")
 	}
+	if err := (&model.Node{
+		NodeID:       "phase1-node",
+		Name:         "phase1-node",
+		IP:           "10.0.0.8",
+		AgentToken:   common.AgentToken,
+		AgentVersion: "0.1.0",
+		NginxVersion: "1.25.5",
+		Status:       service.NodeStatusOnline,
+		LastSeenAt:   time.Now(),
+	}).Insert(); err != nil {
+		t.Fatalf("failed to seed phase1 node: %v", err)
+	}
 
-	agentResp := performAgentJSONRequest(t, engine, http.MethodGet, "/api/agent/config-versions/active", nil)
+	agentResp := performAgentJSONRequestWithToken(t, engine, common.AgentToken, http.MethodGet, "/api/agent/config-versions/active", nil)
 	var activeConfig map[string]any
 	decodeResponseData(t, agentResp, &activeConfig)
 	supportFiles, ok := activeConfig["support_files"].([]any)
