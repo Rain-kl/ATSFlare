@@ -46,17 +46,16 @@
 
 **2.5.1 HTTPS/TLS 支持**
 
-* `proxy_routes` 增加 HTTPS 相关字段：`enable_https`、`ssl_cert_path`、`ssl_key_path`
+* `proxy_routes` 增加 HTTPS 相关字段：`enable_https`、`cert_id`、`redirect_http`
 * 渲染器根据字段生成 HTTPS `server` 块（443 端口），并可选生成 HTTP → HTTPS 重定向块
-* 证书文件仍由节点本地预先准备，控制面只记录路径，不托管证书
+* 控制面托管证书并下发到节点本地，支持手动导入与文件导入
 
-**2.5.2 节点分组与差异化下发**
+**2.5.2 域名管理与证书托管**
 
-* 新增 `node_groups` 表：管理分组（如 staging、production）
-* `nodes` 增加 `group_id` 字段，节点可归属某个分组
-* 发布时可选择目标分组，生成面向该分组的版本
-* 不指定分组时，默认行为与第一版相同（全量下发）
-* Agent 在心跳时携带自身分组信息，Server 按分组返回对应激活版本
+* 新增 `managed_domains` 表：管理业务域名，支持精确域名与通配符域名（如 `*.example.com`）
+* 新增 `tls_certificates` 表：保存证书与私钥，支持手动粘贴导入和证书文件上传导入
+* 控制面新增证书管理与域名管理页面
+* 在反代规则编辑时，输入域名后自动匹配可用证书（包含通配符匹配）
 
 **2.5.3 Agent Token 管理**
 
@@ -80,8 +79,9 @@
 
 * 多租户
 * WAF、限流、Bot、防刷
+* 节点分组与差异化下发
 * 对象存储、消息队列、Redis、Prometheus
-* 证书托管与自动签发
+* 证书自动签发（ACME）
 * Purge、中台审计、审批流
 * mid-tier / 分层缓存
 * 复杂缓存策略配置
@@ -193,8 +193,7 @@ Agent 使用 Go 单体程序：
 第二版新增字段：
 
 * `enable_https` — 是否启用 HTTPS（bool，默认 false）
-* `ssl_cert_path` — 节点本地证书文件路径（string）
-* `ssl_key_path` — 节点本地私钥文件路径（string）
+* `cert_id` — 关联托管证书 ID（nullable，未启用 HTTPS 时可为空）
 * `redirect_http` — 是否将 HTTP 重定向到 HTTPS（bool，默认 false）
 * `custom_headers` — 自定义 `proxy_set_header` 指令（JSON 格式，存字符串）
 
@@ -219,9 +218,7 @@ Agent 使用 Go 单体程序：
 * `rendered_config` 保存渲染后的 Nginx 路由配置
 * 第一版直接存 SQLite，不单独上对象存储
 
-第二版新增字段：
-
-* `group_id` — 关联目标分组（nullable，null 表示全量发布）
+第二版沿用第一版字段，不新增分组字段。
 
 ### 5.3 nodes（第一版）
 
@@ -242,9 +239,7 @@ Agent 使用 Go 单体程序：
 * `created_at`
 * `updated_at`
 
-第二版新增字段：
-
-* `group_id` — 所属节点分组（nullable，无分组时为 null）
+第二版沿用第一版字段，不新增分组字段。
 
 ### 5.4 apply_logs（第一版）
 
@@ -259,19 +254,37 @@ Agent 使用 Go 单体程序：
 * `message`
 * `created_at`
 
-### 5.5 node_groups（第二版新增）
+### 5.5 tls_certificates（第二版新增）
 
-节点分组表，用于差异化下发。
+证书托管表，用于保存证书与私钥内容。
 
 建议字段：
 
 * `id`
-* `name` — 分组名称，唯一（如 `staging`、`production`）
-* `remark` — 备注
+* `name` — 证书名称（唯一）
+* `cert_pem` — 证书 PEM 内容
+* `key_pem` — 私钥 PEM 内容
+* `not_before` — 证书生效时间
+* `not_after` — 证书过期时间
+* `remark`
 * `created_at`
 * `updated_at`
 
-### 5.6 agent_tokens（第二版新增）
+### 5.6 managed_domains（第二版新增）
+
+域名管理表，用于维护可选域名及其默认证书关系。
+
+建议字段：
+
+* `id`
+* `domain` — 域名（支持精确域名和 `*.example.com`）
+* `cert_id` — 关联 `tls_certificates.id`（nullable）
+* `enabled`
+* `remark`
+* `created_at`
+* `updated_at`
+
+### 5.7 agent_tokens（第二版新增）
 
 Agent Token 管理表，替代全局单一 Token。
 
@@ -363,13 +376,13 @@ server {
 
 ### HTTPS 处理
 
-第一版不在控制中心管理证书。
+第一版不在控制中心管理证书，第二版开始支持证书托管。
 
 约定如下：
 
-* Nginx 的监听端口、证书、TLS 相关配置由节点本地预先准备
-* 控制中心只负责反代映射
-* 如果节点已经具备 HTTPS 接入能力，后续可以扩展生成 HTTPS `server` 块
+* 第一版：Nginx 的监听端口、证书、TLS 相关配置由节点本地预先准备
+* 第二版：控制中心托管证书并在配置下发时生成对应证书文件与 HTTPS 配置引用
+* 第二版：反代规则可通过 `cert_id` 绑定证书，并支持 HTTP → HTTPS 重定向
 
 ### 缓存处理
 
@@ -512,10 +525,16 @@ Agent 每次上报：
 
 ### 11.3 第二版新增管理端 API
 
-* `GET /api/node-groups/` — 分组列表
-* `POST /api/node-groups/` — 创建分组
-* `PUT /api/node-groups/:id` — 更新分组
-* `DELETE /api/node-groups/:id` — 删除分组
+* `GET /api/tls-certificates/` — 证书列表
+* `POST /api/tls-certificates/` — 手动导入证书（粘贴 PEM）
+* `POST /api/tls-certificates/import-file` — 证书文件导入
+* `PUT /api/tls-certificates/:id` — 更新证书备注/状态
+* `DELETE /api/tls-certificates/:id` — 删除证书
+* `GET /api/managed-domains/` — 域名列表
+* `POST /api/managed-domains/` — 创建域名并可绑定默认证书
+* `PUT /api/managed-domains/:id` — 更新域名配置
+* `DELETE /api/managed-domains/:id` — 删除域名
+* `GET /api/tls-certificates/match?domain=` — 按输入域名返回匹配证书（支持 `*.example.com`）
 * `GET /api/agent-tokens/` — Token 列表
 * `POST /api/agent-tokens/` — 创建 Token
 * `DELETE /api/agent-tokens/:id` — 撤销 Token
@@ -558,8 +577,7 @@ Agent（第二版）：
 第二版新增字段：
 
 * 是否启用 HTTPS
-* SSL 证书路径
-* SSL 私钥路径
+* 证书选择（自动匹配候选证书，支持通配符）
 * 是否 HTTP → HTTPS 重定向
 * 自定义请求头（JSON 编辑器）
 
@@ -579,7 +597,6 @@ Agent（第二版）：
 
 第二版新增：
 
-* 发布目标分组选择（可选，不选则全量）
 * 发布前展示配置预览与变更摘要
 
 ### 12.4 节点页（第一版，已实现）
@@ -592,10 +609,6 @@ Agent（第二版）：
 * 当前版本
 * 最后心跳时间
 * 最近错误
-
-第二版新增：
-
-* 所属分组
 
 ### 12.5 应用记录页（第一版，已实现）
 
@@ -621,19 +634,35 @@ Agent（第二版）：
 * 创建 Token
 * 撤销 Token
 
-### 12.7 节点分组页（第二版新增）
+### 12.7 证书管理页（第二版新增）
 
 展示：
 
-* 分组名称
+* 证书名称
+* 有效期（起止时间）
+* 绑定域名数量
 * 备注
-* 该分组下节点数
 
 动作：
 
-* 创建分组
-* 编辑分组
-* 删除分组
+* 手动导入证书（粘贴 PEM）
+* 文件导入证书
+* 删除证书
+
+### 12.8 域名管理页（第二版新增）
+
+展示：
+
+* 域名（支持 `*.example.com`）
+* 绑定证书
+* 是否启用
+* 备注
+
+动作：
+
+* 创建域名
+* 绑定/更换证书
+* 删除域名
 
 ---
 
@@ -666,13 +695,16 @@ atsf_server/
 ```text
 atsf_server/
   controller/
-    node_group.go      # 节点分组 CRUD
+    tls_certificate.go # 证书管理
+    managed_domain.go  # 域名管理
     agent_token.go     # Token 管理
   model/
-    node_group.go      # NodeGroup 模型
+    tls_certificate.go # TLSCertificate 模型
+    managed_domain.go  # ManagedDomain 模型
     agent_token.go     # AgentToken 模型
   service/
-    node_group.go      # 分组逻辑
+    tls_certificate.go # 证书导入与匹配逻辑
+    managed_domain.go  # 域名管理逻辑
     agent_token.go     # Token 创建与验证
     renderer.go        # 抽离渲染逻辑（HTTPS 支持扩展）
   middleware/
@@ -697,9 +729,8 @@ atsf_agent/
 
 第二版 Agent 无需新增模块，只需在现有模块内扩展：
 
-* `config`: 新增 `group_id` 配置项
-* `heartbeat`: 心跳请求中携带 `group_id`
-* `sync`: 按分组获取对应激活版本（Server 端路由区分）
+* `sync`: 拉取包含 HTTPS 与证书引用的渲染配置并应用
+* `nginx`: 写入控制面托管证书生成的本地文件并参与 `nginx -t` / reload
 
 ---
 
@@ -720,7 +751,7 @@ atsf_agent/
 
 1. HTTPS/TLS 支持（ProxyRoute 扩展字段 + 渲染器 + 前端表单）
 2. Agent Token 管理（agent_tokens 表 + 中间件改造 + 前端 Token 管理页）
-3. 节点分组与差异化下发（node_groups 表 + 发布分组逻辑 + Agent 携带 group_id）
+3. 域名管理与证书托管（managed_domains/tls_certificates + 证书导入 + 自动匹配）
 4. 路由增强（custom_headers 字段 + 渲染器注入 + 前端表单）
 5. 配置预览与变更摘要（preview 接口 + diff 接口 + 前端发布确认弹窗）
 
@@ -746,8 +777,8 @@ atsf_agent/
 
 ### 第二版取舍
 
-* HTTPS 支持不托管证书，只记录本地路径，避免引入证书存储和签发复杂度
-* 节点分组不做跨分组继承，每个分组独立一套激活版本，降低理解负担
+* HTTPS 支持由控制面托管证书，但只支持导入，不做自动签发与自动续期
+* 第二版不做节点分组，所有节点继续消费同一份激活版本
 * Token 管理不做细粒度权限（如只读 Token），第二版所有 Token 权限一致
 * 路由自定义头不做模板变量，只支持静态 key-value，避免过早引入 DSL
 * 配置预览只展示渲染结果，不实际验证 Nginx 语法，真实校验仍由 Agent 完成
@@ -755,5 +786,5 @@ atsf_agent/
 第二版成功标准：
 
 ```text
-HTTPS 路由可生效 + 节点可按分组差异化下发 + Token 可在界面管理 + 发布前可预览变更
+HTTPS 路由可生效 + 控制面可托管证书并按域名自动匹配（含通配符）+ Token 可在界面管理 + 发布前可预览变更
 ```

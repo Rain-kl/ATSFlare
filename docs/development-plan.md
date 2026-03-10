@@ -71,21 +71,47 @@ MVP 已于第一版完成。当前进入第二版迭代。
 * 支持通过控制面配置 HTTPS 路由
 * 渲染出包含 443 端口的 `server` 块
 * 支持 HTTP → HTTPS 重定向块
+* 控制面支持托管证书
 
 交付：
 
-* `proxy_routes` 新增字段：`enable_https`、`ssl_cert_path`、`ssl_key_path`、`redirect_http`
+* `proxy_routes` 新增字段：`enable_https`、`cert_id`、`redirect_http`
 * 渲染器支持 HTTPS server 块生成
 * 前端反代规则页增加 HTTPS 配置表单
+* `tls_certificates` 表与模型
+* 证书导入能力：手动导入（粘贴 PEM）与文件导入
 * AutoMigrate 覆盖新字段
 
 完成标准：
 
 * 创建含 HTTPS 字段的路由并发布，Agent 拉取后 Nginx 能以 HTTPS 正确转发
 * HTTP 重定向配置生效
+* 证书可通过控制面导入并被 HTTPS 路由引用
 * 未开启 HTTPS 的路由渲染行为与第一版保持一致
 
-### V2 Phase 2: Agent Token 管理
+### V2 Phase 2: 域名管理与证书自动匹配
+
+目标：
+
+* 控制面可管理域名并绑定证书
+* 反代规则编辑时按输入域名自动匹配证书
+* 支持 `*.example.com` 通配符证书匹配
+
+交付：
+
+* `managed_domains` 表与模型
+* 域名管理 CRUD API
+* 证书匹配 API（精确匹配 + 通配符匹配）
+* 前端域名管理页
+* 前端反代规则页接入证书自动匹配
+
+完成标准：
+
+* 创建域名并绑定证书后，反代规则输入域名可自动匹配证书
+* 通配符证书可匹配子域名（如 `api.example.com` 匹配 `*.example.com`）
+* 无匹配证书时前端给出明确提示
+
+### V2 Phase 3: Agent Token 管理
 
 目标：
 
@@ -106,30 +132,6 @@ MVP 已于第一版完成。当前进入第二版迭代。
 * 新建 Token 后 Agent 可用该 Token 访问 Agent API
 * 撤销 Token 后 Agent 请求立即返回 401
 * 全局环境变量 Token 仅在数据库无有效记录时生效
-
-### V2 Phase 3: 节点分组与差异化下发
-
-目标：
-
-* 节点可按分组管理
-* 发布时可选择目标分组，生成分组专属版本
-* Agent 按分组拉取对应激活版本
-
-交付：
-
-* `node_groups` 表与模型
-* `nodes` 新增 `group_id` 字段
-* `config_versions` 新增 `group_id` 字段（nullable，null 表示全量）
-* 发布 API 接受可选 `group_id` 参数
-* Agent API 按节点分组返回对应激活版本
-* Agent `agent.json` 新增 `group_id` 配置项
-* 前端节点分组管理页与节点页分组字段
-
-完成标准：
-
-* 同一系统内 staging 和 production 分组各有独立激活版本
-* staging 节点拉取 staging 版本，production 节点拉取 production 版本
-* 不属于任何分组的节点拉取全量（group_id = null）版本
 
 ### V2 Phase 4: 路由自定义头
 
@@ -172,14 +174,14 @@ MVP 已于第一版完成。当前进入第二版迭代。
 建议严格按以下顺序开发：
 
 1. HTTPS/TLS 支持（对现有渲染链路影响最小，独立可测）
-2. Agent Token 管理（安全性改善，早做早稳）
-3. 节点分组（数据模型扩展，影响面最广，需要 Agent 配合）
+2. 域名管理与证书自动匹配（与 HTTPS 强相关，尽早完成闭环）
+3. Agent Token 管理（安全性改善，早做早稳）
 4. 路由自定义头（纯增量，对现有结构影响小）
 5. 配置预览与变更摘要（纯只读接口，最后补充）
 
 不要先做以下内容：
 
-* 证书托管
+* 节点分组与差异化下发
 * 灰度百分比发布
 * WAF、限流
 * Redis、Prometheus
@@ -191,22 +193,22 @@ MVP 已于第一版完成。当前进入第二版迭代。
 
 * `enable_https=true` 的路由发布后生成 443 端口 server 块
 * `redirect_http=true` 的路由生成 80 → 443 重定向块
+* 支持手动导入证书与文件导入证书
 * 未开启 HTTPS 的路由渲染结果不受影响
 * Agent 拉取后 Nginx reload 成功
 
 ### V2 Phase 2 检查项
 
+* 可通过管理界面维护域名并绑定证书
+* 反代规则输入域名后可自动匹配证书
+* 通配符证书可匹配子域名（`*.example.com`）
+
+### V2 Phase 3 检查项
+
 * 可通过管理界面创建 Token
 * 新 Token 可被 Agent 使用
 * 撤销 Token 后访问立即失败
 * 全局 Token 环境变量在数据库有记录时失效
-
-### V2 Phase 3 检查项
-
-* 可创建分组并将节点归入分组
-* 可发布面向指定分组的版本
-* 分组节点只拉取该分组的激活版本
-* 无分组节点拉取全量激活版本
 
 ### V2 Phase 4 检查项
 
