@@ -1,4 +1,4 @@
-name: Linux Release
+name: Server Release
 permissions:
   contents: write
 
@@ -6,46 +6,113 @@ on:
   push:
     tags:
       - "*"
+
+env:
+  VERSION: ${{ github.ref_name }}
+
 jobs:
-  release:
+  build-frontend:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
-          node-version: 16
+          node-version: 18
+
       - name: Build Frontend
         env:
           CI: ""
         run: |
           cd atsf_server/web
           npm install
-          REACT_APP_VERSION=$(git describe --tags) npm run build
-          cd ../..
-      - name: Set up Go
-        uses: actions/setup-go@v3
+          REACT_APP_VERSION="$VERSION" npm run build
+
+      - name: Upload Frontend Artifact
+        uses: actions/upload-artifact@v4
         with:
-          go-version: ">=1.18.0"
-      - name: Build Server (amd64)
+          name: frontend-build
+          path: atsf_server/web/build
+          retention-days: 1
+
+  build-binaries:
+    needs: build-frontend
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+            asset_name: atsflare-server-linux-amd64
+          - goos: linux
+            goarch: arm64
+            asset_name: atsflare-server-linux-arm64
+          - goos: darwin
+            goarch: amd64
+            asset_name: atsflare-server-darwin-amd64
+          - goos: darwin
+            goarch: arm64
+            asset_name: atsflare-server-darwin-arm64
+          - goos: windows
+            goarch: amd64
+            asset_name: atsflare-server-windows-amd64.exe
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download Frontend Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-build
+          path: atsf_server/web/build
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: atsf_server/go.mod
+
+      - name: Build Server
         working-directory: atsf_server
+        env:
+          CGO_ENABLED: 0
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          ASSET_NAME: ${{ matrix.asset_name }}
         run: |
           go mod download
-          go build -ldflags "-s -w -X 'atsflare/common.Version=$(git describe --tags)' -extldflags '-static'" -o ../atsflare
+          mkdir -p ../dist
+          go build -trimpath -ldflags "-s -w -X 'atsflare/common.Version=$VERSION'" -o "../dist/$ASSET_NAME" .
 
-      - name: Build Server (arm64)
-        working-directory: atsf_server
-        run: |
-          sudo apt-get update
-          sudo apt-get install gcc-aarch64-linux-gnu
-          CC=aarch64-linux-gnu-gcc CGO_ENABLED=1 GOOS=linux GOARCH=arm64 go build -ldflags "-s -w -X 'atsflare/common.Version=$(git describe --tags)' -extldflags '-static'" -o ../atsflare-arm64
+      - name: Upload Binary Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: dist/${{ matrix.asset_name }}
+          retention-days: 1
+
+  release:
+    needs: build-binaries
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Binary Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: server-*
+          path: dist
+          merge-multiple: true
 
       - name: Determine prerelease
         id: prerelease
         run: |
-          TAG="${GITHUB_REF#refs/tags/}"
+          TAG="$VERSION"
           if [[ "$TAG" == *alpha* ]] || [[ "$TAG" == *beta* ]] || [[ "$TAG" == *rc* ]]; then
             echo "is_prerelease=true" >> "$GITHUB_OUTPUT"
           else
@@ -56,9 +123,7 @@ jobs:
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          files: |
-            atsflare
-            atsflare-arm64
+          files: dist/*
           draft: false
           prerelease: ${{ steps.prerelease.outputs.is_prerelease }}
           generate_release_notes: true
