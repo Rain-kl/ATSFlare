@@ -52,9 +52,9 @@ func (r *Runner) Run(ctx context.Context) error {
 		log.Printf("agent initial discovery register failed: %v", err)
 	}
 
-	heartbeatTicker := time.NewTicker(r.Config.HeartbeatInterval)
+	heartbeatTicker := time.NewTicker(r.Config.HeartbeatInterval.Duration())
 	defer heartbeatTicker.Stop()
-	syncTicker := time.NewTicker(r.Config.SyncInterval)
+	syncTicker := time.NewTicker(r.Config.SyncInterval.Duration())
 	defer syncTicker.Stop()
 
 	for {

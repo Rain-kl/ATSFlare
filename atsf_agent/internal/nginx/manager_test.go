@@ -203,6 +203,47 @@ func TestNewExecutorUsesAbsoluteDockerMountPath(t *testing.T) {
 	}
 }
 
+func TestDetectVersionFromBinary(t *testing.T) {
+	version, err := detectVersion(context.Background(), ExecutorOptions{
+		NginxPath: "/opt/nginx/sbin/nginx",
+	}, &fakeRunner{
+		runFn: func(name string, args ...string) ([]byte, error) {
+			return []byte("nginx version: nginx/1.25.5\n"), nil
+		},
+	})
+	if err != nil {
+		t.Fatalf("detectVersion failed: %v", err)
+	}
+	if version != "1.25.5" {
+		t.Fatalf("unexpected version: %s", version)
+	}
+}
+
+func TestDetectVersionFromDockerImage(t *testing.T) {
+	runner := &fakeRunner{
+		runFn: func(name string, args ...string) ([]byte, error) {
+			return []byte("nginx version: nginx/1.27.4\n"), nil
+		},
+	}
+	version, err := detectVersion(context.Background(), ExecutorOptions{
+		DockerBinary: "docker",
+		Image:        "nginx:stable-alpine",
+	}, runner)
+	if err != nil {
+		t.Fatalf("detectVersion failed: %v", err)
+	}
+	if version != "1.27.4" {
+		t.Fatalf("unexpected version: %s", version)
+	}
+	if len(runner.calls) != 1 {
+		t.Fatalf("expected one command call, got %d", len(runner.calls))
+	}
+	expectedArgs := []string{"run", "--rm", "nginx:stable-alpine", "nginx", "-v"}
+	if !reflect.DeepEqual(runner.calls[0].args, expectedArgs) {
+		t.Fatalf("unexpected docker args: %#v", runner.calls[0].args)
+	}
+}
+
 func TestManagerApplyWritesSupportFilesAndReplacesPlaceholder(t *testing.T) {
 	tempDir := t.TempDir()
 	manager := &Manager{

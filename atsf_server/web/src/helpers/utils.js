@@ -17,7 +17,7 @@ export function isRoot() {
 
 export function getSystemName() {
   let system_name = localStorage.getItem('system_name');
-  if (!system_name) return '项目模板';
+  if (!system_name) return 'ATSFlare';
   return system_name;
 }
 

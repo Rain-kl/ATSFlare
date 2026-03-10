@@ -24,9 +24,21 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	cfg.NginxVersion = nginx.DetectVersion(
+		context.Background(),
+		nginx.ExecutorOptions{
+			NginxPath:       cfg.NginxPath,
+			DockerBinary:    cfg.DockerBinary,
+			ContainerName:   cfg.NginxContainerName,
+			Image:           cfg.NginxDockerImage,
+			RouteConfigPath: cfg.RouteConfigPath,
+			CertDir:         cfg.CertDir,
+			NginxCertDir:    cfg.NginxCertDir,
+		},
+	)
 	log.Printf("agent config loaded: server=%s node=%s ip=%s heartbeat_interval=%s sync_interval=%s route_config=%s cert_dir=%s", cfg.ServerURL, cfg.NodeName, cfg.NodeIP, cfg.HeartbeatInterval, cfg.SyncInterval, cfg.RouteConfigPath, cfg.CertDir)
 
-	client := httpclient.New(cfg.ServerURL, cfg.AgentToken, cfg.RequestTimeout)
+	client := httpclient.New(cfg.ServerURL, cfg.AgentToken, cfg.RequestTimeout.Duration())
 	stateStore := state.NewStore(cfg.StatePath)
 	runner := &agent.Runner{
 		Config:           cfg,

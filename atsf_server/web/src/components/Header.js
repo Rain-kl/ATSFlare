@@ -57,12 +57,6 @@ const headerButtons = [
     admin: true,
   },
   {
-    name: '文件',
-    to: '/file',
-    icon: 'file',
-    admin: true,
-  },
-  {
     name: '用户',
     to: '/user',
     icon: 'user',

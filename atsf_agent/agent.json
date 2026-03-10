@@ -1,14 +1,10 @@
 {
   "server_url": "http://127.0.0.1:3000",
   "agent_token": "123",
-  "node_name": "edge-01",
-  "node_ip": "10.0.0.8",
-  "agent_version": "0.1.0",
-  "nginx_version": "1.25.5",
   "data_dir": "./data",
   "nginx_container_name": "atsflare-nginx",
   "nginx_docker_image": "nginx:stable-alpine",
-  "heartbeat_interval": 30000000000,
-  "sync_interval": 30000000000,
-  "request_timeout": 10000000000
+  "heartbeat_interval": 30000,
+  "sync_interval": 30000,
+  "request_timeout": 10000
 }

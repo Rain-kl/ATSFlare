@@ -263,6 +263,56 @@ func NewExecutor(options ExecutorOptions) Executor {
 	}
 }
 
+func DetectVersion(ctx context.Context, options ExecutorOptions) string {
+	version, err := detectVersion(ctx, options, &OSCommandRunner{})
+	if err != nil {
+		log.Printf("detect nginx version failed: %v", err)
+		return ""
+	}
+	log.Printf("detected nginx version: %s", version)
+	return version
+}
+
+func detectVersion(ctx context.Context, options ExecutorOptions, runner CommandRunner) (string, error) {
+	if runner == nil {
+		runner = &OSCommandRunner{}
+	}
+	if options.NginxPath != "" {
+		output, err := runner.Run(ctx, options.NginxPath, "-v")
+		if err != nil {
+			return "", fmt.Errorf("run nginx -v failed: %w: %s", err, string(output))
+		}
+		version := parseNginxVersion(string(output))
+		if version == "" {
+			return "", errors.New("cannot parse nginx version from binary output")
+		}
+		return version, nil
+	}
+	output, err := runner.Run(ctx, options.DockerBinary, "run", "--rm", options.Image, "nginx", "-v")
+	if err != nil {
+		return "", fmt.Errorf("run docker nginx -v failed: %w: %s", err, string(output))
+	}
+	version := parseNginxVersion(string(output))
+	if version == "" {
+		return "", errors.New("cannot parse nginx version from docker output")
+	}
+	return version, nil
+}
+
+func parseNginxVersion(output string) string {
+	start := strings.Index(output, "nginx/")
+	if start < 0 {
+		return ""
+	}
+	version := output[start+len("nginx/"):]
+	for i, r := range version {
+		if r == ' ' || r == '\n' || r == '\r' || r == '\t' {
+			return version[:i]
+		}
+	}
+	return version
+}
+
 type backupState struct {
 	RouteExisted bool
 	RouteData    []byte

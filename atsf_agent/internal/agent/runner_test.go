@@ -102,10 +102,10 @@ func TestRunnerKeepsHeartbeatWhenStartupSyncFails(t *testing.T) {
 			AgentToken:        "agent-token",
 			NodeName:          "edge-01",
 			NodeIP:            "10.0.0.8",
-			AgentVersion:      "0.1.0",
+			AgentVersion:      config.AgentVersion,
 			NginxVersion:      "1.25.5",
-			HeartbeatInterval: 10 * time.Millisecond,
-			SyncInterval:      20 * time.Millisecond,
+			HeartbeatInterval: config.MillisecondDuration(10 * time.Millisecond),
+			SyncInterval:      config.MillisecondDuration(20 * time.Millisecond),
 		},
 		StateStore:       stateStore,
 		HeartbeatService: heartbeatService,
@@ -153,10 +153,10 @@ func TestRunnerDoesNotExitOnHeartbeatOrSyncError(t *testing.T) {
 			AgentToken:        "agent-token",
 			NodeName:          "edge-01",
 			NodeIP:            "10.0.0.8",
-			AgentVersion:      "0.1.0",
+			AgentVersion:      config.AgentVersion,
 			NginxVersion:      "1.25.5",
-			HeartbeatInterval: 10 * time.Millisecond,
-			SyncInterval:      10 * time.Millisecond,
+			HeartbeatInterval: config.MillisecondDuration(10 * time.Millisecond),
+			SyncInterval:      config.MillisecondDuration(10 * time.Millisecond),
 		},
 		StateStore:       stateStore,
 		HeartbeatService: heartbeatService,
@@ -214,20 +214,20 @@ func TestRunnerDiscoveryRegisterUpdatesTokenAndNodeID(t *testing.T) {
 			DiscoveryToken:    cfg.DiscoveryToken,
 			NodeName:          cfg.NodeName,
 			NodeIP:            cfg.NodeIP,
-			AgentVersion:      "0.1.0",
+			AgentVersion:      config.AgentVersion,
 			NginxVersion:      "1.25.5",
-			HeartbeatInterval: 10 * time.Millisecond,
-			SyncInterval:      20 * time.Millisecond,
+			HeartbeatInterval: config.MillisecondDuration(10 * time.Millisecond),
+			SyncInterval:      config.MillisecondDuration(20 * time.Millisecond),
 		},
 		StateStore:       stateStore,
 		HeartbeatService: heartbeatService,
 		SyncService:      syncService,
 	}
 	runner.Config = cfg
-	runner.Config.AgentVersion = "0.1.0"
+	runner.Config.AgentVersion = config.AgentVersion
 	runner.Config.NginxVersion = "1.25.5"
-	runner.Config.HeartbeatInterval = 10 * time.Millisecond
-	runner.Config.SyncInterval = 20 * time.Millisecond
+	runner.Config.HeartbeatInterval = config.MillisecondDuration(10 * time.Millisecond)
+	runner.Config.SyncInterval = config.MillisecondDuration(20 * time.Millisecond)
 
 	err = runner.Run(ctx)
 	if !errors.Is(err, context.Canceled) {

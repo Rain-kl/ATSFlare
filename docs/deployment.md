@@ -1,4 +1,4 @@
-# ATSFlare 部署与联调说明（当前基线）
+# ATSFlare 部署说明
 
 本文档仅保留当前可用基线的最小部署方式，用于第三版开发前后的本地部署、联调与回归验证。
 
@@ -67,14 +67,12 @@ go run .
 {
   "server_url": "http://127.0.0.1:3000",
   "agent_token": "replace-with-node-auth-token",
-  "agent_version": "0.1.0",
-  "nginx_version": "1.25.5",
   "data_dir": "./data",
   "nginx_container_name": "atsflare-nginx",
   "nginx_docker_image": "nginx:stable-alpine",
-  "heartbeat_interval": 30000000000,
-  "sync_interval": 30000000000,
-  "request_timeout": 10000000000
+  "heartbeat_interval": 30000,
+  "sync_interval": 30000,
+  "request_timeout": 10000
 }
 ```
 
@@ -84,20 +82,20 @@ go run .
 {
   "server_url": "http://127.0.0.1:3000",
   "discovery_token": "replace-with-global-discovery-token",
-  "agent_version": "0.1.0",
-  "nginx_version": "1.25.5",
   "data_dir": "./data",
   "nginx_container_name": "atsflare-nginx",
   "nginx_docker_image": "nginx:stable-alpine",
-  "heartbeat_interval": 30000000000,
-  "sync_interval": 30000000000,
-  "request_timeout": 10000000000
+  "heartbeat_interval": 30000,
+  "sync_interval": 30000,
+  "request_timeout": 10000
 }
 ```
 
 说明：
 
-* 时间字段当前仍使用纳秒整数
+* `agent_version` 由 Agent 代码内常量提供，升级时同步修改代码
+* `nginx_version` 由 Agent 启动时执行命令自动探测
+* 时间字段使用毫秒整数
 * `agent_token` 与 `discovery_token` 至少填写一个
 * 若 `agent_token` 为空且 `discovery_token` 存在，Agent 会自动注册并写回新的专属 `agent_token`
 * `node_name` 与 `node_ip` 可省略，未填写时自动探测
@@ -197,7 +195,6 @@ npm run build
 
 ## 7. 当前已知限制
 
-* 时间字段仍使用纳秒整数，不够友好
 * 暂未内置 systemd unit 文件
 * 暂未提供一键部署脚本
 * Docker 模式仍是 MVP 级封装

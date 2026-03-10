@@ -19,25 +19,25 @@ const (
 )
 
 type Config struct {
-	ServerURL          string        `json:"server_url"`
-	AgentToken         string        `json:"agent_token"`
-	DiscoveryToken     string        `json:"discovery_token"`
-	NodeName           string        `json:"node_name"`
-	NodeIP             string        `json:"node_ip"`
-	AgentVersion       string        `json:"agent_version"`
-	NginxVersion       string        `json:"nginx_version"`
-	NginxPath          string        `json:"nginx_path"`
-	NginxContainerName string        `json:"nginx_container_name"`
-	NginxDockerImage   string        `json:"nginx_docker_image"`
-	DockerBinary       string        `json:"docker_binary"`
-	DataDir            string        `json:"data_dir"`
-	RouteConfigPath    string        `json:"route_config_path"`
-	CertDir            string        `json:"cert_dir"`
-	NginxCertDir       string        `json:"nginx_cert_dir"`
-	StatePath          string        `json:"state_path"`
-	HeartbeatInterval  time.Duration `json:"heartbeat_interval"`
-	SyncInterval       time.Duration `json:"sync_interval"`
-	RequestTimeout     time.Duration `json:"request_timeout"`
+	ServerURL          string              `json:"server_url"`
+	AgentToken         string              `json:"agent_token"`
+	DiscoveryToken     string              `json:"discovery_token"`
+	NodeName           string              `json:"node_name"`
+	NodeIP             string              `json:"node_ip"`
+	AgentVersion       string              `json:"-"`
+	NginxVersion       string              `json:"-"`
+	NginxPath          string              `json:"nginx_path"`
+	NginxContainerName string              `json:"nginx_container_name"`
+	NginxDockerImage   string              `json:"nginx_docker_image"`
+	DockerBinary       string              `json:"docker_binary"`
+	DataDir            string              `json:"data_dir"`
+	RouteConfigPath    string              `json:"route_config_path"`
+	CertDir            string              `json:"cert_dir"`
+	NginxCertDir       string              `json:"nginx_cert_dir"`
+	StatePath          string              `json:"state_path"`
+	HeartbeatInterval  MillisecondDuration `json:"heartbeat_interval"`
+	SyncInterval       MillisecondDuration `json:"sync_interval"`
+	RequestTimeout     MillisecondDuration `json:"request_timeout"`
 	configPath         string
 }
 
@@ -60,9 +60,7 @@ func Load(path string) (*Config, error) {
 
 func applyDefaults(cfg *Config, baseDir string) {
 	baseDir = filepath.Clean(baseDir)
-	if cfg.AgentVersion == "" {
-		cfg.AgentVersion = "dev"
-	}
+	cfg.AgentVersion = AgentVersion
 	if cfg.NginxContainerName == "" {
 		cfg.NginxContainerName = "atsflare-nginx"
 	}
@@ -103,13 +101,13 @@ func applyDefaults(cfg *Config, baseDir string) {
 		}
 	}
 	if cfg.HeartbeatInterval <= 0 {
-		cfg.HeartbeatInterval = 30 * time.Second
+		cfg.HeartbeatInterval = MillisecondDuration(30 * time.Second)
 	}
 	if cfg.SyncInterval <= 0 {
-		cfg.SyncInterval = 30 * time.Second
+		cfg.SyncInterval = MillisecondDuration(30 * time.Second)
 	}
 	if cfg.RequestTimeout <= 0 {
-		cfg.RequestTimeout = 10 * time.Second
+		cfg.RequestTimeout = MillisecondDuration(10 * time.Second)
 	}
 	normalizeManagedPaths(cfg)
 }
