@@ -750,8 +750,8 @@ atsf_agent/
 按以下顺序执行，前项完成后再推进下一项：
 
 1. HTTPS/TLS 支持（ProxyRoute 扩展字段 + 渲染器 + 前端表单）
-2. Agent Token 管理（agent_tokens 表 + 中间件改造 + 前端 Token 管理页）
-3. 域名管理与证书托管（managed_domains/tls_certificates + 证书导入 + 自动匹配）
+2. 域名管理与证书托管（managed_domains/tls_certificates + 证书导入 + 自动匹配）
+3. Agent Token 管理（agent_tokens 表 + 中间件改造 + 前端 Token 管理页）
 4. 路由增强（custom_headers 字段 + 渲染器注入 + 前端表单）
 5. 配置预览与变更摘要（preview 接口 + diff 接口 + 前端发布确认弹窗）
 
