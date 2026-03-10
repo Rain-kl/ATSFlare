@@ -17,15 +17,15 @@ func AgentRegister(c *gin.Context) {
 		})
 		return
 	}
-	discoveryNode, ok := c.Get("discovery_node")
-	if !ok {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"success": false,
-			"message": "无权进行此操作，Discovery Token 无效",
-		})
-		return
+	var (
+		result *service.AgentRegistrationResponse
+		err    error
+	)
+	if authNode, ok := c.Get("agent_node"); ok {
+		result, err = service.RegisterNodeWithAgentToken(authNode.(*model.Node), payload)
+	} else {
+		result, err = service.RegisterNodeWithDiscovery(payload)
 	}
-	result, err := service.RegisterNode(discoveryNode.(*model.Node), payload)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,

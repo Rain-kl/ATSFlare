@@ -14,6 +14,10 @@ type NodeInput struct {
 	Name string `json:"name"`
 }
 
+type NodeBootstrapView struct {
+	DiscoveryToken string `json:"discovery_token"`
+}
+
 type AgentRegistrationResponse struct {
 	NodeID     string `json:"node_id"`
 	AgentToken string `json:"agent_token"`
@@ -37,7 +41,7 @@ func CreateNode(input NodeInput) (*NodeView, error) {
 	if err != nil {
 		return nil, err
 	}
-	node.DiscoveryToken, err = newRandomToken()
+	node.AgentToken, err = newRandomToken()
 	if err != nil {
 		return nil, err
 	}
@@ -85,12 +89,61 @@ func AuthenticateAgentToken(token string) (*model.Node, error) {
 	return model.GetNodeByAgentToken(token)
 }
 
-func AuthenticateDiscoveryToken(token string) (*model.Node, error) {
+func ValidateDiscoveryToken(token string) error {
 	token = strings.TrimSpace(token)
 	if token == "" {
-		return nil, errors.New("缺少 Discovery Token")
+		return errors.New("缺少 Discovery Token")
 	}
-	return model.GetNodeByDiscoveryToken(token)
+	discoveryToken, err := EnsureGlobalDiscoveryToken()
+	if err != nil {
+		return err
+	}
+	if token != discoveryToken {
+		return errors.New("Discovery Token 无效")
+	}
+	return nil
+}
+
+func EnsureGlobalDiscoveryToken() (string, error) {
+	common.OptionMapRWMutex.RLock()
+	needsInit := common.OptionMap == nil
+	common.OptionMapRWMutex.RUnlock()
+	if needsInit {
+		model.InitOptionMap()
+	}
+	common.OptionMapRWMutex.RLock()
+	token := strings.TrimSpace(common.OptionMap["AgentDiscoveryToken"])
+	common.OptionMapRWMutex.RUnlock()
+	if token != "" {
+		return token, nil
+	}
+	token, err := newRandomToken()
+	if err != nil {
+		return "", err
+	}
+	if err = model.UpdateOption("AgentDiscoveryToken", token); err != nil {
+		return "", err
+	}
+	return token, nil
+}
+
+func GetNodeBootstrapView() (*NodeBootstrapView, error) {
+	token, err := EnsureGlobalDiscoveryToken()
+	if err != nil {
+		return nil, err
+	}
+	return &NodeBootstrapView{DiscoveryToken: token}, nil
+}
+
+func RotateGlobalDiscoveryToken() (*NodeBootstrapView, error) {
+	token, err := newRandomToken()
+	if err != nil {
+		return nil, err
+	}
+	if err = model.UpdateOption("AgentDiscoveryToken", token); err != nil {
+		return nil, err
+	}
+	return &NodeBootstrapView{DiscoveryToken: token}, nil
 }
 
 func buildNodeView(node *model.Node) *NodeView {
@@ -100,6 +153,7 @@ func buildNodeView(node *model.Node) *NodeView {
 		NodeID:         node.NodeID,
 		Name:           node.Name,
 		IP:             node.IP,
+		AgentToken:     node.AgentToken,
 		AgentVersion:   node.AgentVersion,
 		NginxVersion:   node.NginxVersion,
 		Status:         status,
@@ -110,10 +164,84 @@ func buildNodeView(node *model.Node) *NodeView {
 		UpdatedAt:      node.UpdatedAt,
 		Pending:        status == NodeStatusPending,
 	}
-	if status == NodeStatusPending {
-		view.DiscoveryToken = node.DiscoveryToken
-	}
 	return view
+}
+
+func RegisterNodeWithAgentToken(node *model.Node, payload AgentNodePayload) (*AgentRegistrationResponse, error) {
+	payload = normalizeAgentNodePayload(payload)
+	if node == nil {
+		return nil, errors.New("节点不存在")
+	}
+	if err := validateAgentNodePayload(payload); err != nil {
+		return nil, err
+	}
+	applyNodeRuntime(node, payload, true)
+	if err := node.Update(); err != nil {
+		return nil, err
+	}
+	common.SysLog("agent register succeeded on reserved node: node_id=" + node.NodeID + " name=" + node.Name)
+	return &AgentRegistrationResponse{
+		NodeID:     node.NodeID,
+		AgentToken: node.AgentToken,
+		Name:       node.Name,
+	}, nil
+}
+
+func RegisterNodeWithDiscovery(payload AgentNodePayload) (*AgentRegistrationResponse, error) {
+	payload = normalizeAgentNodePayload(payload)
+	if err := validateAgentNodePayload(payload); err != nil {
+		return nil, err
+	}
+	nodeID, err := newServerNodeID()
+	if err != nil {
+		return nil, err
+	}
+	agentToken, err := newRandomToken()
+	if err != nil {
+		return nil, err
+	}
+	nodeName := payload.Name
+	if nodeName == "" {
+		nodeName = nodeID
+	}
+	node := &model.Node{
+		NodeID:     nodeID,
+		Name:       nodeName,
+		AgentToken: agentToken,
+	}
+	applyNodeRuntime(node, payload, false)
+	if err = node.Insert(); err != nil {
+		if isUniqueConstraintError(err) {
+			return nil, errors.New("节点标识生成冲突，请重试")
+		}
+		return nil, err
+	}
+	common.SysLog("agent discovery register succeeded: node_id=" + node.NodeID + " name=" + node.Name)
+	return &AgentRegistrationResponse{
+		NodeID:     node.NodeID,
+		AgentToken: node.AgentToken,
+		Name:       node.Name,
+	}, nil
+}
+
+func normalizeAgentNodePayload(payload AgentNodePayload) AgentNodePayload {
+	payload.Name = strings.TrimSpace(payload.Name)
+	payload.IP = strings.TrimSpace(payload.IP)
+	payload.AgentVersion = strings.TrimSpace(payload.AgentVersion)
+	payload.NginxVersion = strings.TrimSpace(payload.NginxVersion)
+	payload.CurrentVersion = strings.TrimSpace(payload.CurrentVersion)
+	payload.LastError = strings.TrimSpace(payload.LastError)
+	return payload
+}
+
+func validateAgentNodePayload(payload AgentNodePayload) error {
+	if payload.IP == "" {
+		return errors.New("ip 不能为空")
+	}
+	if payload.AgentVersion == "" {
+		return errors.New("agent_version 不能为空")
+	}
+	return nil
 }
 
 func applyNodeRuntime(node *model.Node, payload AgentNodePayload, preserveName bool) {

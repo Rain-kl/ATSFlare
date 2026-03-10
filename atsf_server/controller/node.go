@@ -32,6 +32,38 @@ func CreateNode(c *gin.Context) {
 	})
 }
 
+func GetNodeBootstrapToken(c *gin.Context) {
+	bootstrap, err := service.GetNodeBootstrapView()
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": err.Error(),
+		})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "",
+		"data":    bootstrap,
+	})
+}
+
+func RotateNodeBootstrapToken(c *gin.Context) {
+	bootstrap, err := service.RotateGlobalDiscoveryToken()
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": err.Error(),
+		})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "",
+		"data":    bootstrap,
+	})
+}
+
 func UpdateNode(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil || id == 0 {

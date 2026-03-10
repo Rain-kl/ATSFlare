@@ -123,17 +123,19 @@ MVP 已于第一版完成。当前进入第二版迭代。
 
 * agent-auth 中间件改造（查表验证）
 * 移除全局 Token 环境变量, 节点不再通过该方式连接server
-* 引入自动发现TOKEN, 需要用户手动在节点页创建, 持有该TOKEN的节点会自动连接到SERVER
+* 用户手动创建节点时，直接生成节点专属 auth token
+* 引入全局自动发现 TOKEN，任意新节点持有同一个 TOKEN 即可自动连接到 SERVER
 * Node CRUD API
 * 前端 节点 管理页
 
 完成标准：
 
-* 用户启动server后需要手动在节点页添加节点, 此时会生成随机TOKEN, 持有该TOKEN的节点可以加入server. server可以修改节点的名称
+* 用户启动 server 后手动在节点页添加节点，会直接生成该节点的专属 auth token，持有该 token 的节点可占据该节点位
+* 用户可在管理界面查看全局 discovery token，批量部署的节点可共用该 token 自动注册到 server
 * 用户可以编辑节点, 包括节点名
 * 删除节点后 Agent 请求立即返回 401
 * 节点配置文件不再要求填写节点名和IP地址, 节点名默认从主机名获取, IP也是自动获取. 手动指定则为覆盖
-* 节点配置文件agent_token为空, 自动发现TOKEN配置为server生成值后, 会自己向server注册, 注册后会进行TOKEN置换, 更新节点配置文件agent_token
+* 节点配置文件填写节点专属 `agent_token` 时，可直接上线；若 `agent_token` 为空且填写全局 discovery token，则会自动注册并完成 token 置换
 
 
 ### V2 Phase 4: 路由自定义头
@@ -208,8 +210,9 @@ MVP 已于第一版完成。当前进入第二版迭代。
 
 ### V2 Phase 3 检查项
 
-* 可通过管理界面创建节点并生成 discovery token
-* Agent 可使用 discovery token 自动接入并完成 agent token 置换
+* 可通过管理界面创建节点并生成节点专属 auth token
+* 可查看全局 discovery token，并允许多个节点共用该 token 自动接入
+* Agent 可使用全局 discovery token 自动接入并完成 agent token 置换
 * 用户可编辑节点名并删除节点
 * 删除节点后 Agent 请求立即失败
 * Agent 在未显式配置节点名/IP 时可自动探测

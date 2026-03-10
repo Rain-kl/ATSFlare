@@ -41,24 +41,8 @@ func TestPhase2AgentLifecycle(t *testing.T) {
 	})
 	var createdNode service.NodeView
 	decodeResponseData(t, createdNodeResp, &createdNode)
-	if createdNode.DiscoveryToken == "" || !createdNode.Pending {
-		t.Fatal("expected created node to expose discovery token while pending")
-	}
-
-	nodePayload := map[string]any{
-		"node_id":         "local-node-id",
-		"name":            "shanghai-edge-1",
-		"ip":              "10.0.0.8",
-		"agent_version":   "0.1.0",
-		"nginx_version":   "1.25.5",
-		"current_version": "",
-		"last_error":      "",
-	}
-	resp := performAgentJSONRequestWithToken(t, engine, createdNode.DiscoveryToken, http.MethodPost, "/api/agent/nodes/register", nodePayload)
-	var registration service.AgentRegistrationResponse
-	decodeResponseData(t, resp, &registration)
-	if registration.NodeID != createdNode.NodeID || registration.AgentToken == "" {
-		t.Fatal("expected discovery registration to return assigned node_id and agent token")
+	if createdNode.AgentToken == "" || !createdNode.Pending {
+		t.Fatal("expected created node to expose agent token while pending")
 	}
 
 	heartbeatPayload := map[string]any{
@@ -70,21 +54,21 @@ func TestPhase2AgentLifecycle(t *testing.T) {
 		"current_version": "",
 		"last_error":      "",
 	}
-	resp = performAgentJSONRequestWithToken(t, engine, registration.AgentToken, http.MethodPost, "/api/agent/nodes/heartbeat", heartbeatPayload)
+	resp := performAgentJSONRequestWithToken(t, engine, createdNode.AgentToken, http.MethodPost, "/api/agent/nodes/heartbeat", heartbeatPayload)
 	var registeredNode model.Node
 	decodeResponseData(t, resp, &registeredNode)
 	if registeredNode.IP != "10.0.0.9" || registeredNode.AgentVersion != "0.1.1" || registeredNode.NodeID != createdNode.NodeID {
 		t.Fatal("expected heartbeat to update node metadata")
 	}
 
-	activeConfigResp := performAgentJSONRequestWithToken(t, engine, registration.AgentToken, http.MethodGet, "/api/agent/config-versions/active", nil)
+	activeConfigResp := performAgentJSONRequestWithToken(t, engine, createdNode.AgentToken, http.MethodGet, "/api/agent/config-versions/active", nil)
 	var activeConfig service.AgentConfigResponse
 	decodeResponseData(t, activeConfigResp, &activeConfig)
 	if activeConfig.Version == "" || activeConfig.RenderedConfig == "" || activeConfig.Checksum == "" {
 		t.Fatal("expected active config response to contain version payload")
 	}
 
-	successApplyResp := performAgentJSONRequestWithToken(t, engine, registration.AgentToken, http.MethodPost, "/api/agent/apply-logs", map[string]any{
+	successApplyResp := performAgentJSONRequestWithToken(t, engine, createdNode.AgentToken, http.MethodPost, "/api/agent/apply-logs", map[string]any{
 		"node_id": "spoofed-node-id",
 		"version": activeConfig.Version,
 		"result":  service.ApplyResultOK,
@@ -96,7 +80,7 @@ func TestPhase2AgentLifecycle(t *testing.T) {
 		t.Fatal("expected apply log success to be recorded")
 	}
 
-	failedApplyResp := performAgentJSONRequestWithToken(t, engine, registration.AgentToken, http.MethodPost, "/api/agent/apply-logs", map[string]any{
+	failedApplyResp := performAgentJSONRequestWithToken(t, engine, createdNode.AgentToken, http.MethodPost, "/api/agent/apply-logs", map[string]any{
 		"node_id": "spoofed-node-id",
 		"version": activeConfig.Version,
 		"result":  service.ApplyResultFailed,
@@ -114,8 +98,11 @@ func TestPhase2AgentLifecycle(t *testing.T) {
 	if len(nodes) != 1 {
 		t.Fatalf("expected 1 node, got %d", len(nodes))
 	}
-	if nodes[0].Pending || nodes[0].DiscoveryToken != "" {
-		t.Fatal("expected registered node to clear pending discovery state")
+	if nodes[0].Pending {
+		t.Fatal("expected registered node to clear pending state")
+	}
+	if nodes[0].AgentToken != createdNode.AgentToken {
+		t.Fatal("expected node auth token to remain stable after occupancy")
 	}
 	if nodes[0].LatestApplyResult != service.ApplyResultFailed || nodes[0].LatestApplyMessage != "nginx reload failed" {
 		t.Fatal("expected node list to expose latest apply status")
@@ -159,11 +146,54 @@ func TestPhase2AgentLifecycle(t *testing.T) {
 
 	deniedReq := httptest.NewRequest(http.MethodPost, "/api/agent/nodes/heartbeat", bytes.NewReader([]byte(`{"ip":"10.0.0.9","agent_version":"0.1.1"}`)))
 	deniedReq.Header.Set("Content-Type", "application/json")
-	deniedReq.Header.Set("X-Agent-Token", registration.AgentToken)
+	deniedReq.Header.Set("X-Agent-Token", createdNode.AgentToken)
 	deniedRecorder := httptest.NewRecorder()
 	engine.ServeHTTP(deniedRecorder, deniedReq)
 	if deniedRecorder.Code != http.StatusUnauthorized {
 		t.Fatalf("expected deleted node token to be rejected, got %d", deniedRecorder.Code)
+	}
+}
+
+func TestPhase2GlobalDiscoveryRegistration(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	common.RedisEnabled = false
+	setupTestDB(t)
+
+	engine := gin.New()
+	engine.Use(sessions.Sessions("session", cookie.NewStore([]byte("test-secret"))))
+	router.SetApiRouter(engine)
+
+	adminToken := prepareRootToken(t)
+	bootstrapResp := performJSONRequest(t, engine, adminToken, http.MethodGet, "/api/nodes/bootstrap-token", nil)
+	var bootstrap service.NodeBootstrapView
+	decodeResponseData(t, bootstrapResp, &bootstrap)
+	if bootstrap.DiscoveryToken == "" {
+		t.Fatal("expected global discovery token to be available")
+	}
+
+	resp := performAgentJSONRequestWithToken(t, engine, bootstrap.DiscoveryToken, http.MethodPost, "/api/agent/nodes/register", map[string]any{
+		"node_id":         "local-node-id",
+		"name":            "bulk-edge-1",
+		"ip":              "10.0.0.18",
+		"agent_version":   "0.2.0",
+		"nginx_version":   "1.25.5",
+		"current_version": "",
+		"last_error":      "",
+	})
+	var registration service.AgentRegistrationResponse
+	decodeResponseData(t, resp, &registration)
+	if registration.AgentToken == "" || registration.NodeID == "" {
+		t.Fatal("expected discovery registration to issue node-specific agent token")
+	}
+
+	nodesResp := performJSONRequest(t, engine, adminToken, http.MethodGet, "/api/nodes/", nil)
+	var nodes []service.NodeView
+	decodeResponseData(t, nodesResp, &nodes)
+	if len(nodes) != 1 {
+		t.Fatalf("expected 1 discovered node, got %d", len(nodes))
+	}
+	if nodes[0].Name != "bulk-edge-1" || nodes[0].AgentToken != registration.AgentToken || nodes[0].Pending {
+		t.Fatal("expected discovered node to be created online with issued agent token")
 	}
 }
 

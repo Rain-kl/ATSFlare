@@ -144,7 +144,7 @@ Agent 放在 `atsf_agent`，使用 Go 单体程序开发。
 
 第二版扩展实体：
 
-* `nodes` — 增加 `agent_token`、`discovery_token`，用于节点管理与自动发现
+* `nodes` — 增加 `agent_token`，用于节点占位与节点鉴权
 
 约束（全版本）：
 
@@ -154,7 +154,8 @@ Agent 放在 `atsf_agent`，使用 Go 单体程序开发。
 * 激活版本全局只能有一个，不引入分组维度
 * 回滚通过"激活旧版本"实现，不直接修改历史记录
 * 域名到证书匹配必须支持精确匹配和通配符匹配（如 `*.example.com`）
-* `nodes.discovery_token` 仅用于首次接入，接入成功后必须失效
+* 管理端手工创建节点时必须直接生成 `nodes.agent_token`
+* 全局 `discovery_token` 由系统配置统一保存，不按节点分配
 * 删除节点必须立即使该节点凭证失效
 
 如需新增表，必须先证明它服务于当前迭代版本的主链路。
@@ -214,9 +215,10 @@ Agent（第一版）：
 
 Agent（第二版）：
 
-* 首次接入使用 `discovery_token`
-* 注册成功后下发节点专属 `agent_token`
-* 后续请求改为查 `nodes.agent_token` 验证
+* 手工创建的节点直接使用节点专属 `agent_token` 接入
+* 全局 `discovery_token` 仅用于批量自动发现
+* 使用全局 `discovery_token` 注册成功后，下发节点专属 `agent_token`
+* 后续请求统一查 `nodes.agent_token` 验证
 * 不再依赖全局环境变量 Agent Token
 
 注意：
@@ -303,6 +305,7 @@ Agent 必须满足以下行为：
 * 启动时先校验本地路由文件 checksum 与控制面激活版本是否一致
 * Docker 模式启动时应重建容器，而不是继续复用异常停止的旧容器
 * 若本地 `agent_token` 为空且配置了 `discovery_token`，则应自动发起首次注册并完成 Token 置换
+* 若本地已显式配置节点专属 `agent_token`，则无需注册，直接进入心跳与同步流程
 
 ### 7.3 容错规范
 

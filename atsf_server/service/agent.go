@@ -49,7 +49,7 @@ type NodeView struct {
 	NodeID             string     `json:"node_id"`
 	Name               string     `json:"name"`
 	IP                 string     `json:"ip"`
-	DiscoveryToken     string     `json:"discovery_token,omitempty"`
+	AgentToken         string     `json:"agent_token"`
 	Pending            bool       `json:"pending"`
 	AgentVersion       string     `json:"agent_version"`
 	NginxVersion       string     `json:"nginx_version"`
@@ -65,54 +65,15 @@ type NodeView struct {
 }
 
 func RegisterNode(node *model.Node, payload AgentNodePayload) (*AgentRegistrationResponse, error) {
-	common.SysLog("agent discovery register request received: name=" + strings.TrimSpace(payload.Name) + " ip=" + strings.TrimSpace(payload.IP))
-	payload.Name = strings.TrimSpace(payload.Name)
-	payload.IP = strings.TrimSpace(payload.IP)
-	payload.AgentVersion = strings.TrimSpace(payload.AgentVersion)
-	payload.NginxVersion = strings.TrimSpace(payload.NginxVersion)
-	payload.CurrentVersion = strings.TrimSpace(payload.CurrentVersion)
-	payload.LastError = strings.TrimSpace(payload.LastError)
-	if node == nil {
-		return nil, errors.New("节点不存在")
-	}
-	if payload.IP == "" {
-		return nil, errors.New("ip 不能为空")
-	}
-	if payload.AgentVersion == "" {
-		return nil, errors.New("agent_version 不能为空")
-	}
-	agentToken, err := newRandomToken()
-	if err != nil {
-		return nil, err
-	}
-	applyNodeRuntime(node, payload, true)
-	node.AgentToken = agentToken
-	node.DiscoveryToken = ""
-	if err = node.Update(); err != nil {
-		return nil, err
-	}
-	common.SysLog("agent discovery register succeeded: node_id=" + node.NodeID + " name=" + node.Name)
-	return &AgentRegistrationResponse{
-		NodeID:     node.NodeID,
-		AgentToken: node.AgentToken,
-		Name:       node.Name,
-	}, nil
+	return RegisterNodeWithAgentToken(node, payload)
 }
 
 func HeartbeatNode(node *model.Node, payload AgentNodePayload) (*model.Node, error) {
 	common.SysLog("agent heartbeat received: node_id=" + node.NodeID + " current_version=" + strings.TrimSpace(payload.CurrentVersion))
 	payload.NodeID = node.NodeID
-	payload.Name = strings.TrimSpace(payload.Name)
-	payload.IP = strings.TrimSpace(payload.IP)
-	payload.AgentVersion = strings.TrimSpace(payload.AgentVersion)
-	payload.NginxVersion = strings.TrimSpace(payload.NginxVersion)
-	payload.CurrentVersion = strings.TrimSpace(payload.CurrentVersion)
-	payload.LastError = strings.TrimSpace(payload.LastError)
-	if payload.IP == "" {
-		return nil, errors.New("ip 不能为空")
-	}
-	if payload.AgentVersion == "" {
-		return nil, errors.New("agent_version 不能为空")
+	payload = normalizeAgentNodePayload(payload)
+	if err := validateAgentNodePayload(payload); err != nil {
+		return nil, err
 	}
 	applyNodeRuntime(node, payload, true)
 	if err := model.DB.Model(node).Select("ip", "agent_version", "nginx_version", "status", "current_version", "last_seen_at", "last_error").Updates(node).Error; err != nil {
@@ -237,11 +198,8 @@ func computeNodeStatus(node *model.Node) string {
 	if node == nil {
 		return NodeStatusOffline
 	}
-	if strings.TrimSpace(node.AgentToken) == "" && strings.TrimSpace(node.DiscoveryToken) != "" {
-		return NodeStatusPending
-	}
 	if node.LastSeenAt.IsZero() {
-		return NodeStatusOffline
+		return NodeStatusPending
 	}
 	if time.Since(node.LastSeenAt) > common.NodeOfflineThreshold {
 		return NodeStatusOffline

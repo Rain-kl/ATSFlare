@@ -60,9 +60,10 @@
 **2.5.3 Agent 管理与自动发现**
 
 * 管理端支持手工创建节点、编辑节点名、删除节点
-* `nodes` 表增加 Agent 鉴权 Token 与自动发现 Token 字段
-* 首次接入不再依赖全局环境变量 Token，而是依赖管理端为节点生成的自动发现 Token
-* Agent 首次注册成功后，Server 下发节点专属 Agent Token，Agent 本地完成 Token 置换
+* 管理端手工创建节点时，直接为该节点生成专属 `agent_token`
+* 预创建节点时，持有该 `agent_token` 的 Agent 会占据该节点位，并持续以该 Token 完成后续鉴权
+* 系统同时维护一个全局 `discovery_token`，任意新节点可使用该 Token 自动接入 Server
+* Agent 使用全局 `discovery_token` 首次注册成功后，Server 会为该节点生成专属 `agent_token`，Agent 本地完成 Token 置换
 * Agent 默认自动探测主机名与 IP，也允许通过配置覆盖
 
 **2.5.4 路由增强**
@@ -291,13 +292,14 @@ Agent 使用 Go 单体程序：
 
 新增字段建议：
 
-* `agent_token` — 节点专属 Agent Token，用于注册完成后的正式鉴权
-* `discovery_token` — 自动发现 Token，仅用于首次接入
+* `agent_token` — 节点专属 Agent Token，用于节点占位与后续正式鉴权
 
 约束：
 
-* `agent_token` 与 `discovery_token` 都应为随机生成值
-* `discovery_token` 仅用于首次接入，注册成功后应失效或清空
+* 管理端手工创建节点时必须直接生成 `agent_token`
+* 一个节点位只对应一个 `agent_token`
+* 全局 `discovery_token` 不存放在 `nodes` 表，而由系统配置统一维护
+* 使用全局 `discovery_token` 自动接入的节点，应在注册成功后获得新的专属 `agent_token`
 * 删除节点后，该节点关联的 Token 必须立即失效
 
 ---

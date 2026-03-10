@@ -23,19 +23,23 @@ func AgentAuth() func(c *gin.Context) {
 	}
 }
 
-func AgentDiscoveryAuth() func(c *gin.Context) {
+func AgentRegisterAuth() func(c *gin.Context) {
 	return func(c *gin.Context) {
 		token := c.GetHeader("X-Agent-Token")
-		node, err := service.AuthenticateDiscoveryToken(token)
-		if err != nil {
+		if node, err := service.AuthenticateAgentToken(token); err == nil {
+			c.Set("agent_node", node)
+			c.Next()
+			return
+		}
+		if err := service.ValidateDiscoveryToken(token); err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{
 				"success": false,
-				"message": "无权进行此操作，Discovery Token 无效",
+				"message": "无权进行此操作，注册 Token 无效",
 			})
 			c.Abort()
 			return
 		}
-		c.Set("discovery_node", node)
+		c.Set("discovery_enabled", true)
 		c.Next()
 	}
 }

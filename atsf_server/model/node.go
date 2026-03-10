@@ -8,7 +8,6 @@ type Node struct {
 	Name           string    `json:"name" gorm:"size:128;not null"`
 	IP             string    `json:"ip" gorm:"size:64;not null"`
 	AgentToken     string    `json:"-" gorm:"size:128;index"`
-	DiscoveryToken string    `json:"-" gorm:"size:128;index"`
 	AgentVersion   string    `json:"agent_version" gorm:"size:64;not null"`
 	NginxVersion   string    `json:"nginx_version" gorm:"size:64"`
 	Status         string    `json:"status" gorm:"size:16;not null;default:'offline'"`
@@ -39,12 +38,6 @@ func GetNodeByID(id uint) (*Node, error) {
 func GetNodeByAgentToken(token string) (*Node, error) {
 	node := &Node{}
 	err := DB.Where("agent_token = ?", token).First(node).Error
-	return node, err
-}
-
-func GetNodeByDiscoveryToken(token string) (*Node, error) {
-	node := &Node{}
-	err := DB.Where("discovery_token = ?", token).First(node).Error
 	return node, err
 }
 

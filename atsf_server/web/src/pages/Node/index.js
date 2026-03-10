@@ -28,6 +28,7 @@ const renderApply = (result) => {
 
 const Node = () => {
   const [nodes, setNodes] = useState([]);
+  const [bootstrap, setBootstrap] = useState({ discovery_token: '' });
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState(initialForm);
@@ -45,7 +46,31 @@ const Node = () => {
     setLoading(false);
   };
 
+  const loadBootstrapToken = async () => {
+    const res = await API.get('/api/nodes/bootstrap-token');
+    const { success, message, data } = res.data;
+    if (success) {
+      setBootstrap(data || { discovery_token: '' });
+    } else {
+      showError(message);
+    }
+  };
+
+  const rotateBootstrapToken = async () => {
+    setLoading(true);
+    const res = await API.post('/api/nodes/bootstrap-token/rotate');
+    const { success, message, data } = res.data;
+    if (success) {
+      setBootstrap(data || { discovery_token: '' });
+      showSuccess('全局 discovery token 已重新生成');
+    } else {
+      showError(message);
+    }
+    setLoading(false);
+  };
+
   useEffect(() => {
+    loadBootstrapToken().then();
     loadNodes().then();
   }, []);
 
@@ -100,7 +125,20 @@ const Node = () => {
   return (
     <Segment loading={loading}>
       <Header as='h3'>节点管理</Header>
-      <p className='page-subtitle'>创建节点、查看接入令牌，并跟踪节点在线状态、版本与最近一次应用结果。</p>
+      <p className='page-subtitle'>创建节点后会直接生成节点专属 auth token；批量部署时可复用全局 discovery token 自动注册。</p>
+
+      <Form>
+        <Form.Group widths='equal'>
+          <Form.Input
+            label='全局 Discovery Token'
+            readOnly
+            value={bootstrap.discovery_token || ''}
+          />
+        </Form.Group>
+        <Button type='button' onClick={rotateBootstrapToken}>
+          重新生成 Discovery Token
+        </Button>
+      </Form>
 
       <Form onSubmit={submitNode}>
         <Form.Group widths='equal'>
@@ -126,7 +164,7 @@ const Node = () => {
           <Table.Row>
             <Table.HeaderCell>节点名</Table.HeaderCell>
             <Table.HeaderCell>Node ID</Table.HeaderCell>
-            <Table.HeaderCell>Discovery Token</Table.HeaderCell>
+            <Table.HeaderCell>Auth Token</Table.HeaderCell>
             <Table.HeaderCell>IP</Table.HeaderCell>
             <Table.HeaderCell>状态</Table.HeaderCell>
             <Table.HeaderCell>Agent / Nginx</Table.HeaderCell>
@@ -143,12 +181,12 @@ const Node = () => {
               <Table.Cell>{node.name}</Table.Cell>
               <Table.Cell>{node.node_id}</Table.Cell>
               <Table.Cell>
-                {node.pending && node.discovery_token ? (
+                {node.agent_token ? (
                   <>
-                    <Label color='orange'>待接入</Label>
-                    <div className='table-meta' style={{ wordBreak: 'break-all' }}>{node.discovery_token}</div>
+                    {node.pending ? <Label color='orange'>未占用</Label> : <Label color='green'>已绑定</Label>}
+                    <div className='table-meta' style={{ wordBreak: 'break-all' }}>{node.agent_token}</div>
                   </>
-                ) : '已激活'}
+                ) : '暂无'}
               </Table.Cell>
               <Table.Cell>{node.ip}</Table.Cell>
               <Table.Cell>{renderStatus(node.status)}</Table.Cell>

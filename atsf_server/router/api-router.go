@@ -98,6 +98,8 @@ func SetApiRouter(router *gin.Engine) {
 		nodeRoute := apiRouter.Group("/nodes")
 		nodeRoute.Use(middleware.AdminAuth())
 		{
+			nodeRoute.GET("/bootstrap-token", controller.GetNodeBootstrapToken)
+			nodeRoute.POST("/bootstrap-token/rotate", controller.RotateNodeBootstrapToken)
 			nodeRoute.GET("/", controller.GetNodes)
 			nodeRoute.POST("/", controller.CreateNode)
 			nodeRoute.PUT("/:id", controller.UpdateNode)
@@ -111,7 +113,7 @@ func SetApiRouter(router *gin.Engine) {
 		agentRoute := apiRouter.Group("/agent")
 		{
 			discoveryRoute := agentRoute.Group("/")
-			discoveryRoute.Use(middleware.AgentDiscoveryAuth())
+			discoveryRoute.Use(middleware.AgentRegisterAuth())
 			{
 				discoveryRoute.POST("/nodes/register", controller.AgentRegister)
 			}
