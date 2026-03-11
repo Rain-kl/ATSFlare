@@ -280,7 +280,7 @@ Docker 镜像发布使用 [.github/workflows/docker-image.yml](.github/workflows
 
 * 仅构建 `atsf_server` 服务端镜像
 * 发布到 GitHub Container Registry（`ghcr.io/<owner>/<repo>:<tag>`）
-* 单个工作流同时产出 `linux/amd64` 与 `linux/arm64` 多架构镜像
+* 单个工作流通过分架构原生构建再合并 manifest 的方式产出 `linux/amd64` 与 `linux/arm64` 多架构镜像，避免 `arm64` 长时间模拟编译
 
 ---
 
