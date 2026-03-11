@@ -193,7 +193,7 @@ export function UsersPage() {
   });
 
   const activeQuery = searchKeyword.length > 0 ? searchQuery : usersQuery;
-  const users = activeQuery.data ?? [];
+  const users = useMemo(() => activeQuery.data ?? [], [activeQuery.data]);
 
   const summary = useMemo(() => {
     return [

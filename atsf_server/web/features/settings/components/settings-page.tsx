@@ -565,6 +565,7 @@ export function SettingsPage() {
                   </p>
                 </div>
                 {publicStatus.wechat_login && publicStatus.wechat_qrcode ? (
+                  // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={publicStatus.wechat_qrcode}
                     alt='微信绑定二维码'

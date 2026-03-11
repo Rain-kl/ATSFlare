@@ -93,7 +93,7 @@ export function FilesPage() {
   });
 
   const activeQuery = searchKeyword.length > 0 ? filesSearchQuery : filesPageQuery;
-  const files = activeQuery.data ?? [];
+  const files = useMemo(() => activeQuery.data ?? [], [activeQuery.data]);
 
   const summary = useMemo(() => {
     return [

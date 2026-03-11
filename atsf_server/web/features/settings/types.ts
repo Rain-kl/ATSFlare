@@ -22,4 +22,4 @@ export interface UpdateSelfPayload {
   password: string;
 }
 
-export interface SettingsProfile extends AuthUser {}
+export type SettingsProfile = AuthUser;
