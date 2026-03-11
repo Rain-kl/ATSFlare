@@ -370,52 +370,6 @@ export function NodesPage() {
 
 			<div className='grid gap-6 xl:grid-cols-[1fr_1fr]'>
 				<AppCard
-					title='Discovery Token 部署'
-					description='适用于新节点首次接入，Agent 会自动注册并换取节点专属 Token。'
-					action={
-						<div className='flex flex-wrap gap-2'>
-							<SecondaryButton type='button' onClick={handleRotateToken} disabled={rotateMutation.isPending}>
-								{rotateMutation.isPending ? '生成中...' : '重新生成 Token'}
-							</SecondaryButton>
-							{discoveryCommand ? (
-								<PrimaryButton
-									type='button'
-									onClick={() => void handleCopy(discoveryCommand, 'Discovery 部署命令已复制。')}
-								>
-									复制命令
-								</PrimaryButton>
-							) : null}
-						</div>
-					}
-				>
-					{bootstrapQuery.isLoading ? (
-						<LoadingState />
-					) : bootstrapQuery.isError ? (
-						<ErrorState title='Discovery Token 加载失败' description={getErrorMessage(bootstrapQuery.error)} />
-					) : (
-						<div className='space-y-4'>
-							<ResourceField label='Server URL' hint='默认使用当前管理端来源，可按需改为对外访问地址。'>
-								<ResourceInput value={serverUrl} onChange={(event) => setServerUrl(event.target.value)} />
-							</ResourceField>
-
-							<div className='grid gap-4 md:grid-cols-2'>
-								<div className='rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-4'>
-									<p className='text-xs uppercase tracking-[0.2em] text-[var(--foreground-muted)]'>Discovery Token</p>
-									<p className='mt-2 break-all text-sm text-[var(--foreground-primary)]'>
-										{bootstrapToken || '暂无'}
-									</p>
-								</div>
-								<div className='rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-4 text-sm leading-6 text-[var(--foreground-secondary)]'>
-									创建节点后也可以使用节点专属 Token 安装，这种方式适合预分配节点名与更新策略。
-								</div>
-							</div>
-
-							{discoveryCommand ? <CodeBlock className='whitespace-pre-wrap'>{discoveryCommand}</CodeBlock> : null}
-						</div>
-					)}
-				</AppCard>
-
-				<AppCard
 					title='节点专属部署命令'
 					description='适用于已在管理端预创建节点的场景，可避免首次接入时匿名自动命名。'
 					action={

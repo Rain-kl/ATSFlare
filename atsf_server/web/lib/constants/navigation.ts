@@ -13,7 +13,7 @@ export const dashboardNavigation: NavigationItem[] = [
     },
     {
         href: '/proxy-route',
-        label: '反向代理',
+        label: '规则',
         icon: 'proxy',
     },
     {

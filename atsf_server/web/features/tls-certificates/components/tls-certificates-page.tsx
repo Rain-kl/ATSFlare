@@ -221,7 +221,6 @@ export function TlsCertificatesPage() {
 
       <AppCard
         title='证书列表'
-        description='展示证书有效期、到期状态与最近更新时间。删除前会提示确认。'
         action={
           <SecondaryButton
             type='button'

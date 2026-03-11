@@ -219,36 +219,6 @@ export function DashboardOverview() {
 
   return (
     <div className='space-y-6'>
-      <AppCard
-        title='控制台仪表盘'
-        description='首页统一承接节点、发布、域名、证书、反向代理和用户六个模块的核心总览，避免在各页面重复扫一遍摘要。'
-        action={<StatusBadge label='实时聚合概览' variant='success' />}
-      >
-        <div className='grid gap-4 md:grid-cols-3'>
-          <div className='rounded-2xl border border-[var(--border-default)] bg-[var(--surface-muted)] p-4'>
-            <p className='text-xs uppercase tracking-[0.2em] text-[var(--foreground-muted)]'>信息架构</p>
-            <p className='mt-2 text-base font-semibold text-[var(--foreground-primary)]'>首页负责总览</p>
-            <p className='mt-2 text-sm leading-6 text-[var(--foreground-secondary)]'>
-              模块页保留列表、表单和具体操作，摘要统一回收到仪表盘。
-            </p>
-          </div>
-          <div className='rounded-2xl border border-[var(--border-default)] bg-[var(--surface-muted)] p-4'>
-            <p className='text-xs uppercase tracking-[0.2em] text-[var(--foreground-muted)]'>导航效率</p>
-            <p className='mt-2 text-base font-semibold text-[var(--foreground-primary)]'>顶栏与侧栏已精简</p>
-            <p className='mt-2 text-sm leading-6 text-[var(--foreground-secondary)]'>
-              顶栏只保留版本、主题切换和用户入口，侧栏宽度与按钮高度同步压缩。
-            </p>
-          </div>
-          <div className='rounded-2xl border border-[var(--border-default)] bg-[var(--surface-muted)] p-4'>
-            <p className='text-xs uppercase tracking-[0.2em] text-[var(--foreground-muted)]'>响应式</p>
-            <p className='mt-2 text-base font-semibold text-[var(--foreground-primary)]'>小屏可正常展开侧栏</p>
-            <p className='mt-2 text-sm leading-6 text-[var(--foreground-secondary)]'>
-              小于 1000px 时切换为抽屉侧栏，不再出现按钮可点但导航不可见的问题。
-            </p>
-          </div>
-        </div>
-      </AppCard>
-
       <div className='grid gap-6 xl:grid-cols-2'>
         {dashboardCards.map((card) => (
           <SummaryCard key={card.title} {...card} />

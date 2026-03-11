@@ -289,7 +289,6 @@ export function UsersPage() {
 
       <AppCard
         title='用户列表'
-        description='搜索会切换到全量匹配结果；分页模式下按服务器默认每页 10 条加载。'
         action={
           <div className='flex flex-wrap gap-2'>
             <SecondaryButton

@@ -228,7 +228,6 @@ export function ManagedDomainsPage() {
 
       <AppCard
         title='域名规则列表'
-        description='支持快速查看绑定证书、启用状态与最近更新时间。'
         action={
           <SecondaryButton
             type='button'

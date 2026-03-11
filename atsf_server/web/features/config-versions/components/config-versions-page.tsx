@@ -301,18 +301,10 @@ export function ConfigVersionsPage() {
             onConfirm={() => publishMutation.mutate()}
             onCancel={() => setPublishPreview(null)}
           />
-        ) : (
-          <AppCard title='发布建议' description='建议先查看变更摘要，再决定是否发布为新的激活版本。'>
-            <div className='space-y-3 text-sm leading-6 text-[var(--foreground-secondary)]'>
-              <p>1. 使用“预览并发布”查看新增、删除和修改的域名清单。</p>
-              <p>2. 确认渲染出的 Nginx 配置与支持文件内容符合预期。</p>
-              <p>3. 若需要回滚，可在下方历史版本列表中重新激活旧版本。</p>
-            </div>
-          </AppCard>
-        )}
+        ) : null}
       </div>
 
-      <AppCard title='历史版本' description='支持查看快照详情，并在必要时将旧版本重新设为当前激活版本。'>
+      <AppCard title='历史版本'>
         {versionsQuery.isLoading ? (
           <LoadingState />
         ) : versionsQuery.isError ? (

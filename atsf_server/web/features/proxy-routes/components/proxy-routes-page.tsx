@@ -408,7 +408,7 @@ export function ProxyRoutesPage() {
 
       {feedback ? <InlineMessage tone={feedback.tone} message={feedback.message} /> : null}
 
-      <AppCard title='规则列表' description='支持查看启用状态、HTTPS 配置、自定义请求头数量及最近更新时间。'>
+      <AppCard title='规则列表'>
         {routesQuery.isLoading ? (
           <LoadingState />
         ) : routesQuery.isError ? (
