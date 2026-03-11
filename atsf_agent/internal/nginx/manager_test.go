@@ -244,6 +244,18 @@ func TestDetectVersionFromDockerImage(t *testing.T) {
 	}
 }
 
+func TestParseNginxVersionIgnoresDockerEntrypointPaths(t *testing.T) {
+	output := strings.Join([]string{
+		"/docker-entrypoint.sh: /docker-entrypoint.d/10-listen-on-ipv6-by-default.sh: info: can not modify /etc/nginx/conf.d/default.conf (read-only file system?)",
+		"nginx version: nginx/1.27.4",
+	}, "\n")
+
+	version := parseNginxVersion(output)
+	if version != "1.27.4" {
+		t.Fatalf("unexpected version: %s", version)
+	}
+}
+
 func TestManagerApplyWritesSupportFilesAndReplacesPlaceholder(t *testing.T) {
 	tempDir := t.TempDir()
 	manager := &Manager{

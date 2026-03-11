@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -300,18 +301,14 @@ func detectVersion(ctx context.Context, options ExecutorOptions, runner CommandR
 }
 
 func parseNginxVersion(output string) string {
-	start := strings.Index(output, "nginx/")
-	if start < 0 {
+	matches := nginxVersionPattern.FindStringSubmatch(output)
+	if len(matches) != 2 {
 		return ""
 	}
-	version := output[start+len("nginx/"):]
-	for i, r := range version {
-		if r == ' ' || r == '\n' || r == '\r' || r == '\t' {
-			return version[:i]
-		}
-	}
-	return version
+	return matches[1]
 }
+
+var nginxVersionPattern = regexp.MustCompile(`(?im)nginx version:\s*nginx/([^\s]+)`)
 
 type backupState struct {
 	RouteExisted bool
