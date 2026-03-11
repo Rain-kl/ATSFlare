@@ -152,15 +152,15 @@ atsf_server/web/
     (dashboard)/
       layout.tsx
       page.tsx
-      proxy-routes/
-      config-versions/
-      nodes/
-      apply-logs/
-      managed-domains/
-      tls-certificates/
-      files/
-      users/
-      settings/
+      proxy-route/
+      config-version/
+      node/
+      apply-log/
+      managed-domain/
+      tls-certificate/
+      file/
+      user/
+      setting/
     not-found.tsx
   components/
     ui/
@@ -170,15 +170,15 @@ atsf_server/web/
     feedback/
   features/
     auth/
-    proxy-routes/
-    config-versions/
-    nodes/
-    apply-logs/
-    managed-domains/
-    tls-certificates/
-    files/
-    users/
-    settings/
+    proxy-route/
+    config-version/
+    node/
+    apply-log/
+    managed-domain/
+    tls-certificate/
+    file/
+    user/
+    setting/
   lib/
     api/
     auth/
@@ -210,21 +210,20 @@ atsf_server/web/
 | 现有路由 | 目标路由 | 改造重点 |
 | --- | --- | --- |
 | `/` | `/` | 首页概览卡片、系统状态、公告区域重设计 |
-| `/proxy-route` | `/proxy-routes` | 表格、创建/编辑抽屉、发布动作、域名证书联动 |
-| `/config-version` | `/config-versions` | 版本列表、diff 预览、激活流程、只读预览体验 |
-| `/node` | `/nodes` | 节点状态标签、心跳时间、部署命令、更新动作 |
-| `/apply-log` | `/apply-logs` | 过滤器、结果状态可视化、分页与详情展示 |
-| `/managed-domain` | `/managed-domains` | 通配符匹配提示、证书绑定状态、启用状态切换 |
-| `/tls-certificate` | `/tls-certificates` | 导入、上传、有效期展示、到期提醒样式 |
-| `/file` | `/files` | 文件列表与下载交互优化 |
-| `/user` | `/users` | 用户列表、角色管理、搜索与编辑体验 |
-| `/setting` | `/settings` | 系统设置、运维设置、个人设置按信息架构重组 |
+| `/proxy-route` | `/proxy-route` | 表格、创建/编辑抽屉、发布动作、域名证书联动 |
+| `/config-version` | `/config-version` | 版本列表、diff 预览、激活流程、只读预览体验 |
+| `/node` | `/node` | 节点状态标签、心跳时间、部署命令、更新动作 |
+| `/apply-log` | `/apply-log` | 过滤器、结果状态可视化、分页与详情展示 |
+| `/managed-domain` | `/managed-domain` | 通配符匹配提示、证书绑定状态、启用状态切换 |
+| `/tls-certificate` | `/tls-certificate` | 导入、上传、有效期展示、到期提醒样式 |
+| `/file` | `/file` | 文件列表与下载交互优化 |
+| `/user` | `/user` | 用户列表、角色管理、搜索与编辑体验 |
+| `/setting` | `/setting` | 系统设置、运维设置、个人设置按信息架构重组 |
 | `/login` 等 | `/login` 等 | 统一认证页视觉与表单规范 |
 
 说明：
 
-* 路由命名建议统一改为复数英文资源名。
-* 为兼容旧链接，可在切换期保留旧路由跳转。
+* 路由命名统一使用单数英文资源名。
 
 ---
 
@@ -302,12 +301,12 @@ atsf_server/web/
 
 优先顺序：
 
-1. `proxy-routes`
-2. `config-versions`
-3. `nodes`
-4. `managed-domains`
-5. `tls-certificates`
-6. `apply-logs`
+1. `proxy-route`
+2. `config-version`
+3. `node`
+4. `managed-domain`
+5. `tls-certificate`
+6. `apply-log`
 
 验收：
 
@@ -320,7 +319,7 @@ atsf_server/web/
 
 任务：
 
-* 迁移 `settings`、`users`、`files`、`about` 等模块
+* 迁移 `setting`、`user`、`file`、`about` 等模块
 * 重构表单项、标签页、操作区布局
 * 增加部署命令复制、时间友好显示、状态颜色体系
 

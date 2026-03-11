@@ -137,16 +137,16 @@ tests/
 
 要求：
 
-* 使用英文小写复数资源名
+* 使用英文小写单数资源名
 * 使用语义清晰的层级结构
 
 示例：
 
-* `/nodes`
-* `/proxy-routes`
-* `/config-versions`
-* `/tls-certificates`
-* `/managed-domains`
+* `/node`
+* `/proxy-route`
+* `/config-version`
+* `/tls-certificate`
+* `/managed-domain`
 
 ### 4.2 页面职责
 
