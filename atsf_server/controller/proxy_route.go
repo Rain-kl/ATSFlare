@@ -8,6 +8,13 @@ import (
 	"strconv"
 )
 
+// GetProxyRoutes godoc
+// @Summary List proxy routes
+// @Tags ProxyRoutes
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} map[string]interface{}
+// @Router /api/proxy-routes/ [get]
 func GetProxyRoutes(c *gin.Context) {
 	routes, err := service.ListProxyRoutes()
 	if err != nil {
@@ -24,6 +31,16 @@ func GetProxyRoutes(c *gin.Context) {
 	})
 }
 
+// CreateProxyRoute godoc
+// @Summary Create proxy route
+// @Tags ProxyRoutes
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param payload body service.ProxyRouteInput true "Proxy route payload"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Router /api/proxy-routes/ [post]
 func CreateProxyRoute(c *gin.Context) {
 	var input service.ProxyRouteInput
 	if err := json.NewDecoder(c.Request.Body).Decode(&input); err != nil {
@@ -48,6 +65,17 @@ func CreateProxyRoute(c *gin.Context) {
 	})
 }
 
+// UpdateProxyRoute godoc
+// @Summary Update proxy route
+// @Tags ProxyRoutes
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "Route ID"
+// @Param payload body service.ProxyRouteInput true "Proxy route payload"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Router /api/proxy-routes/{id} [put]
 func UpdateProxyRoute(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil || id == 0 {
@@ -80,6 +108,15 @@ func UpdateProxyRoute(c *gin.Context) {
 	})
 }
 
+// DeleteProxyRoute godoc
+// @Summary Delete proxy route
+// @Tags ProxyRoutes
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "Route ID"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Router /api/proxy-routes/{id} [delete]
 func DeleteProxyRoute(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil || id == 0 {

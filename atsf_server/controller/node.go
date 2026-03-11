@@ -9,6 +9,16 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// CreateNode godoc
+// @Summary Create node
+// @Tags Nodes
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param payload body service.NodeInput true "Node payload"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Router /api/nodes/ [post]
 func CreateNode(c *gin.Context) {
 	var input service.NodeInput
 	if err := json.NewDecoder(c.Request.Body).Decode(&input); err != nil {
@@ -33,6 +43,13 @@ func CreateNode(c *gin.Context) {
 	})
 }
 
+// GetNodeBootstrapToken godoc
+// @Summary Get global discovery token
+// @Tags Nodes
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} map[string]interface{}
+// @Router /api/nodes/bootstrap-token [get]
 func GetNodeBootstrapToken(c *gin.Context) {
 	bootstrap, err := service.GetNodeBootstrapView()
 	if err != nil {
@@ -49,6 +66,13 @@ func GetNodeBootstrapToken(c *gin.Context) {
 	})
 }
 
+// RotateNodeBootstrapToken godoc
+// @Summary Rotate global discovery token
+// @Tags Nodes
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} map[string]interface{}
+// @Router /api/nodes/bootstrap-token/rotate [post]
 func RotateNodeBootstrapToken(c *gin.Context) {
 	bootstrap, err := service.RotateGlobalDiscoveryToken()
 	if err != nil {
@@ -65,6 +89,17 @@ func RotateNodeBootstrapToken(c *gin.Context) {
 	})
 }
 
+// UpdateNode godoc
+// @Summary Update node
+// @Tags Nodes
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "Node ID"
+// @Param payload body service.NodeInput true "Node payload"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Router /api/nodes/{id} [put]
 func UpdateNode(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil || id == 0 {
@@ -97,6 +132,15 @@ func UpdateNode(c *gin.Context) {
 	})
 }
 
+// DeleteNode godoc
+// @Summary Delete node
+// @Tags Nodes
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "Node ID"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Router /api/nodes/{id} [delete]
 func DeleteNode(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil || id == 0 {
@@ -119,6 +163,15 @@ func DeleteNode(c *gin.Context) {
 	})
 }
 
+// RequestNodeAgentUpdate godoc
+// @Summary Request agent self-update on node
+// @Tags Nodes
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "Node ID"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Router /api/nodes/{id}/agent-update [post]
 func RequestNodeAgentUpdate(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil || id == 0 {

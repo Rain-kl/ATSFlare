@@ -1,0 +1,897 @@
+basePath: /
+definitions:
+  model.Option:
+    properties:
+      key:
+        type: string
+      value:
+        type: string
+    type: object
+  service.AgentNodePayload:
+    properties:
+      agent_version:
+        type: string
+      current_version:
+        type: string
+      ip:
+        type: string
+      last_error:
+        type: string
+      name:
+        type: string
+      nginx_version:
+        type: string
+      node_id:
+        type: string
+    type: object
+  service.ApplyLogPayload:
+    properties:
+      message:
+        type: string
+      node_id:
+        type: string
+      result:
+        type: string
+      version:
+        type: string
+    type: object
+  service.ManagedDomainInput:
+    properties:
+      cert_id:
+        type: integer
+      domain:
+        type: string
+      enabled:
+        type: boolean
+      remark:
+        type: string
+    type: object
+  service.NodeInput:
+    properties:
+      auto_update_enabled:
+        type: boolean
+      name:
+        type: string
+    type: object
+  service.ProxyRouteCustomHeaderInput:
+    properties:
+      key:
+        type: string
+      value:
+        type: string
+    type: object
+  service.ProxyRouteInput:
+    properties:
+      cert_id:
+        type: integer
+      custom_headers:
+        items:
+          $ref: '#/definitions/service.ProxyRouteCustomHeaderInput'
+        type: array
+      domain:
+        type: string
+      enable_https:
+        type: boolean
+      enabled:
+        type: boolean
+      origin_url:
+        type: string
+      redirect_http:
+        type: boolean
+      remark:
+        type: string
+    type: object
+  service.TLSCertificateInput:
+    properties:
+      cert_pem:
+        type: string
+      key_pem:
+        type: string
+      name:
+        type: string
+      remark:
+        type: string
+    type: object
+info:
+  contact: {}
+  description: ATSFlare Server 管理端与 Agent API 文档。
+  title: ATSFlare Server API
+  version: "3.0"
+paths:
+  /api/agent/apply-logs:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Apply log payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/service.ApplyLogPayload'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - AgentTokenAuth: []
+      summary: Report agent apply result
+      tags:
+      - Agent
+  /api/agent/config-versions/active:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - AgentTokenAuth: []
+      summary: Get active config for agent
+      tags:
+      - Agent
+  /api/agent/nodes/heartbeat:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Agent heartbeat payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/service.AgentNodePayload'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - AgentTokenAuth: []
+      summary: Report agent heartbeat
+      tags:
+      - Agent
+  /api/agent/nodes/register:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Agent node payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/service.AgentNodePayload'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - AgentTokenAuth: []
+      summary: Register or discover agent node
+      tags:
+      - Agent
+  /api/apply-logs/:
+    get:
+      parameters:
+      - description: Node ID
+        in: query
+        name: node_id
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List apply logs
+      tags:
+      - ApplyLogs
+  /api/config-versions/:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List config versions
+      tags:
+      - ConfigVersions
+  /api/config-versions/{id}/activate:
+    put:
+      parameters:
+      - description: Version ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Activate an existing config version
+      tags:
+      - ConfigVersions
+  /api/config-versions/active:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get active config version
+      tags:
+      - ConfigVersions
+  /api/config-versions/diff:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Diff current draft against active version
+      tags:
+      - ConfigVersions
+  /api/config-versions/preview:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Preview config rendering
+      tags:
+      - ConfigVersions
+  /api/config-versions/publish:
+    post:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Publish a new config version
+      tags:
+      - ConfigVersions
+  /api/managed-domains/:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List managed domains
+      tags:
+      - ManagedDomains
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Managed domain payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/service.ManagedDomainInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create managed domain
+      tags:
+      - ManagedDomains
+  /api/managed-domains/{id}:
+    delete:
+      parameters:
+      - description: Managed domain ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete managed domain
+      tags:
+      - ManagedDomains
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Managed domain ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Managed domain payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/service.ManagedDomainInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update managed domain
+      tags:
+      - ManagedDomains
+  /api/managed-domains/match:
+    get:
+      parameters:
+      - description: Domain
+        in: query
+        name: domain
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Match certificate for domain
+      tags:
+      - ManagedDomains
+  /api/nodes/:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List nodes
+      tags:
+      - Nodes
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Node payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/service.NodeInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create node
+      tags:
+      - Nodes
+  /api/nodes/{id}:
+    delete:
+      parameters:
+      - description: Node ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete node
+      tags:
+      - Nodes
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Node ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Node payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/service.NodeInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update node
+      tags:
+      - Nodes
+  /api/nodes/{id}/agent-update:
+    post:
+      parameters:
+      - description: Node ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Request agent self-update on node
+      tags:
+      - Nodes
+  /api/nodes/bootstrap-token:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get global discovery token
+      tags:
+      - Nodes
+  /api/nodes/bootstrap-token/rotate:
+    post:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Rotate global discovery token
+      tags:
+      - Nodes
+  /api/option/:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: List editable options
+      tags:
+      - Options
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Option payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/model.Option'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Update option
+      tags:
+      - Options
+  /api/proxy-routes/:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List proxy routes
+      tags:
+      - ProxyRoutes
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Proxy route payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/service.ProxyRouteInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create proxy route
+      tags:
+      - ProxyRoutes
+  /api/proxy-routes/{id}:
+    delete:
+      parameters:
+      - description: Route ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete proxy route
+      tags:
+      - ProxyRoutes
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Route ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Proxy route payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/service.ProxyRouteInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update proxy route
+      tags:
+      - ProxyRoutes
+  /api/status:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get server status
+      tags:
+      - Public
+  /api/tls-certificates/:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List TLS certificates
+      tags:
+      - TLSCertificates
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: TLS certificate payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/service.TLSCertificateInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create TLS certificate from PEM
+      tags:
+      - TLSCertificates
+  /api/tls-certificates/{id}:
+    delete:
+      parameters:
+      - description: Certificate ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete TLS certificate
+      tags:
+      - TLSCertificates
+  /api/tls-certificates/import-file:
+    post:
+      consumes:
+      - multipart/form-data
+      parameters:
+      - description: Certificate name
+        in: formData
+        name: name
+        required: true
+        type: string
+      - description: Remark
+        in: formData
+        name: remark
+        type: string
+      - description: Certificate file
+        in: formData
+        name: cert_file
+        required: true
+        type: file
+      - description: Private key file
+        in: formData
+        name: key_file
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Import TLS certificate from files
+      tags:
+      - TLSCertificates
+  /api/update/latest-release:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get latest GitHub release
+      tags:
+      - Update
+schemes:
+- http
+- https
+securityDefinitions:
+  AgentTokenAuth:
+    description: Agent API 使用节点专属 Agent Token 或全局 Discovery Token
+    in: header
+    name: X-Agent-Token
+    type: apiKey
+  BearerAuth:
+    description: 管理端可使用 Bearer Token，例如：Bearer <token>
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

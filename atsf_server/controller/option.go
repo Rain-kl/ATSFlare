@@ -9,6 +9,12 @@ import (
 	"strings"
 )
 
+// GetOptions godoc
+// @Summary List editable options
+// @Tags Options
+// @Produce json
+// @Success 200 {object} map[string]interface{}
+// @Router /api/option/ [get]
 func GetOptions(c *gin.Context) {
 	var options []*model.Option
 	common.OptionMapRWMutex.Lock()
@@ -30,6 +36,15 @@ func GetOptions(c *gin.Context) {
 	return
 }
 
+// UpdateOption godoc
+// @Summary Update option
+// @Tags Options
+// @Accept json
+// @Produce json
+// @Param payload body model.Option true "Option payload"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Router /api/option/ [put]
 func UpdateOption(c *gin.Context) {
 	var option model.Option
 	err := json.NewDecoder(c.Request.Body).Decode(&option)

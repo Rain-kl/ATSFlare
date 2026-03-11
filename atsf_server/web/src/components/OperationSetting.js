@@ -132,11 +132,23 @@ const OperationSetting = () => {
   const curlCommand = inputs.AgentDiscoveryToken
     ? `curl -fsSL https://raw.githubusercontent.com/Rain-kl/ATSFlare/main/scripts/install-agent.sh | bash -s -- --server-url ${serverAddr} --discovery-token ${inputs.AgentDiscoveryToken}`
     : '';
+  const openSwaggerDoc = () => {
+    window.open('/swagger/index.html', '_blank', 'noopener,noreferrer');
+  };
 
   return (
     <Grid columns={1}>
       <Grid.Column>
         <Form loading={loading}>
+          <Header as='h3'>接口文档</Header>
+          <Message info size='small'>
+            <p>通过 Swagger UI 查看当前 Server API，并直接在浏览器中调试接口。</p>
+          </Message>
+          <Button onClick={openSwaggerDoc} primary>
+            打开接口文档
+          </Button>
+
+          <Divider />
           <Header as='h3'>Agent 运行参数</Header>
           <Message info size='small'>
             <p>这些参数通过心跳响应下发到所有 Agent，修改后下次心跳即生效。</p>

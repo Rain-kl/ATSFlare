@@ -9,6 +9,13 @@ import (
 	"strings"
 )
 
+// GetManagedDomains godoc
+// @Summary List managed domains
+// @Tags ManagedDomains
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} map[string]interface{}
+// @Router /api/managed-domains/ [get]
 func GetManagedDomains(c *gin.Context) {
 	domains, err := service.ListManagedDomains()
 	if err != nil {
@@ -25,6 +32,16 @@ func GetManagedDomains(c *gin.Context) {
 	})
 }
 
+// CreateManagedDomain godoc
+// @Summary Create managed domain
+// @Tags ManagedDomains
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param payload body service.ManagedDomainInput true "Managed domain payload"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Router /api/managed-domains/ [post]
 func CreateManagedDomain(c *gin.Context) {
 	var input service.ManagedDomainInput
 	if err := json.NewDecoder(c.Request.Body).Decode(&input); err != nil {
@@ -49,6 +66,17 @@ func CreateManagedDomain(c *gin.Context) {
 	})
 }
 
+// UpdateManagedDomain godoc
+// @Summary Update managed domain
+// @Tags ManagedDomains
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "Managed domain ID"
+// @Param payload body service.ManagedDomainInput true "Managed domain payload"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Router /api/managed-domains/{id} [put]
 func UpdateManagedDomain(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil || id == 0 {
@@ -81,6 +109,15 @@ func UpdateManagedDomain(c *gin.Context) {
 	})
 }
 
+// DeleteManagedDomain godoc
+// @Summary Delete managed domain
+// @Tags ManagedDomains
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "Managed domain ID"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Router /api/managed-domains/{id} [delete]
 func DeleteManagedDomain(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil || id == 0 {
@@ -103,6 +140,14 @@ func DeleteManagedDomain(c *gin.Context) {
 	})
 }
 
+// MatchManagedDomainCertificate godoc
+// @Summary Match certificate for domain
+// @Tags ManagedDomains
+// @Produce json
+// @Security BearerAuth
+// @Param domain query string true "Domain"
+// @Success 200 {object} map[string]interface{}
+// @Router /api/managed-domains/match [get]
 func MatchManagedDomainCertificate(c *gin.Context) {
 	domain := strings.TrimSpace(c.Query("domain"))
 	result, err := service.MatchManagedDomainCertificate(domain)

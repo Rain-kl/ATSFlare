@@ -9,6 +9,16 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// AgentRegister godoc
+// @Summary Register or discover agent node
+// @Tags Agent
+// @Accept json
+// @Produce json
+// @Security AgentTokenAuth
+// @Param payload body service.AgentNodePayload true "Agent node payload"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Router /api/agent/nodes/register [post]
 func AgentRegister(c *gin.Context) {
 	var payload service.AgentNodePayload
 	if err := json.NewDecoder(c.Request.Body).Decode(&payload); err != nil {
@@ -41,6 +51,16 @@ func AgentRegister(c *gin.Context) {
 	})
 }
 
+// AgentHeartbeat godoc
+// @Summary Report agent heartbeat
+// @Tags Agent
+// @Accept json
+// @Produce json
+// @Security AgentTokenAuth
+// @Param payload body service.AgentNodePayload true "Agent heartbeat payload"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Router /api/agent/nodes/heartbeat [post]
 func AgentHeartbeat(c *gin.Context) {
 	var payload service.AgentNodePayload
 	if err := json.NewDecoder(c.Request.Body).Decode(&payload); err != nil {
@@ -74,6 +94,13 @@ func AgentHeartbeat(c *gin.Context) {
 	})
 }
 
+// AgentGetActiveConfig godoc
+// @Summary Get active config for agent
+// @Tags Agent
+// @Produce json
+// @Security AgentTokenAuth
+// @Success 200 {object} map[string]interface{}
+// @Router /api/agent/config-versions/active [get]
 func AgentGetActiveConfig(c *gin.Context) {
 	config, err := service.GetActiveConfigForAgent()
 	if err != nil {
@@ -90,6 +117,16 @@ func AgentGetActiveConfig(c *gin.Context) {
 	})
 }
 
+// AgentReportApplyLog godoc
+// @Summary Report agent apply result
+// @Tags Agent
+// @Accept json
+// @Produce json
+// @Security AgentTokenAuth
+// @Param payload body service.ApplyLogPayload true "Apply log payload"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Router /api/agent/apply-logs [post]
 func AgentReportApplyLog(c *gin.Context) {
 	var payload service.ApplyLogPayload
 	if err := json.NewDecoder(c.Request.Body).Decode(&payload); err != nil {
@@ -118,6 +155,13 @@ func AgentReportApplyLog(c *gin.Context) {
 	})
 }
 
+// GetNodes godoc
+// @Summary List nodes
+// @Tags Nodes
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} map[string]interface{}
+// @Router /api/nodes/ [get]
 func GetNodes(c *gin.Context) {
 	nodes, err := service.ListNodeViews()
 	if err != nil {
@@ -134,6 +178,14 @@ func GetNodes(c *gin.Context) {
 	})
 }
 
+// GetApplyLogs godoc
+// @Summary List apply logs
+// @Tags ApplyLogs
+// @Produce json
+// @Security BearerAuth
+// @Param node_id query string false "Node ID"
+// @Success 200 {object} map[string]interface{}
+// @Router /api/apply-logs/ [get]
 func GetApplyLogs(c *gin.Context) {
 	logs, err := service.ListApplyLogs(c.Query("node_id"))
 	if err != nil {

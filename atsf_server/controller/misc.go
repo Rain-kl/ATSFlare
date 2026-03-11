@@ -9,6 +9,12 @@ import (
 	"net/http"
 )
 
+// GetStatus godoc
+// @Summary Get server status
+// @Tags Public
+// @Produce json
+// @Success 200 {object} map[string]interface{}
+// @Router /api/status [get]
 func GetStatus(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,

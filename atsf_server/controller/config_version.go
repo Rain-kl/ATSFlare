@@ -7,6 +7,13 @@ import (
 	"strconv"
 )
 
+// GetConfigVersions godoc
+// @Summary List config versions
+// @Tags ConfigVersions
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} map[string]interface{}
+// @Router /api/config-versions/ [get]
 func GetConfigVersions(c *gin.Context) {
 	versions, err := service.ListConfigVersions()
 	if err != nil {
@@ -23,6 +30,13 @@ func GetConfigVersions(c *gin.Context) {
 	})
 }
 
+// GetActiveConfigVersion godoc
+// @Summary Get active config version
+// @Tags ConfigVersions
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} map[string]interface{}
+// @Router /api/config-versions/active [get]
 func GetActiveConfigVersion(c *gin.Context) {
 	version, err := service.GetActiveConfigVersion()
 	if err != nil {
@@ -39,6 +53,13 @@ func GetActiveConfigVersion(c *gin.Context) {
 	})
 }
 
+// PreviewConfigVersion godoc
+// @Summary Preview config rendering
+// @Tags ConfigVersions
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} map[string]interface{}
+// @Router /api/config-versions/preview [get]
 func PreviewConfigVersion(c *gin.Context) {
 	preview, err := service.PreviewConfigVersion()
 	if err != nil {
@@ -55,6 +76,13 @@ func PreviewConfigVersion(c *gin.Context) {
 	})
 }
 
+// DiffConfigVersion godoc
+// @Summary Diff current draft against active version
+// @Tags ConfigVersions
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} map[string]interface{}
+// @Router /api/config-versions/diff [get]
 func DiffConfigVersion(c *gin.Context) {
 	diff, err := service.DiffConfigVersion()
 	if err != nil {
@@ -71,6 +99,13 @@ func DiffConfigVersion(c *gin.Context) {
 	})
 }
 
+// PublishConfigVersion godoc
+// @Summary Publish a new config version
+// @Tags ConfigVersions
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} map[string]interface{}
+// @Router /api/config-versions/publish [post]
 func PublishConfigVersion(c *gin.Context) {
 	username := c.GetString("username")
 	result, err := service.PublishConfigVersion(username)
@@ -88,6 +123,15 @@ func PublishConfigVersion(c *gin.Context) {
 	})
 }
 
+// ActivateConfigVersion godoc
+// @Summary Activate an existing config version
+// @Tags ConfigVersions
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "Version ID"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Router /api/config-versions/{id}/activate [put]
 func ActivateConfigVersion(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil || id == 0 {

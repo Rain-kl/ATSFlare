@@ -2,6 +2,7 @@ package main
 
 import (
 	"atsflare/common"
+	_ "atsflare/docs"
 	"atsflare/middleware"
 	"atsflare/model"
 	"atsflare/router"
@@ -22,6 +23,19 @@ var buildFS embed.FS
 //go:embed web/build/index.html
 var indexPage []byte
 
+// @title ATSFlare Server API
+// @version 3.0
+// @description ATSFlare Server 管理端与 Agent API 文档。
+// @BasePath /
+// @schemes http https
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+// @description 管理端可使用 Bearer Token，例如：Bearer <token>
+// @securityDefinitions.apikey AgentTokenAuth
+// @in header
+// @name X-Agent-Token
+// @description Agent API 使用节点专属 Agent Token 或全局 Discovery Token
 func main() {
 	common.SetupGinLog()
 	common.SysLog("ATSFlare " + common.Version + " started")

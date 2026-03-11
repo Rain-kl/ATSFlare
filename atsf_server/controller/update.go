@@ -22,6 +22,12 @@ type latestReleaseResponse struct {
 	PublishedAt string `json:"published_at"`
 }
 
+// GetLatestRelease godoc
+// @Summary Get latest GitHub release
+// @Tags Update
+// @Produce json
+// @Success 200 {object} map[string]interface{}
+// @Router /api/update/latest-release [get]
 func GetLatestRelease(c *gin.Context) {
 	req, err := http.NewRequestWithContext(c.Request.Context(), http.MethodGet, latestReleaseURL, nil)
 	if err != nil {

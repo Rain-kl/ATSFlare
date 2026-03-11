@@ -8,6 +8,13 @@ import (
 	"strconv"
 )
 
+// GetTLSCertificates godoc
+// @Summary List TLS certificates
+// @Tags TLSCertificates
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} map[string]interface{}
+// @Router /api/tls-certificates/ [get]
 func GetTLSCertificates(c *gin.Context) {
 	certificates, err := service.ListTLSCertificates()
 	if err != nil {
@@ -24,6 +31,16 @@ func GetTLSCertificates(c *gin.Context) {
 	})
 }
 
+// CreateTLSCertificate godoc
+// @Summary Create TLS certificate from PEM
+// @Tags TLSCertificates
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param payload body service.TLSCertificateInput true "TLS certificate payload"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Router /api/tls-certificates/ [post]
 func CreateTLSCertificate(c *gin.Context) {
 	var input service.TLSCertificateInput
 	if err := json.NewDecoder(c.Request.Body).Decode(&input); err != nil {
@@ -48,6 +65,19 @@ func CreateTLSCertificate(c *gin.Context) {
 	})
 }
 
+// ImportTLSCertificateFile godoc
+// @Summary Import TLS certificate from files
+// @Tags TLSCertificates
+// @Accept multipart/form-data
+// @Produce json
+// @Security BearerAuth
+// @Param name formData string true "Certificate name"
+// @Param remark formData string false "Remark"
+// @Param cert_file formData file true "Certificate file"
+// @Param key_file formData file true "Private key file"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Router /api/tls-certificates/import-file [post]
 func ImportTLSCertificateFile(c *gin.Context) {
 	name := c.PostForm("name")
 	remark := c.PostForm("remark")
@@ -82,6 +112,15 @@ func ImportTLSCertificateFile(c *gin.Context) {
 	})
 }
 
+// DeleteTLSCertificate godoc
+// @Summary Delete TLS certificate
+// @Tags TLSCertificates
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "Certificate ID"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Router /api/tls-certificates/{id} [delete]
 func DeleteTLSCertificate(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil || id == 0 {
