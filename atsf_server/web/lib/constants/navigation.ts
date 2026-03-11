@@ -29,19 +29,19 @@ export const dashboardNavigation: NavigationItem[] = [
     href: '/apply-logs',
     label: '应用记录',
     shortLabel: '记录',
-    description: '阶段 3 接入筛选、分页与详情展示。',
+    description: '已接入 node_id 筛选、结果状态展示与单条详情查看。',
   },
   {
     href: '/managed-domains',
     label: '域名管理',
     shortLabel: '域名',
-    description: '阶段 3 接入证书绑定与启用状态切换。',
+    description: '已接入列表、证书绑定、启停控制与编辑删除。',
   },
   {
     href: '/tls-certificates',
     label: 'TLS 证书',
     shortLabel: '证书',
-    description: '阶段 3 接入导入、上传与有效期展示。',
+    description: '已接入 PEM 导入、文件上传、到期展示与删除。',
   },
   {
     href: '/files',

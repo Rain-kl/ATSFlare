@@ -1,0 +1,23 @@
+export interface TlsCertificateItem {
+  id: number;
+  name: string;
+  not_before: string;
+  not_after: string;
+  remark: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TlsCertificateMutationPayload {
+  name: string;
+  cert_pem: string;
+  key_pem: string;
+  remark: string;
+}
+
+export interface TlsCertificateFileImportPayload {
+  name: string;
+  remark: string;
+  certFile: File;
+  keyFile: File;
+}
