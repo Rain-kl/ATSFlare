@@ -9,6 +9,31 @@ export function isPathActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
+export function isNavigationItemActive(pathname: string, item: NavigationItem): boolean {
+  return isPathActive(pathname, item.href) || item.children?.some((child) => isNavigationItemActive(pathname, child)) || false;
+}
+
+export function flattenNavigationItems(items: NavigationItem[]): NavigationItem[] {
+  return items.flatMap((item) => [item, ...(item.children ? flattenNavigationItems(item.children) : [])]);
+}
+
 export function getCurrentNavigationItem(pathname: string): NavigationItem | undefined {
-  return dashboardNavigation.find((item) => isPathActive(pathname, item.href));
+  const findMatch = (items: NavigationItem[]): NavigationItem | undefined => {
+    for (const item of items) {
+      if (item.children) {
+        const childMatch = findMatch(item.children);
+        if (childMatch) {
+          return childMatch;
+        }
+      }
+
+      if (isPathActive(pathname, item.href)) {
+        return item;
+      }
+    }
+
+    return undefined;
+  };
+
+  return findMatch(dashboardNavigation);
 }

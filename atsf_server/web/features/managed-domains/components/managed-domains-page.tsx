@@ -11,6 +11,7 @@ import { ErrorState } from '@/components/feedback/error-state';
 import { InlineMessage } from '@/components/feedback/inline-message';
 import { LoadingState } from '@/components/feedback/loading-state';
 import { PageHeader } from '@/components/layout/page-header';
+import { AppModal } from '@/components/ui/app-modal';
 import { AppCard } from '@/components/ui/app-card';
 import { StatusBadge } from '@/components/ui/status-badge';
 import {
@@ -110,6 +111,7 @@ function toFormValues(domain: ManagedDomainItem): ManagedDomainFormValues {
 export function ManagedDomainsPage() {
   const queryClient = useQueryClient();
   const [editingDomainId, setEditingDomainId] = useState<number | null>(null);
+  const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [feedback, setFeedback] = useState<FeedbackState | null>(null);
 
   const form = useForm<ManagedDomainFormValues>({
@@ -144,6 +146,7 @@ export function ManagedDomainsPage() {
         message: editingDomainId ? '域名规则已更新。' : '域名规则已创建。',
       });
       setEditingDomainId(null);
+      setIsEditorOpen(false);
       form.reset(defaultValues);
       await queryClient.invalidateQueries({ queryKey: managedDomainsQueryKey });
     },
@@ -185,14 +188,23 @@ export function ManagedDomainsPage() {
 
   const handleReset = () => {
     setEditingDomainId(null);
+    setIsEditorOpen(false);
     setFeedback(null);
     form.reset(defaultValues);
+  };
+
+  const handleCreate = () => {
+    setEditingDomainId(null);
+    setFeedback(null);
+    form.reset(defaultValues);
+    setIsEditorOpen(true);
   };
 
   const handleEdit = (domain: ManagedDomainItem) => {
     setEditingDomainId(domain.id);
     setFeedback(null);
     form.reset(toFormValues(domain));
+    setIsEditorOpen(true);
   };
 
   const handleDelete = (domain: ManagedDomainItem) => {
@@ -210,128 +222,35 @@ export function ManagedDomainsPage() {
   });
 
   return (
+    <>
     <div className='space-y-6'>
       <PageHeader
         title='域名管理'
         description='维护精确域名与通配符域名，为其绑定默认证书，并控制是否参与自动匹配与发布。'
+        action={
+          <PrimaryButton type='button' onClick={handleCreate}>
+            新增域名
+          </PrimaryButton>
+        }
       />
 
       {feedback ? <InlineMessage tone={feedback.tone} message={feedback.message} /> : null}
 
-      <div className='grid gap-6 xl:grid-cols-[1.15fr_0.85fr]'>
-        <AppCard
-          title={editingDomainId ? '编辑域名规则' : '新增域名规则'}
-          description='支持精确域名与单层通配符域名，证书可留空以仅维护资产关系。'
-        >
-          <form className='space-y-5' onSubmit={handleSubmit}>
-            <div className='grid gap-4 md:grid-cols-2'>
-              <ResourceField
-                label='域名'
-                hint='示例：example.com 或 *.example.com'
-                error={form.formState.errors.domain?.message}
-              >
-                <ResourceInput placeholder='example.com 或 *.example.com' {...form.register('domain')} />
-              </ResourceField>
-              <ResourceField
-                label='默认证书'
-                hint='证书用于域名自动匹配与规则推荐，可不选择。'
-                error={form.formState.errors.cert_id?.message}
-              >
-                <ResourceSelect
-                  value={watchedCertId}
-                  disabled={certificatesQuery.isLoading}
-                  onChange={(event) =>
-                    form.setValue('cert_id', event.target.value, {
-                      shouldDirty: true,
-                      shouldValidate: true,
-                    })
-                  }
-                >
-                  <option value=''>不绑定证书</option>
-                  {certificates.map((certificate) => (
-                    <option key={certificate.id} value={certificate.id}>
-                      {buildCertificateLabel(certificate)}
-                    </option>
-                  ))}
-                </ResourceSelect>
-              </ResourceField>
-            </div>
-
-            <ToggleField
-              label='启用规则'
-              description='停用后该域名不会参与证书自动匹配，但记录会保留。'
-              checked={watchedEnabled}
-              onChange={(checked) =>
-                form.setValue('enabled', checked, {
-                  shouldDirty: true,
-                  shouldValidate: true,
-                })
-              }
-            />
-
-            <ResourceField
-              label='备注'
-              hint='可选，用于记录归属、用途或生效说明。'
-              error={form.formState.errors.remark?.message}
+      <AppCard title='规则摘要' description='域名维护动作已改为弹窗操作，列表专注展示状态与证书绑定关系。'>
+        <div className='grid gap-4 md:grid-cols-2 xl:grid-cols-4'>
+          {summary.map((item) => (
+            <div
+              key={item.label}
+              className='rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-4'
             >
-              <ResourceInput placeholder='例如：主站泛域名证书' {...form.register('remark')} />
-            </ResourceField>
-
-            <div className='flex flex-wrap gap-3'>
-              <PrimaryButton type='submit' disabled={saveMutation.isPending}>
-                {saveMutation.isPending ? '保存中...' : editingDomainId ? '保存修改' : '新增域名'}
-              </PrimaryButton>
-              <SecondaryButton type='button' onClick={handleReset} disabled={saveMutation.isPending}>
-                {editingDomainId ? '取消编辑' : '重置表单'}
-              </SecondaryButton>
-            </div>
-          </form>
-        </AppCard>
-
-        <div className='space-y-6'>
-          <AppCard title='规则摘要' description='帮助区分精确与通配符规则覆盖情况。'>
-            <div className='grid gap-4 sm:grid-cols-2 xl:grid-cols-1'>
-              {summary.map((item) => (
-                <div
-                  key={item.label}
-                  className='rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-4'
-                >
-                  <p className='text-xs uppercase tracking-[0.2em] text-[var(--foreground-muted)]'>
-                    {item.label}
-                  </p>
-                  <p className='mt-2 text-lg font-semibold text-[var(--foreground-primary)]'>{item.value}</p>
-                </div>
-              ))}
-            </div>
-          </AppCard>
-
-          <AppCard title='匹配提示' description='自动证书推荐时，精确域名优先级高于通配符域名。'>
-            <div className='space-y-3 text-sm leading-6 text-[var(--foreground-secondary)]'>
-              <p>
-                当前输入：
-                <span className='ml-2 font-medium text-[var(--foreground-primary)]'>
-                  {watchedDomain.trim() || '未填写域名'}
-                </span>
+              <p className='text-xs uppercase tracking-[0.2em] text-[var(--foreground-muted)]'>
+                {item.label}
               </p>
-              <div className='flex flex-wrap gap-2'>
-                {watchedDomain.trim() ? (
-                  <StatusBadge {...getMatchTypeMeta(watchedDomain.trim())} />
-                ) : (
-                  <StatusBadge label='等待输入' variant='warning' />
-                )}
-                <StatusBadge
-                  label={currentCertificate ? `证书：${currentCertificate.name}` : '未绑定证书'}
-                  variant={currentCertificate ? 'success' : 'warning'}
-                />
-              </div>
-              <p>
-                建议只为真正需要默认推荐的域名绑定证书；如果同一 hostname 同时命中精确和通配符规则，
-                系统会优先使用精确匹配。
-              </p>
+              <p className='mt-2 text-lg font-semibold text-[var(--foreground-primary)]'>{item.value}</p>
             </div>
-          </AppCard>
+          ))}
         </div>
-      </div>
+      </AppCard>
 
       <AppCard
         title='域名规则列表'
@@ -417,5 +336,103 @@ export function ManagedDomainsPage() {
         )}
       </AppCard>
     </div>
+    <AppModal
+      isOpen={isEditorOpen}
+      onClose={handleReset}
+      title={editingDomainId ? '编辑域名规则' : '新增域名规则'}
+      description='支持精确域名与单层通配符域名，证书可留空以仅维护资产关系。'
+      footer={
+        <div className='flex flex-wrap justify-end gap-3'>
+          <SecondaryButton type='button' onClick={handleReset} disabled={saveMutation.isPending}>
+            取消
+          </SecondaryButton>
+          <PrimaryButton type='submit' form='managed-domain-editor-form' disabled={saveMutation.isPending}>
+            {saveMutation.isPending ? '保存中...' : editingDomainId ? '保存修改' : '新增域名'}
+          </PrimaryButton>
+        </div>
+      }
+    >
+      <form id='managed-domain-editor-form' className='space-y-5' onSubmit={handleSubmit}>
+        <div className='grid gap-4 md:grid-cols-2'>
+          <ResourceField
+            label='域名'
+            hint='示例：example.com 或 *.example.com'
+            error={form.formState.errors.domain?.message}
+          >
+            <ResourceInput placeholder='example.com 或 *.example.com' {...form.register('domain')} />
+          </ResourceField>
+          <ResourceField
+            label='默认证书'
+            hint='证书用于域名自动匹配与规则推荐，可不选择。'
+            error={form.formState.errors.cert_id?.message}
+          >
+            <ResourceSelect
+              value={watchedCertId}
+              disabled={certificatesQuery.isLoading}
+              onChange={(event) =>
+                form.setValue('cert_id', event.target.value, {
+                  shouldDirty: true,
+                  shouldValidate: true,
+                })
+              }
+            >
+              <option value=''>不绑定证书</option>
+              {certificates.map((certificate) => (
+                <option key={certificate.id} value={certificate.id}>
+                  {buildCertificateLabel(certificate)}
+                </option>
+              ))}
+            </ResourceSelect>
+          </ResourceField>
+        </div>
+
+        <ToggleField
+          label='启用规则'
+          description='停用后该域名不会参与证书自动匹配，但记录会保留。'
+          checked={watchedEnabled}
+          onChange={(checked) =>
+            form.setValue('enabled', checked, {
+              shouldDirty: true,
+              shouldValidate: true,
+            })
+          }
+        />
+
+        <AppCard title='匹配提示' description='自动证书推荐时，精确域名优先级高于通配符域名。'>
+          <div className='space-y-3 text-sm leading-6 text-[var(--foreground-secondary)]'>
+            <p>
+              当前输入：
+              <span className='ml-2 font-medium text-[var(--foreground-primary)]'>
+                {watchedDomain.trim() || '未填写域名'}
+              </span>
+            </p>
+            <div className='flex flex-wrap gap-2'>
+              {watchedDomain.trim() ? (
+                <StatusBadge {...getMatchTypeMeta(watchedDomain.trim())} />
+              ) : (
+                <StatusBadge label='等待输入' variant='warning' />
+              )}
+              <StatusBadge
+                label={currentCertificate ? `证书：${currentCertificate.name}` : '未绑定证书'}
+                variant={currentCertificate ? 'success' : 'warning'}
+              />
+            </div>
+            <p>
+              建议只为真正需要默认推荐的域名绑定证书；如果同一 hostname 同时命中精确和通配符规则，
+              系统会优先使用精确匹配。
+            </p>
+          </div>
+        </AppCard>
+
+        <ResourceField
+          label='备注'
+          hint='可选，用于记录归属、用途或生效说明。'
+          error={form.formState.errors.remark?.message}
+        >
+          <ResourceInput placeholder='例如：主站泛域名证书' {...form.register('remark')} />
+        </ResourceField>
+      </form>
+    </AppModal>
+    </>
   );
 }

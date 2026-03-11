@@ -31,7 +31,6 @@
 * 应用记录 `/apply-log`
 * 域名管理 `/managed-domain`
 * TLS 证书 `/tls-certificate`
-* 文件管理 `/file`
 * 用户管理 `/user`
 * 设置 `/setting`
 * 登录、注册、重置密码、GitHub OAuth 等认证页面
@@ -158,7 +157,6 @@ atsf_server/web/
       apply-log/
       managed-domain/
       tls-certificate/
-      file/
       user/
       setting/
     not-found.tsx
@@ -176,7 +174,6 @@ atsf_server/web/
     apply-log/
     managed-domain/
     tls-certificate/
-    file/
     user/
     setting/
   lib/
@@ -216,7 +213,6 @@ atsf_server/web/
 | `/apply-log` | `/apply-log` | 过滤器、结果状态可视化、分页与详情展示 |
 | `/managed-domain` | `/managed-domain` | 通配符匹配提示、证书绑定状态、启用状态切换 |
 | `/tls-certificate` | `/tls-certificate` | 导入、上传、有效期展示、到期提醒样式 |
-| `/file` | `/file` | 文件列表与下载交互优化 |
 | `/user` | `/user` | 用户列表、角色管理、搜索与编辑体验 |
 | `/setting` | `/setting` | 系统设置、运维设置、个人设置按信息架构重组 |
 | `/login` 等 | `/login` 等 | 统一认证页视觉与表单规范 |
@@ -319,7 +315,7 @@ atsf_server/web/
 
 任务：
 
-* 迁移 `setting`、`user`、`file`、`about` 等模块
+* 迁移 `setting`、`user`、`about` 等模块
 * 重构表单项、标签页、操作区布局
 * 增加部署命令复制、时间友好显示、状态颜色体系
 

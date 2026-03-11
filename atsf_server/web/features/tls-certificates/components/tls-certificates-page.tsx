@@ -11,6 +11,7 @@ import { ErrorState } from '@/components/feedback/error-state';
 import { InlineMessage } from '@/components/feedback/inline-message';
 import { LoadingState } from '@/components/feedback/loading-state';
 import { PageHeader } from '@/components/layout/page-header';
+import { AppModal } from '@/components/ui/app-modal';
 import { AppCard } from '@/components/ui/app-card';
 import { StatusBadge } from '@/components/ui/status-badge';
 import {
@@ -120,6 +121,7 @@ function toFilePayload(
 export function TlsCertificatesPage() {
   const queryClient = useQueryClient();
   const [feedback, setFeedback] = useState<FeedbackState | null>(null);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [fileForm, setFileForm] = useState<FileImportFormValues>(defaultFileValues);
   const [certFile, setCertFile] = useState<File | null>(null);
   const [keyFile, setKeyFile] = useState<File | null>(null);
@@ -139,6 +141,7 @@ export function TlsCertificatesPage() {
     mutationFn: async (values: ManualImportFormValues) => createTlsCertificate(toManualPayload(values)),
     onSuccess: async () => {
       setFeedback({ tone: 'success', message: '证书已导入。' });
+      setIsImportModalOpen(false);
       manualForm.reset(defaultManualValues);
       await queryClient.invalidateQueries({ queryKey: tlsCertificatesQueryKey });
     },
@@ -152,6 +155,7 @@ export function TlsCertificatesPage() {
       importTlsCertificateFiles(toFilePayload(values, certFile, keyFile)),
     onSuccess: async () => {
       setFeedback({ tone: 'success', message: '证书文件已导入。' });
+      setIsImportModalOpen(false);
       setFileForm(defaultFileValues);
       setCertFile(null);
       setKeyFile(null);
@@ -222,11 +226,21 @@ export function TlsCertificatesPage() {
     deleteMutation.mutate(certificate.id);
   };
 
+  const handleCloseImportModal = () => {
+    setIsImportModalOpen(false);
+  };
+
   return (
+    <>
     <div className='space-y-6'>
       <PageHeader
         title='TLS 证书'
         description='支持手动粘贴 PEM 导入和文件上传导入，并展示证书有效期与到期风险。'
+        action={
+          <PrimaryButton type='button' onClick={() => setIsImportModalOpen(true)}>
+            导入证书
+          </PrimaryButton>
+        }
       />
 
       {feedback ? <InlineMessage tone={feedback.tone} message={feedback.message} /> : null}
@@ -245,6 +259,83 @@ export function TlsCertificatesPage() {
         </div>
       </AppCard>
 
+      <AppCard
+        title='证书列表'
+        description='展示证书有效期、到期状态与最近更新时间。删除前会提示确认。'
+        action={
+          <SecondaryButton
+            type='button'
+            onClick={() => void queryClient.invalidateQueries({ queryKey: tlsCertificatesQueryKey })}
+          >
+            刷新
+          </SecondaryButton>
+        }
+      >
+        {certificatesQuery.isLoading ? (
+          <LoadingState />
+        ) : certificatesQuery.isError ? (
+          <ErrorState title='证书列表加载失败' description={getErrorMessage(certificatesQuery.error)} />
+        ) : certificates.length === 0 ? (
+          <EmptyState title='暂无证书' description='请先导入至少一张证书，再为 HTTPS 规则或域名绑定使用。' />
+        ) : (
+          <div className='overflow-x-auto'>
+            <table className='min-w-full divide-y divide-[var(--border-default)] text-left text-sm'>
+              <thead>
+                <tr className='text-[var(--foreground-secondary)]'>
+                  <th className='px-3 py-3 font-medium'>名称</th>
+                  <th className='px-3 py-3 font-medium'>状态</th>
+                  <th className='px-3 py-3 font-medium'>有效期</th>
+                  <th className='px-3 py-3 font-medium'>备注</th>
+                  <th className='px-3 py-3 font-medium'>更新时间</th>
+                  <th className='px-3 py-3 font-medium'>操作</th>
+                </tr>
+              </thead>
+              <tbody className='divide-y divide-[var(--border-default)]'>
+                {certificates.map((certificate) => {
+                  const status = getCertificateStatus(certificate);
+
+                  return (
+                    <tr key={certificate.id} className='align-top'>
+                      <td className='px-3 py-4 font-medium text-[var(--foreground-primary)]'>{certificate.name}</td>
+                      <td className='px-3 py-4'>
+                        <StatusBadge label={status.label} variant={status.variant} />
+                      </td>
+                      <td className='px-3 py-4 text-[var(--foreground-secondary)]'>
+                        <div className='space-y-1'>
+                          <p>{formatDateTime(certificate.not_before)}</p>
+                          <p>{formatDateTime(certificate.not_after)}</p>
+                        </div>
+                      </td>
+                      <td className='px-3 py-4 text-[var(--foreground-secondary)]'>{certificate.remark || '—'}</td>
+                      <td className='px-3 py-4 text-[var(--foreground-secondary)]'>
+                        {formatDateTime(certificate.updated_at)}
+                      </td>
+                      <td className='px-3 py-4'>
+                        <DangerButton
+                          type='button'
+                          onClick={() => handleDelete(certificate)}
+                          disabled={deleteMutation.isPending}
+                          className='px-3 py-2 text-xs'
+                        >
+                          删除
+                        </DangerButton>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </AppCard>
+    </div>
+    <AppModal
+      isOpen={isImportModalOpen}
+      onClose={handleCloseImportModal}
+      title='导入证书'
+      description='手动粘贴和文件导入都保留在同一个弹窗中，避免压缩主列表空间。'
+      size='xl'
+    >
       <div className='grid gap-6 xl:grid-cols-2'>
         <AppCard title='手动导入' description='直接粘贴 PEM 证书和私钥内容，适合快速录入已有证书。'>
           <form className='space-y-5' onSubmit={handleManualSubmit}>
@@ -351,76 +442,7 @@ export function TlsCertificatesPage() {
           </form>
         </AppCard>
       </div>
-
-      <AppCard
-        title='证书列表'
-        description='展示证书有效期、到期状态与最近更新时间。删除前会提示确认。'
-        action={
-          <SecondaryButton
-            type='button'
-            onClick={() => void queryClient.invalidateQueries({ queryKey: tlsCertificatesQueryKey })}
-          >
-            刷新
-          </SecondaryButton>
-        }
-      >
-        {certificatesQuery.isLoading ? (
-          <LoadingState />
-        ) : certificatesQuery.isError ? (
-          <ErrorState title='证书列表加载失败' description={getErrorMessage(certificatesQuery.error)} />
-        ) : certificates.length === 0 ? (
-          <EmptyState title='暂无证书' description='请先导入至少一张证书，再为 HTTPS 规则或域名绑定使用。' />
-        ) : (
-          <div className='overflow-x-auto'>
-            <table className='min-w-full divide-y divide-[var(--border-default)] text-left text-sm'>
-              <thead>
-                <tr className='text-[var(--foreground-secondary)]'>
-                  <th className='px-3 py-3 font-medium'>名称</th>
-                  <th className='px-3 py-3 font-medium'>状态</th>
-                  <th className='px-3 py-3 font-medium'>有效期</th>
-                  <th className='px-3 py-3 font-medium'>备注</th>
-                  <th className='px-3 py-3 font-medium'>更新时间</th>
-                  <th className='px-3 py-3 font-medium'>操作</th>
-                </tr>
-              </thead>
-              <tbody className='divide-y divide-[var(--border-default)]'>
-                {certificates.map((certificate) => {
-                  const status = getCertificateStatus(certificate);
-
-                  return (
-                    <tr key={certificate.id} className='align-top'>
-                      <td className='px-3 py-4 font-medium text-[var(--foreground-primary)]'>{certificate.name}</td>
-                      <td className='px-3 py-4'>
-                        <StatusBadge label={status.label} variant={status.variant} />
-                      </td>
-                      <td className='px-3 py-4 text-[var(--foreground-secondary)]'>
-                        <div className='space-y-1'>
-                          <p>{formatDateTime(certificate.not_before)}</p>
-                          <p>{formatDateTime(certificate.not_after)}</p>
-                        </div>
-                      </td>
-                      <td className='px-3 py-4 text-[var(--foreground-secondary)]'>{certificate.remark || '—'}</td>
-                      <td className='px-3 py-4 text-[var(--foreground-secondary)]'>
-                        {formatDateTime(certificate.updated_at)}
-                      </td>
-                      <td className='px-3 py-4'>
-                        <DangerButton
-                          type='button'
-                          onClick={() => handleDelete(certificate)}
-                          disabled={deleteMutation.isPending}
-                          className='px-3 py-2 text-xs'
-                        >
-                          删除
-                        </DangerButton>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </AppCard>
-    </div>
+    </AppModal>
+    </>
   );
 }

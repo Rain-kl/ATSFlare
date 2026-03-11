@@ -12,6 +12,7 @@ import { InlineMessage } from '@/components/feedback/inline-message';
 import { LoadingState } from '@/components/feedback/loading-state';
 import { useAuth } from '@/components/providers/auth-provider';
 import { PageHeader } from '@/components/layout/page-header';
+import { AppModal } from '@/components/ui/app-modal';
 import { AppCard } from '@/components/ui/app-card';
 import { StatusBadge } from '@/components/ui/status-badge';
 import {
@@ -99,6 +100,7 @@ export function UsersPage() {
   const [searchInput, setSearchInput] = useState('');
   const [searchKeyword, setSearchKeyword] = useState('');
   const [editingUserId, setEditingUserId] = useState<number | null>(null);
+  const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [feedback, setFeedback] = useState<FeedbackState | null>(null);
 
   const form = useForm<UserFormValues>({
@@ -156,6 +158,7 @@ export function UsersPage() {
     onSuccess: async (message) => {
       setFeedback({ tone: 'success', message });
       setEditingUserId(null);
+      setIsEditorOpen(false);
       form.reset(defaultValues);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: usersListQueryKey }),
@@ -219,13 +222,22 @@ export function UsersPage() {
 
   const handleResetForm = () => {
     setEditingUserId(null);
+    setIsEditorOpen(false);
     setFeedback(null);
     form.reset(defaultValues);
+  };
+
+  const handleCreate = () => {
+    setEditingUserId(null);
+    setFeedback(null);
+    form.reset(defaultValues);
+    setIsEditorOpen(true);
   };
 
   const handleEdit = (targetUser: UserItem) => {
     setFeedback(null);
     setEditingUserId(targetUser.id);
+    setIsEditorOpen(true);
   };
 
   const handleManage = (targetUser: UserItem, action: ManageUserAction) => {
@@ -270,89 +282,35 @@ export function UsersPage() {
   }
 
   return (
+    <>
     <div className='space-y-6'>
       <PageHeader
         title='用户管理'
         description='支持搜索、分页、创建、编辑以及启用、封禁、权限调整等常见账户管理动作。'
+        action={
+          <PrimaryButton type='button' onClick={handleCreate}>
+            新建用户
+          </PrimaryButton>
+        }
       />
 
       {feedback ? <InlineMessage tone={feedback.tone} message={feedback.message} /> : null}
 
-      <div className='grid gap-6 xl:grid-cols-[1.2fr_0.8fr]'>
-        <AppCard title='用户概览' description='当前视图会根据分页或搜索结果实时刷新。'>
-          <div className='grid gap-4 md:grid-cols-2 xl:grid-cols-4'>
-            {summary.map((item) => (
-              <div
-                key={item.label}
-                className='rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-4'
-              >
-                <p className='text-xs uppercase tracking-[0.2em] text-[var(--foreground-muted)]'>
-                  {item.label}
-                </p>
-                <p className='mt-2 text-lg font-semibold text-[var(--foreground-primary)]'>{item.value}</p>
-              </div>
-            ))}
-          </div>
-        </AppCard>
-
-        <AppCard
-          title={editingUserId ? '编辑用户' : '创建新用户'}
-          description={editingUserId ? '可更新用户名、显示名称与密码。留空密码表示不修改。' : '新建用户默认创建为普通用户。'}
-        >
-          {editingUserId && editingUserQuery.isLoading ? (
-            <LoadingState />
-          ) : editingUserId && editingUserQuery.isError ? (
-            <ErrorState title='用户详情加载失败' description={getErrorMessage(editingUserQuery.error)} />
-          ) : (
-            <form className='space-y-5' onSubmit={handleSubmit}>
-              <ResourceField label='用户名' error={form.formState.errors.username?.message}>
-                <ResourceInput placeholder='请输入用户名' {...form.register('username')} />
-              </ResourceField>
-
-              <ResourceField label='显示名称' error={form.formState.errors.display_name?.message}>
-                <ResourceInput placeholder='请输入显示名称' {...form.register('display_name')} />
-              </ResourceField>
-
-              <ResourceField
-                label={editingUserId ? '新密码' : '密码'}
-                hint={editingUserId ? '留空表示保持原密码不变。' : '密码长度需为 8 到 20 个字符。'}
-                error={form.formState.errors.password?.message}
-              >
-                <ResourceInput type='password' placeholder='请输入密码' {...form.register('password')} />
-              </ResourceField>
-
-              {editingUserId && editingUserQuery.data ? (
-                <div className='grid gap-4 md:grid-cols-2'>
-                  <div className='rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-4'>
-                    <p className='text-xs uppercase tracking-[0.2em] text-[var(--foreground-muted)]'>绑定邮箱</p>
-                    <p className='mt-2 break-all text-sm text-[var(--foreground-primary)]'>
-                      {editingUserQuery.data.email || '未绑定'}
-                    </p>
-                  </div>
-                  <div className='rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-4'>
-                    <p className='text-xs uppercase tracking-[0.2em] text-[var(--foreground-muted)]'>第三方账号</p>
-                    <p className='mt-2 text-sm text-[var(--foreground-primary)]'>
-                      GitHub：{editingUserQuery.data.github_id || '未绑定'}
-                    </p>
-                    <p className='mt-1 text-sm text-[var(--foreground-primary)]'>
-                      微信：{editingUserQuery.data.wechat_id || '未绑定'}
-                    </p>
-                  </div>
-                </div>
-              ) : null}
-
-              <div className='flex flex-wrap gap-3'>
-                <PrimaryButton type='submit' disabled={saveMutation.isPending}>
-                  {saveMutation.isPending ? '保存中...' : editingUserId ? '保存修改' : '创建用户'}
-                </PrimaryButton>
-                <SecondaryButton type='button' onClick={handleResetForm} disabled={saveMutation.isPending}>
-                  {editingUserId ? '取消编辑' : '重置表单'}
-                </SecondaryButton>
-              </div>
-            </form>
-          )}
-        </AppCard>
-      </div>
+      <AppCard title='用户概览' description='当前视图会根据分页或搜索结果实时刷新，新增和编辑统一在弹窗中完成。'>
+        <div className='grid gap-4 md:grid-cols-2 xl:grid-cols-4'>
+          {summary.map((item) => (
+            <div
+              key={item.label}
+              className='rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-4'
+            >
+              <p className='text-xs uppercase tracking-[0.2em] text-[var(--foreground-muted)]'>
+                {item.label}
+              </p>
+              <p className='mt-2 text-lg font-semibold text-[var(--foreground-primary)]'>{item.value}</p>
+            </div>
+          ))}
+        </div>
+      </AppCard>
 
       <AppCard
         title='用户列表'
@@ -488,5 +446,66 @@ export function UsersPage() {
         </div>
       </AppCard>
     </div>
+    <AppModal
+      isOpen={isEditorOpen}
+      onClose={handleResetForm}
+      title={editingUserId ? '编辑用户' : '创建新用户'}
+      description={editingUserId ? '可更新用户名、显示名称与密码。留空密码表示不修改。' : '新建用户默认创建为普通用户。'}
+      footer={
+        <div className='flex flex-wrap justify-end gap-3'>
+          <SecondaryButton type='button' onClick={handleResetForm} disabled={saveMutation.isPending}>
+            取消
+          </SecondaryButton>
+          <PrimaryButton type='submit' form='user-editor-form' disabled={saveMutation.isPending}>
+            {saveMutation.isPending ? '保存中...' : editingUserId ? '保存修改' : '创建用户'}
+          </PrimaryButton>
+        </div>
+      }
+    >
+      {editingUserId && editingUserQuery.isLoading ? (
+        <LoadingState />
+      ) : editingUserId && editingUserQuery.isError ? (
+        <ErrorState title='用户详情加载失败' description={getErrorMessage(editingUserQuery.error)} />
+      ) : (
+        <form id='user-editor-form' className='space-y-5' onSubmit={handleSubmit}>
+          <ResourceField label='用户名' error={form.formState.errors.username?.message}>
+            <ResourceInput placeholder='请输入用户名' {...form.register('username')} />
+          </ResourceField>
+
+          <ResourceField label='显示名称' error={form.formState.errors.display_name?.message}>
+            <ResourceInput placeholder='请输入显示名称' {...form.register('display_name')} />
+          </ResourceField>
+
+          <ResourceField
+            label={editingUserId ? '新密码' : '密码'}
+            hint={editingUserId ? '留空表示保持原密码不变。' : '密码长度需为 8 到 20 个字符。'}
+            error={form.formState.errors.password?.message}
+          >
+            <ResourceInput type='password' placeholder='请输入密码' {...form.register('password')} />
+          </ResourceField>
+
+          {editingUserId && editingUserQuery.data ? (
+            <div className='grid gap-4 md:grid-cols-2'>
+              <div className='rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-4'>
+                <p className='text-xs uppercase tracking-[0.2em] text-[var(--foreground-muted)]'>绑定邮箱</p>
+                <p className='mt-2 break-all text-sm text-[var(--foreground-primary)]'>
+                  {editingUserQuery.data.email || '未绑定'}
+                </p>
+              </div>
+              <div className='rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-4'>
+                <p className='text-xs uppercase tracking-[0.2em] text-[var(--foreground-muted)]'>第三方账号</p>
+                <p className='mt-2 text-sm text-[var(--foreground-primary)]'>
+                  GitHub：{editingUserQuery.data.github_id || '未绑定'}
+                </p>
+                <p className='mt-1 text-sm text-[var(--foreground-primary)]'>
+                  微信：{editingUserQuery.data.wechat_id || '未绑定'}
+                </p>
+              </div>
+            </div>
+          ) : null}
+        </form>
+      )}
+    </AppModal>
+    </>
   );
 }

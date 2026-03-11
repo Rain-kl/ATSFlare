@@ -11,6 +11,7 @@ import { ErrorState } from '@/components/feedback/error-state';
 import { InlineMessage } from '@/components/feedback/inline-message';
 import { LoadingState } from '@/components/feedback/loading-state';
 import { PageHeader } from '@/components/layout/page-header';
+import { AppModal } from '@/components/ui/app-modal';
 import { AppCard } from '@/components/ui/app-card';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { publishConfigVersion } from '@/features/config-versions/api/config-versions';
@@ -215,6 +216,7 @@ export function ProxyRoutesPage() {
   const queryClient = useQueryClient();
   const [feedback, setFeedback] = useState<FeedbackState | null>(null);
   const [editingRouteId, setEditingRouteId] = useState<number | null>(null);
+  const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [matchResult, setMatchResult] = useState<ManagedDomainMatchResult | null>(null);
   const [isMatching, setIsMatching] = useState(false);
 
@@ -254,6 +256,7 @@ export function ProxyRoutesPage() {
     onSuccess: async () => {
       setFeedback({ tone: 'success', message: editingRouteId ? '规则已更新。' : '规则已创建。' });
       setEditingRouteId(null);
+      setIsEditorOpen(false);
       setMatchResult(null);
       form.reset(defaultValues);
       await queryClient.invalidateQueries({ queryKey: routesQueryKey });
@@ -353,8 +356,17 @@ export function ProxyRoutesPage() {
   const handleReset = () => {
     setFeedback(null);
     setEditingRouteId(null);
+    setIsEditorOpen(false);
     setMatchResult(null);
     form.reset(defaultValues);
+  };
+
+  const handleCreate = () => {
+    setFeedback(null);
+    setEditingRouteId(null);
+    setMatchResult(null);
+    form.reset(defaultValues);
+    setIsEditorOpen(true);
   };
 
   const handleSubmit = form.handleSubmit((values) => {
@@ -367,6 +379,7 @@ export function ProxyRoutesPage() {
     setEditingRouteId(route.id);
     setMatchResult(null);
     form.reset(toFormValues(route));
+    setIsEditorOpen(true);
   };
 
   const handleDelete = (route: ProxyRouteItem) => {
@@ -390,217 +403,43 @@ export function ProxyRoutesPage() {
   const routes = routesQuery.data || [];
 
   return (
+    <>
     <div className='space-y-6'>
       <PageHeader
         title='反代规则'
         description='维护域名到源站的映射、HTTPS 证书绑定与自定义请求头，并可直接触发配置发布。'
+        action={
+          <PrimaryButton type='button' onClick={handleCreate}>
+            新增规则
+          </PrimaryButton>
+        }
       />
 
       {feedback ? <InlineMessage tone={feedback.tone} message={feedback.message} /> : null}
 
-      <div className='grid gap-6 xl:grid-cols-[1.3fr_0.7fr]'>
-        <AppCard
-          title={editingRouteId ? '编辑规则' : '新增规则'}
-          description='新增或修改反代规则后，可直接在当前页面完成发布。'
-        >
-          <form className='space-y-5' onSubmit={handleSubmit}>
-            <div className='grid gap-4 md:grid-cols-2'>
-              <ResourceField
-                label='域名'
-                hint='示例：example.com'
-                error={form.formState.errors.domain?.message}
-              >
-                <ResourceInput placeholder='example.com' {...form.register('domain')} />
-              </ResourceField>
-              <ResourceField
-                label='源站地址'
-                hint='示例：https://origin.internal'
-                error={form.formState.errors.origin_url?.message}
-              >
-                <ResourceInput placeholder='https://origin.internal' {...form.register('origin_url')} />
-              </ResourceField>
-            </div>
-
-            <div className='grid gap-4 lg:grid-cols-2'>
-              <ToggleField
-                label='启用规则'
-                description='关闭后该规则不会参与配置渲染与发布。'
-                checked={watchedEnabled}
-                onChange={(checked) => form.setValue('enabled', checked, { shouldDirty: true })}
-              />
-              <ToggleField
-                label='启用 HTTPS'
-                description='启用后必须关联 TLS 证书，可选择是否将 HTTP 自动重定向到 HTTPS。'
-                checked={watchedEnableHttps}
-                onChange={(checked) => {
-                  form.setValue('enable_https', checked, { shouldDirty: true, shouldValidate: true });
-                  if (!checked) {
-                    form.setValue('cert_id', '', { shouldDirty: true, shouldValidate: true });
-                    form.setValue('redirect_http', false, { shouldDirty: true, shouldValidate: true });
-                  }
-                }}
-              />
-            </div>
-
-            <div className='grid gap-4 lg:grid-cols-[1.2fr_0.8fr]'>
-              <ResourceField
-                label='TLS 证书'
-                hint='启用 HTTPS 后可自动推荐匹配证书，也支持手动选择。'
-                error={form.formState.errors.cert_id?.message}
-              >
-                <ResourceSelect
-                  value={watchedCertId}
-                  disabled={!watchedEnableHttps || certificatesQuery.isLoading}
-                  onChange={(event) =>
-                    form.setValue('cert_id', event.target.value, {
-                      shouldDirty: true,
-                      shouldValidate: true,
-                    })
-                  }
-                >
-                  <option value=''>请选择证书</option>
-                  {certificates.map((certificate) => (
-                    <option key={certificate.id} value={certificate.id}>
-                      {buildCertificateLabel(certificate)}
-                    </option>
-                  ))}
-                </ResourceSelect>
-              </ResourceField>
-              <ToggleField
-                label='HTTP 跳转 HTTPS'
-                description='仅在启用 HTTPS 后可开启。开启后会将 HTTP 请求重定向到 HTTPS。'
-                checked={watchedRedirectHttp}
-                disabled={!watchedEnableHttps}
-                onChange={(checked) =>
-                  form.setValue('redirect_http', checked, {
-                    shouldDirty: true,
-                    shouldValidate: true,
-                  })
-                }
-              />
-            </div>
-
-            <div className='rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-4'>
-              <div className='flex flex-wrap items-center justify-between gap-3'>
-                <div>
-                  <p className='text-sm font-semibold text-[var(--foreground-primary)]'>自定义请求头</p>
-                  <p className='mt-1 text-xs leading-5 text-[var(--foreground-secondary)]'>
-                    可为空。若填写，请保证 Header 名称合法且不包含换行。
-                  </p>
-                </div>
-                <SecondaryButton
-                  type='button'
-                  onClick={() => append({ key: '', value: '' })}
-                  className='px-3 py-2 text-xs'
-                >
-                  添加请求头
-                </SecondaryButton>
-              </div>
-
-              <div className='mt-4 space-y-4'>
-                {fields.map((field, index) => (
-                  <div key={field.id} className='grid gap-3 md:grid-cols-[1fr_1fr_auto]'>
-                    <ResourceField
-                      label={index === 0 ? 'Header 名称' : `Header 名称 ${index + 1}`}
-                      error={form.formState.errors.custom_headers?.[index]?.key?.message}
-                    >
-                      <ResourceInput
-                        placeholder='X-Trace-Id'
-                        {...form.register(`custom_headers.${index}.key`)}
-                      />
-                    </ResourceField>
-                    <ResourceField
-                      label={index === 0 ? 'Header 值' : `Header 值 ${index + 1}`}
-                      error={form.formState.errors.custom_headers?.[index]?.value?.message}
-                    >
-                      <ResourceInput
-                        placeholder='$request_id'
-                        {...form.register(`custom_headers.${index}.value`)}
-                      />
-                    </ResourceField>
-                    <div className='flex items-end'>
-                      <DangerButton
-                        type='button'
-                        onClick={() => handleRemoveHeader(index)}
-                        className='w-full px-3 py-3 text-xs md:w-auto'
-                      >
-                        删除
-                      </DangerButton>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <ResourceField
-              label='备注'
-              hint='可选，便于标记用途、责任人或特殊说明。'
-              error={form.formState.errors.remark?.message}
+      <AppCard
+        title='发布与摘要'
+        description='规则维护动作改为按钮+弹窗模式，列表不再被长表单挤压。'
+        action={
+          <PrimaryButton type='button' onClick={() => publishMutation.mutate()} disabled={publishMutation.isPending}>
+            {publishMutation.isPending ? '发布中...' : '发布当前规则'}
+          </PrimaryButton>
+        }
+      >
+        <div className='grid gap-4 md:grid-cols-2 xl:grid-cols-4'>
+          {summary.map((item) => (
+            <div
+              key={item.label}
+              className='rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-4'
             >
-              <ResourceTextarea placeholder='例如：主站生产流量入口' {...form.register('remark')} />
-            </ResourceField>
-
-            <div className='flex flex-wrap gap-3'>
-              <PrimaryButton type='submit' disabled={saveMutation.isPending}>
-                {saveMutation.isPending ? '保存中...' : editingRouteId ? '保存修改' : '新增规则'}
-              </PrimaryButton>
-              {editingRouteId ? (
-                <SecondaryButton type='button' onClick={handleReset} disabled={saveMutation.isPending}>
-                  取消编辑
-                </SecondaryButton>
-              ) : null}
-            </div>
-          </form>
-        </AppCard>
-
-        <div className='space-y-6'>
-          <AppCard
-            title='发布与摘要'
-            description='规则变更完成后，可直接发布为新的配置版本。'
-            action={
-              <PrimaryButton type='button' onClick={() => publishMutation.mutate()} disabled={publishMutation.isPending}>
-                {publishMutation.isPending ? '发布中...' : '发布当前规则'}
-              </PrimaryButton>
-            }
-          >
-            <div className='grid gap-4 sm:grid-cols-2 xl:grid-cols-1'>
-              {summary.map((item) => (
-                <div
-                  key={item.label}
-                  className='rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-4'
-                >
-                  <p className='text-xs uppercase tracking-[0.2em] text-[var(--foreground-muted)]'>
-                    {item.label}
-                  </p>
-                  <p className='mt-2 text-lg font-semibold text-[var(--foreground-primary)]'>{item.value}</p>
-                </div>
-              ))}
-            </div>
-          </AppCard>
-
-          <AppCard title='证书匹配提示' description='根据域名自动匹配托管证书，优先使用精确匹配规则。'>
-            <div className='space-y-3'>
-              <p className='text-sm leading-6 text-[var(--foreground-secondary)]'>
-                {getMatchMessage(matchResult, isMatching, watchedDomain, watchedEnableHttps)}
+              <p className='text-xs uppercase tracking-[0.2em] text-[var(--foreground-muted)]'>
+                {item.label}
               </p>
-              {matchResult?.matched && matchResult.candidates.length > 1 ? (
-                <div className='flex flex-wrap gap-2'>
-                  {matchResult.candidates.map((candidate) => (
-                    <StatusBadge
-                      key={`${candidate.managed_domain_id}-${candidate.certificate_id}`}
-                      label={`${candidate.domain} → ${candidate.certificate_name}`}
-                      variant={candidate.match_type === 'exact' ? 'success' : 'info'}
-                    />
-                  ))}
-                </div>
-              ) : null}
-              <div className='rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-4 text-sm text-[var(--foreground-secondary)]'>
-                当前可选证书：{certificatesQuery.isLoading ? '加载中...' : `${certificates.length} 张`}
-              </div>
+              <p className='mt-2 text-lg font-semibold text-[var(--foreground-primary)]'>{item.value}</p>
             </div>
-          </AppCard>
+          ))}
         </div>
-      </div>
+      </AppCard>
 
       <AppCard title='规则列表' description='支持查看启用状态、HTTPS 配置、自定义请求头数量及最近更新时间。'>
         {routesQuery.isLoading ? (
@@ -689,5 +528,183 @@ export function ProxyRoutesPage() {
         )}
       </AppCard>
     </div>
+    <AppModal
+      isOpen={isEditorOpen}
+      onClose={handleReset}
+      title={editingRouteId ? '编辑规则' : '新增规则'}
+      description='新增或修改反代规则后，可直接回到列表页继续发布。'
+      size='xl'
+      footer={
+        <div className='flex flex-wrap justify-end gap-3'>
+          <SecondaryButton type='button' onClick={handleReset} disabled={saveMutation.isPending}>
+            取消
+          </SecondaryButton>
+          <PrimaryButton type='submit' form='proxy-route-editor-form' disabled={saveMutation.isPending}>
+            {saveMutation.isPending ? '保存中...' : editingRouteId ? '保存修改' : '新增规则'}
+          </PrimaryButton>
+        </div>
+      }
+    >
+      <form id='proxy-route-editor-form' className='space-y-5' onSubmit={handleSubmit}>
+        <div className='grid gap-4 md:grid-cols-2'>
+          <ResourceField
+            label='域名'
+            hint='示例：example.com'
+            error={form.formState.errors.domain?.message}
+          >
+            <ResourceInput placeholder='example.com' {...form.register('domain')} />
+          </ResourceField>
+          <ResourceField
+            label='源站地址'
+            hint='示例：https://origin.internal'
+            error={form.formState.errors.origin_url?.message}
+          >
+            <ResourceInput placeholder='https://origin.internal' {...form.register('origin_url')} />
+          </ResourceField>
+        </div>
+
+        <div className='grid gap-4 lg:grid-cols-2'>
+          <ToggleField
+            label='启用规则'
+            description='关闭后该规则不会参与配置渲染与发布。'
+            checked={watchedEnabled}
+            onChange={(checked) => form.setValue('enabled', checked, { shouldDirty: true })}
+          />
+          <ToggleField
+            label='启用 HTTPS'
+            description='启用后必须关联 TLS 证书，可选择是否将 HTTP 自动重定向到 HTTPS。'
+            checked={watchedEnableHttps}
+            onChange={(checked) => {
+              form.setValue('enable_https', checked, { shouldDirty: true, shouldValidate: true });
+              if (!checked) {
+                form.setValue('cert_id', '', { shouldDirty: true, shouldValidate: true });
+                form.setValue('redirect_http', false, { shouldDirty: true, shouldValidate: true });
+              }
+            }}
+          />
+        </div>
+
+        <div className='grid gap-4 lg:grid-cols-[1.2fr_0.8fr]'>
+          <ResourceField
+            label='TLS 证书'
+            hint='启用 HTTPS 后可自动推荐匹配证书，也支持手动选择。'
+            error={form.formState.errors.cert_id?.message}
+          >
+            <ResourceSelect
+              value={watchedCertId}
+              disabled={!watchedEnableHttps || certificatesQuery.isLoading}
+              onChange={(event) =>
+                form.setValue('cert_id', event.target.value, {
+                  shouldDirty: true,
+                  shouldValidate: true,
+                })
+              }
+            >
+              <option value=''>请选择证书</option>
+              {certificates.map((certificate) => (
+                <option key={certificate.id} value={certificate.id}>
+                  {buildCertificateLabel(certificate)}
+                </option>
+              ))}
+            </ResourceSelect>
+          </ResourceField>
+          <ToggleField
+            label='HTTP 跳转 HTTPS'
+            description='仅在启用 HTTPS 后可开启。开启后会将 HTTP 请求重定向到 HTTPS。'
+            checked={watchedRedirectHttp}
+            disabled={!watchedEnableHttps}
+            onChange={(checked) =>
+              form.setValue('redirect_http', checked, {
+                shouldDirty: true,
+                shouldValidate: true,
+              })
+            }
+          />
+        </div>
+
+        <div className='rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-4'>
+          <div className='flex flex-wrap items-center justify-between gap-3'>
+            <div>
+              <p className='text-sm font-semibold text-[var(--foreground-primary)]'>自定义请求头</p>
+              <p className='mt-1 text-xs leading-5 text-[var(--foreground-secondary)]'>
+                可为空。若填写，请保证 Header 名称合法且不包含换行。
+              </p>
+            </div>
+            <SecondaryButton
+              type='button'
+              onClick={() => append({ key: '', value: '' })}
+              className='px-3 py-2 text-xs'
+            >
+              添加请求头
+            </SecondaryButton>
+          </div>
+
+          <div className='mt-4 space-y-4'>
+            {fields.map((field, index) => (
+              <div key={field.id} className='grid gap-3 md:grid-cols-[1fr_1fr_auto]'>
+                <ResourceField
+                  label={index === 0 ? 'Header 名称' : `Header 名称 ${index + 1}`}
+                  error={form.formState.errors.custom_headers?.[index]?.key?.message}
+                >
+                  <ResourceInput
+                    placeholder='X-Trace-Id'
+                    {...form.register(`custom_headers.${index}.key`)}
+                  />
+                </ResourceField>
+                <ResourceField
+                  label={index === 0 ? 'Header 值' : `Header 值 ${index + 1}`}
+                  error={form.formState.errors.custom_headers?.[index]?.value?.message}
+                >
+                  <ResourceInput
+                    placeholder='$request_id'
+                    {...form.register(`custom_headers.${index}.value`)}
+                  />
+                </ResourceField>
+                <div className='flex items-end'>
+                  <DangerButton
+                    type='button'
+                    onClick={() => handleRemoveHeader(index)}
+                    className='w-full px-3 py-3 text-xs md:w-auto'
+                  >
+                    删除
+                  </DangerButton>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <AppCard title='证书匹配提示' description='根据域名自动匹配托管证书，优先使用精确匹配规则。'>
+          <div className='space-y-3'>
+            <p className='text-sm leading-6 text-[var(--foreground-secondary)]'>
+              {getMatchMessage(matchResult, isMatching, watchedDomain, watchedEnableHttps)}
+            </p>
+            {matchResult?.matched && matchResult.candidates.length > 1 ? (
+              <div className='flex flex-wrap gap-2'>
+                {matchResult.candidates.map((candidate) => (
+                  <StatusBadge
+                    key={`${candidate.managed_domain_id}-${candidate.certificate_id}`}
+                    label={`${candidate.domain} → ${candidate.certificate_name}`}
+                    variant={candidate.match_type === 'exact' ? 'success' : 'info'}
+                  />
+                ))}
+              </div>
+            ) : null}
+            <div className='rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-4 text-sm text-[var(--foreground-secondary)]'>
+              当前可选证书：{certificatesQuery.isLoading ? '加载中...' : `${certificates.length} 张`}
+            </div>
+          </div>
+        </AppCard>
+
+        <ResourceField
+          label='备注'
+          hint='可选，便于标记用途、责任人或特殊说明。'
+          error={form.formState.errors.remark?.message}
+        >
+          <ResourceTextarea placeholder='例如：主站生产流量入口' {...form.register('remark')} />
+        </ResourceField>
+      </form>
+    </AppModal>
+    </>
   );
 }

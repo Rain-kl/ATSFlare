@@ -9,7 +9,8 @@ describe('navigation utils', () => {
   });
 
   it('resolves current navigation item for nested paths', () => {
-    expect(getCurrentNavigationItem('/node/abc')?.label).toBe('节点管理');
+    expect(getCurrentNavigationItem('/node/abc')?.label).toBe('节点');
+    expect(getCurrentNavigationItem('/managed-domain')?.label).toBe('域名');
     expect(getCurrentNavigationItem('/setting')?.label).toBe('设置');
   });
 });

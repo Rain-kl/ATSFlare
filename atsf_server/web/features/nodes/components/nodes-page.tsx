@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
@@ -11,6 +12,7 @@ import { ErrorState } from '@/components/feedback/error-state';
 import { InlineMessage } from '@/components/feedback/inline-message';
 import { LoadingState } from '@/components/feedback/loading-state';
 import { PageHeader } from '@/components/layout/page-header';
+import { AppModal } from '@/components/ui/app-modal';
 import { AppCard } from '@/components/ui/app-card';
 import { StatusBadge } from '@/components/ui/status-badge';
 import {
@@ -159,6 +161,7 @@ export function NodesPage() {
 	const queryClient = useQueryClient();
 	const [feedback, setFeedback] = useState<FeedbackState | null>(null);
 	const [editingNodeId, setEditingNodeId] = useState<number | null>(null);
+	const [isEditorOpen, setIsEditorOpen] = useState(false);
 	const [selectedNode, setSelectedNode] = useState<NodeItem | null>(null);
 	const [serverUrl, setServerUrl] = useState('');
 	const [, setRefreshTick] = useState(0);
@@ -211,6 +214,7 @@ export function NodesPage() {
 				message: editingNodeId ? '节点已更新。' : '节点已创建。',
 			});
 			setEditingNodeId(null);
+			setIsEditorOpen(false);
 			setSelectedNode(node);
 			form.reset(defaultValues);
 			await Promise.all([
@@ -284,7 +288,15 @@ export function NodesPage() {
 	const handleReset = () => {
 		setFeedback(null);
 		setEditingNodeId(null);
+		setIsEditorOpen(false);
 		form.reset(defaultValues);
+	};
+
+	const handleCreate = () => {
+		setFeedback(null);
+		setEditingNodeId(null);
+		form.reset(defaultValues);
+		setIsEditorOpen(true);
 	};
 
 	const handleEdit = (node: NodeItem) => {
@@ -295,6 +307,7 @@ export function NodesPage() {
 			name: node.name,
 			auto_update_enabled: node.auto_update_enabled,
 		});
+		setIsEditorOpen(true);
 	};
 
 	const handleDelete = (node: NodeItem) => {
@@ -342,76 +355,54 @@ export function NodesPage() {
 			: '';
 
 	return (
-		<div className='space-y-6'>
+		<>
+			<div className='space-y-6'>
 			<PageHeader
 				title='节点管理'
 				description='查看节点在线状态、最近心跳、部署命令与 Agent 更新动作，并支持预创建节点。'
+				action={
+					<>
+						<SecondaryButton type='button' onClick={handleCreate}>
+							新增节点
+						</SecondaryButton>
+						<Link
+							href='/apply-log'
+							className='inline-flex items-center justify-center rounded-2xl border border-[var(--border-default)] bg-[var(--control-background)] px-4 py-3 text-sm font-medium text-[var(--foreground-primary)] transition hover:bg-[var(--control-background-hover)]'
+						>
+							应用记录
+						</Link>
+					</>
+				}
 			/>
 
 			{feedback ? <InlineMessage tone={feedback.tone} message={feedback.message} /> : null}
 
-			<div className='grid gap-6 xl:grid-cols-[1.1fr_0.9fr]'>
-				<AppCard
-					title='节点摘要'
-					description='阶段 3 已接入状态标签、部署命令、自动更新开关与手动更新动作。'
-					action={
-						<SecondaryButton
-							type='button'
-							onClick={() => void queryClient.invalidateQueries({ queryKey: nodesQueryKey })}
+			<AppCard
+				title='节点摘要'
+				description='节点创建、编辑和更新动作均已收敛到列表页与弹窗，便于在生产环境快速处理。'
+				action={
+					<SecondaryButton
+						type='button'
+						onClick={() => void queryClient.invalidateQueries({ queryKey: nodesQueryKey })}
+					>
+						刷新列表
+					</SecondaryButton>
+				}
+			>
+				<div className='grid gap-4 md:grid-cols-2 xl:grid-cols-4'>
+					{summary.map((item) => (
+						<div
+							key={item.label}
+							className='rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-4'
 						>
-							刷新列表
-						</SecondaryButton>
-					}
-				>
-					<div className='grid gap-4 md:grid-cols-2 xl:grid-cols-4'>
-						{summary.map((item) => (
-							<div
-								key={item.label}
-								className='rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-4'
-							>
-								<p className='text-xs uppercase tracking-[0.2em] text-[var(--foreground-muted)]'>
-									{item.label}
-								</p>
-								<p className='mt-2 text-lg font-semibold text-[var(--foreground-primary)]'>{item.value}</p>
-							</div>
-						))}
-					</div>
-				</AppCard>
-
-				<AppCard
-					title='创建或编辑节点'
-					description='预创建节点后会立即生成节点专属 Token，可直接复制专属安装命令。'
-				>
-					<form className='space-y-5' onSubmit={handleSubmit}>
-						<ResourceField label='节点名' hint='示例：shanghai-edge-1' error={form.formState.errors.name?.message}>
-							<ResourceInput placeholder='shanghai-edge-1' {...form.register('name')} />
-						</ResourceField>
-
-						<ToggleField
-							label='启用自动更新'
-							description='开启后 Agent 心跳返回会提示节点自动执行自更新。'
-							checked={watchedAutoUpdate}
-							onChange={(checked) =>
-								form.setValue('auto_update_enabled', checked, {
-									shouldDirty: true,
-									shouldValidate: true,
-								})
-							}
-						/>
-
-						<div className='flex flex-wrap gap-3'>
-							<PrimaryButton type='submit' disabled={saveMutation.isPending}>
-								{saveMutation.isPending ? '保存中...' : editingNodeId ? '保存修改' : '新增节点'}
-							</PrimaryButton>
-							{editingNodeId ? (
-								<SecondaryButton type='button' onClick={handleReset} disabled={saveMutation.isPending}>
-									取消编辑
-								</SecondaryButton>
-							) : null}
+							<p className='text-xs uppercase tracking-[0.2em] text-[var(--foreground-muted)]'>
+								{item.label}
+							</p>
+							<p className='mt-2 text-lg font-semibold text-[var(--foreground-primary)]'>{item.value}</p>
 						</div>
-					</form>
-				</AppCard>
-			</div>
+					))}
+				</div>
+			</AppCard>
 
 			<div className='grid gap-6 xl:grid-cols-[1fr_1fr]'>
 				<AppCard
@@ -628,6 +619,41 @@ export function NodesPage() {
 					</div>
 				)}
 			</AppCard>
-		</div>
+			</div>
+			<AppModal
+				isOpen={isEditorOpen}
+				onClose={handleReset}
+				title={editingNodeId ? '编辑节点' : '新增节点'}
+				description='预创建节点后会立即生成节点专属 Token，可继续复制专属安装命令。'
+				footer={
+					<div className='flex flex-wrap justify-end gap-3'>
+						<SecondaryButton type='button' onClick={handleReset} disabled={saveMutation.isPending}>
+							取消
+						</SecondaryButton>
+						<PrimaryButton type='submit' form='node-editor-form' disabled={saveMutation.isPending}>
+							{saveMutation.isPending ? '保存中...' : editingNodeId ? '保存修改' : '新增节点'}
+						</PrimaryButton>
+					</div>
+				}
+			>
+				<form id='node-editor-form' className='space-y-5' onSubmit={handleSubmit}>
+					<ResourceField label='节点名' hint='示例：shanghai-edge-1' error={form.formState.errors.name?.message}>
+						<ResourceInput placeholder='shanghai-edge-1' {...form.register('name')} />
+					</ResourceField>
+
+					<ToggleField
+						label='启用自动更新'
+						description='开启后 Agent 心跳返回会提示节点自动执行自更新。'
+						checked={watchedAutoUpdate}
+						onChange={(checked) =>
+							form.setValue('auto_update_enabled', checked, {
+								shouldDirty: true,
+								shouldValidate: true,
+							})
+						}
+					/>
+				</form>
+			</AppModal>
+		</>
 	);
 }

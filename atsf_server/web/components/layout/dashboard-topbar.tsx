@@ -35,7 +35,7 @@ export function DashboardTopbar() {
             className='inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-[var(--border-default)] bg-[var(--control-background)] text-lg text-[var(--foreground-primary)] transition hover:bg-[var(--control-background-hover)]'
             aria-label='切换侧边栏'
           >
-            ≡
+            ☰
           </button>
           <div>
             <p className='text-xs uppercase tracking-[0.24em] text-[var(--foreground-secondary)]'>当前模块</p>
