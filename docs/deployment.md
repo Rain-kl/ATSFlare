@@ -100,6 +100,33 @@ docker compose up -d
 * 用户名：`root`
 * 密码：`123456`
 
+### 2.5 Swagger 文档使用
+
+登录管理端后，访问：`http://localhost:3000/swagger/index.html`
+
+使用说明：
+
+* Swagger UI 受管理端登录态保护，未登录不可直接访问
+* 可在浏览器中查看当前 Server API 与 Agent API 定义，并直接发起调试请求
+* 当 Server API 新增或变更时，需要同步更新 Swag 注解并重新生成 `atsf_server/docs`
+
+如需在本地重新生成 Swagger 文档，先安装 `swag`：
+
+```bash
+go install github.com/swaggo/swag/cmd/swag@latest
+```
+
+安装后请确保 Go 的二进制目录已加入 `PATH`，常见目录为：
+
+* Linux / macOS：`$HOME/go/bin`
+* Windows：`%USERPROFILE%\go\bin`
+
+如需在本地重新生成 Swagger 文档，可在 `atsf_server` 目录执行：
+
+```bash
+swag init -g main.go -o docs
+```
+
 ---
 
 ## 3. Agent 配置
@@ -342,6 +369,6 @@ GitHub Release 中的 Agent 二进制命名格式：
 
 ---
 
-## 8. 文档维护要求
+## 11. 文档维护要求
 
 当部署方式、配置字段、节点接入方式或联调流程变化时，同步更新本文档。

@@ -301,8 +301,8 @@ V3 新增行为：
 3. `docs/development-plan.md`
 4. `docs/deployment.md`
 
-## 12. Swagger 鏂囨。绾︽潫
+## 12. Swagger 文档约束
 
-* Server 鎻愪緵 Swagger UI 鍏ュ彛锛?`/swagger/index.html`
-* Swagger UI 浠呭宸茬櫥褰曠殑绠＄悊绔敤鎴峰紑鏀撅紝涓嶅悜鍖垮悕鐢ㄦ埛鍏紑
-* 鏂板鎴栦慨鏀?API 鏃讹紝闇€鍚屾鏇存柊 Swag 娉ㄨВ骞堕噸鏂扮敓鎴?`atsf_server/docs`
+* Server 提供 Swagger UI 入口：`/swagger/index.html`
+* Swagger UI 仅对已登录的管理端用户开放，不向匿名用户公开
+* 新增或修改 API 时，必须同步更新 Swag 注解并重新生成 `atsf_server/docs`
