@@ -11,19 +11,19 @@ export const dashboardNavigation: NavigationItem[] = [
     href: '/proxy-routes',
     label: '反代规则',
     shortLabel: '规则',
-    description: '阶段 3 接入列表、表单与发布动作。',
+    description: '已接入列表、表单、证书匹配与发布动作。',
   },
   {
     href: '/config-versions',
     label: '配置版本',
     shortLabel: '版本',
-    description: '阶段 3 接入版本预览、激活与回滚体验。',
+    description: '已接入版本预览、发布前 diff 与重新激活。',
   },
   {
     href: '/nodes',
     label: '节点管理',
     shortLabel: '节点',
-    description: '阶段 3 接入状态标签、部署命令与更新动作。',
+    description: '已接入状态标签、部署命令、心跳与更新动作。',
   },
   {
     href: '/apply-logs',

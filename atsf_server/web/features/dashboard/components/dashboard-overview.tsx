@@ -7,15 +7,15 @@ import { dashboardNavigation } from '@/lib/constants/navigation';
 const readinessItems = [
   {
     title: '工程底座',
-    description: 'Next.js App Router、TypeScript strict、Tailwind CSS 与静态导出链路已建立。',
+    description: 'Next.js App Router、TypeScript strict、Tailwind CSS 与静态导出链路已稳定运行。',
   },
   {
-    title: '质量工具',
-    description: 'ESLint、Prettier、Vitest、Playwright 配置已就位，可继续补充模块测试。',
+    title: '认证骨架',
+    description: '登录、注册、重置密码、鉴权守卫与后台布局已迁移到新前端。',
   },
   {
-    title: '目录分层',
-    description: '已拆分 app、components、features、lib、store、tests 等基础结构。',
+    title: '核心模块',
+    description: '阶段 3 已接入反代规则、配置版本与节点页面，其余核心模块可继续按优先级接入。',
   },
 ];
 
@@ -23,9 +23,9 @@ export function DashboardOverview() {
   return (
     <div className='space-y-6'>
       <AppCard
-        title='阶段 1 已启动'
-        description='当前已完成新版管理端基础工程初始化，可继续推进认证迁移与框架层骨架。'
-        action={<StatusBadge label='可继续阶段 2' variant='success' />}
+        title='阶段 3 进行中'
+        description='当前已完成新版管理端基础工程与认证骨架，可继续推进核心业务模块迁移。'
+        action={<StatusBadge label='继续迁移主链路' variant='success' />}
       >
         <div className='grid gap-4 lg:grid-cols-3'>
           {readinessItems.map((item) => (
@@ -43,7 +43,7 @@ export function DashboardOverview() {
       </AppCard>
 
       <div className='grid gap-6 xl:grid-cols-[1.3fr_0.9fr]'>
-        <AppCard title='模块入口' description='各业务页面已建立路由占位，后续按阶段逐步接入真实数据与交互。'>
+        <AppCard title='模块入口' description='核心页面已开始接入真实数据与交互，其余模块按阶段逐步替换占位页面。'>
           <div className='grid gap-3 md:grid-cols-2'>
             {dashboardNavigation.slice(1).map((item) => (
               <Link
@@ -60,11 +60,11 @@ export function DashboardOverview() {
           </div>
         </AppCard>
 
-        <AppCard title='下一步建议' description='按前端改造计划，后续优先进入认证与框架层迁移。'>
+        <AppCard title='下一步建议' description='按前端改造计划，阶段 3 后续优先补齐其余核心主链路页面。'>
           <ol className='space-y-3 text-sm leading-6 text-[var(--foreground-secondary)]'>
-            <li>1. 继续完善认证页细节与第三方登录体验。</li>
-            <li>2. 在业务模块中逐步接入 Query 与 API 资源层。</li>
-            <li>3. 为主链路页面补齐真实列表、表单与动作反馈。</li>
+            <li>1. 继续迁移节点、域名、证书与应用记录页面。</li>
+            <li>2. 为核心动作补齐确认、反馈与错误提示的一致体验。</li>
+            <li>3. 补充模块测试与静态构建回归验证。</li>
           </ol>
         </AppCard>
       </div>

@@ -3,6 +3,7 @@
   "ignorePatterns": [
     ".next",
     "build",
+    "out",
     "coverage",
     "playwright-report",
     "test-results",
