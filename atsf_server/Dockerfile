@@ -11,7 +11,7 @@ RUN corepack enable && pnpm install --frozen-lockfile
 COPY ./web ./
 RUN NEXT_PUBLIC_APP_VERSION="$VERSION" pnpm build
 
-FROM golang:1.22 AS builder2
+FROM golang:1.23 AS builder2
 
 ARG VERSION
 
