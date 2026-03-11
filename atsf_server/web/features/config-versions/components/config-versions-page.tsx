@@ -1,13 +1,14 @@
 'use client';
 
+import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
 
 import { EmptyState } from '@/components/feedback/empty-state';
 import { ErrorState } from '@/components/feedback/error-state';
 import { InlineMessage } from '@/components/feedback/inline-message';
 import { LoadingState } from '@/components/feedback/loading-state';
 import { PageHeader } from '@/components/layout/page-header';
+import { AppModal } from '@/components/ui/app-modal';
 import { AppCard } from '@/components/ui/app-card';
 import { StatusBadge } from '@/components/ui/status-badge';
 import {
@@ -49,26 +50,42 @@ function truncateChecksum(checksum: string) {
   return checksum.length > 16 ? `${checksum.slice(0, 16)}...` : checksum;
 }
 
+function hasConfigDiff(diff: ConfigDiffResult) {
+  return (
+    diff.added_domains.length > 0 ||
+    diff.removed_domains.length > 0 ||
+    diff.modified_domains.length > 0 ||
+    !diff.active_version
+  );
+}
+
 function DiffList({ title, items }: { title: string; items: string[] }) {
   return (
-    <div className='space-y-3'>
-      <div className='flex items-center justify-between gap-3'>
-        <p className='text-sm font-semibold text-[var(--foreground-primary)]'>{title}</p>
-        <StatusBadge label={`${items.length} 项`} variant={items.length > 0 ? 'info' : 'warning'} />
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm font-semibold text-[var(--foreground-primary)]">
+          {title}
+        </p>
+        <StatusBadge
+          label={`${items.length} 项`}
+          variant={items.length > 0 ? 'info' : 'warning'}
+        />
       </div>
       {items.length > 0 ? (
-        <div className='flex flex-wrap gap-2'>
+        <div className="flex flex-wrap gap-2">
           {items.map((item) => (
             <span
               key={item}
-              className='rounded-full border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-1 text-xs text-[var(--foreground-secondary)]'
+              className="rounded-full border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-1 text-xs text-[var(--foreground-secondary)]"
             >
               {item}
             </span>
           ))}
         </div>
       ) : (
-        <p className='text-sm text-[var(--foreground-secondary)]'>当前无相关变更。</p>
+        <p className="text-sm text-[var(--foreground-secondary)]">
+          当前无相关变更。
+        </p>
       )}
     </div>
   );
@@ -76,65 +93,102 @@ function DiffList({ title, items }: { title: string; items: string[] }) {
 
 function SupportFilesList({ files }: { files: SupportFile[] }) {
   if (files.length === 0) {
-    return <p className='text-sm text-[var(--foreground-secondary)]'>当前发布不需要额外支持文件。</p>;
+    return (
+      <p className="text-sm text-[var(--foreground-secondary)]">
+        当前发布不需要额外支持文件。
+      </p>
+    );
   }
 
   return (
-    <div className='space-y-3'>
+    <div className="space-y-3">
       {files.map((file) => (
         <details
           key={file.path}
-          className='rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-3'
+          className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-3"
         >
-          <summary className='cursor-pointer text-sm font-medium text-[var(--foreground-primary)]'>
+          <summary className="cursor-pointer text-sm font-medium text-[var(--foreground-primary)]">
             {file.path}
           </summary>
-          <CodeBlock className='mt-3 max-h-72 whitespace-pre-wrap'>{file.content}</CodeBlock>
+          <CodeBlock className="mt-3 max-h-72 whitespace-pre-wrap">
+            {file.content}
+          </CodeBlock>
         </details>
       ))}
     </div>
   );
 }
 
-function VersionDetailCard({
+function SnapshotModal({
   version,
+  onClose,
 }: {
-  version: ConfigVersionItem;
+  version: ConfigVersionItem | null;
+  onClose: () => void;
 }) {
   return (
-    <AppCard
-      title={`版本 ${version.version}`}
-      description='查看当前版本保存的快照 JSON 与最终渲染配置，便于比对发布结果。'
-      action={
-        <StatusBadge label={version.is_active ? '当前激活' : '历史版本'} variant={version.is_active ? 'success' : 'info'} />
+    <AppModal
+      isOpen={Boolean(version)}
+      onClose={onClose}
+      title={version ? `版本 ${version.version}` : '查看快照'}
+      description="在弹窗中查看快照 JSON 与渲染结果，避免把版本页主视图撑长。"
+      size="xl"
+      footer={
+        <div className="flex justify-end">
+          <SecondaryButton type="button" onClick={onClose}>
+            关闭
+          </SecondaryButton>
+        </div>
       }
     >
-      <div className='grid gap-4 md:grid-cols-3'>
-        <div className='rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-4'>
-          <p className='text-xs uppercase tracking-[0.2em] text-[var(--foreground-muted)]'>Checksum</p>
-          <p className='mt-2 break-all text-sm text-[var(--foreground-primary)]'>{version.checksum}</p>
-        </div>
-        <div className='rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-4'>
-          <p className='text-xs uppercase tracking-[0.2em] text-[var(--foreground-muted)]'>创建人</p>
-          <p className='mt-2 text-sm text-[var(--foreground-primary)]'>{version.created_by || '系统'}</p>
-        </div>
-        <div className='rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-4'>
-          <p className='text-xs uppercase tracking-[0.2em] text-[var(--foreground-muted)]'>创建时间</p>
-          <p className='mt-2 text-sm text-[var(--foreground-primary)]'>{formatDateTime(version.created_at)}</p>
-        </div>
-      </div>
+      {version ? (
+        <div className="space-y-5">
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-4">
+              <p className="text-xs tracking-[0.2em] text-[var(--foreground-muted)] uppercase">
+                Checksum
+              </p>
+              <p className="mt-2 text-sm break-all text-[var(--foreground-primary)]">
+                {version.checksum}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-4">
+              <p className="text-xs tracking-[0.2em] text-[var(--foreground-muted)] uppercase">
+                创建人
+              </p>
+              <p className="mt-2 text-sm text-[var(--foreground-primary)]">
+                {version.created_by || '系统'}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-4">
+              <p className="text-xs tracking-[0.2em] text-[var(--foreground-muted)] uppercase">
+                创建时间
+              </p>
+              <p className="mt-2 text-sm text-[var(--foreground-primary)]">
+                {formatDateTime(version.created_at)}
+              </p>
+            </div>
+          </div>
 
-      <div className='mt-5 space-y-4'>
-        <div>
-          <p className='mb-2 text-sm font-semibold text-[var(--foreground-primary)]'>快照 JSON</p>
-          <CodeBlock className='max-h-96 whitespace-pre-wrap'>{version.snapshot_json}</CodeBlock>
+          <div>
+            <p className="mb-2 text-sm font-semibold text-[var(--foreground-primary)]">
+              快照 JSON
+            </p>
+            <CodeBlock className="max-h-96 whitespace-pre-wrap">
+              {version.snapshot_json}
+            </CodeBlock>
+          </div>
+          <div>
+            <p className="mb-2 text-sm font-semibold text-[var(--foreground-primary)]">
+              渲染结果
+            </p>
+            <CodeBlock className="max-h-[32rem] whitespace-pre-wrap">
+              {version.rendered_config}
+            </CodeBlock>
+          </div>
         </div>
-        <div>
-          <p className='mb-2 text-sm font-semibold text-[var(--foreground-primary)]'>渲染结果</p>
-          <CodeBlock className='max-h-[32rem] whitespace-pre-wrap'>{version.rendered_config}</CodeBlock>
-        </div>
-      </div>
-    </AppCard>
+      ) : null}
+    </AppModal>
   );
 }
 
@@ -151,56 +205,102 @@ function PublishPreviewCard({
   onConfirm: () => void;
   onCancel: () => void;
 }) {
+  const canPublish = preview.route_count > 0 && hasConfigDiff(diff);
+
   return (
     <AppCard
-      title='发布前预览'
-      description='先核对增删改域名、渲染结果与支持文件，再决定是否发布为新激活版本。'
-      action={<StatusBadge label={`启用规则 ${preview.route_count} 条`} variant='info' />}
+      title="发布前预览"
+      description="先核对增删改域名、渲染结果与支持文件，再决定是否发布为新激活版本。"
+      action={
+        <StatusBadge
+          label={`启用规则 ${preview.route_count} 条`}
+          variant="info"
+        />
+      }
     >
-      <div className='space-y-5'>
-        <div className='grid gap-4 md:grid-cols-4'>
-          <div className='rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-4'>
-            <p className='text-xs uppercase tracking-[0.2em] text-[var(--foreground-muted)]'>当前激活版本</p>
-            <p className='mt-2 text-sm text-[var(--foreground-primary)]'>{diff.active_version || '无'}</p>
+      <div className="space-y-5">
+        <div className="grid gap-4 md:grid-cols-4">
+          <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-4">
+            <p className="text-xs tracking-[0.2em] text-[var(--foreground-muted)] uppercase">
+              当前激活版本
+            </p>
+            <p className="mt-2 text-sm text-[var(--foreground-primary)]">
+              {diff.active_version || '无'}
+            </p>
           </div>
-          <div className='rounded-2xl border border-[var(--status-success-border)] bg-[var(--status-success-soft)] px-4 py-4'>
-            <p className='text-xs uppercase tracking-[0.2em] text-[var(--status-success-foreground)]'>新增域名</p>
-            <p className='mt-2 text-lg font-semibold text-[var(--status-success-foreground)]'>{diff.added_domains.length}</p>
+          <div className="rounded-2xl border border-[var(--status-success-border)] bg-[var(--status-success-soft)] px-4 py-4">
+            <p className="text-xs tracking-[0.2em] text-[var(--status-success-foreground)] uppercase">
+              新增域名
+            </p>
+            <p className="mt-2 text-lg font-semibold text-[var(--status-success-foreground)]">
+              {diff.added_domains.length}
+            </p>
           </div>
-          <div className='rounded-2xl border border-[var(--status-warning-border)] bg-[var(--status-warning-soft)] px-4 py-4'>
-            <p className='text-xs uppercase tracking-[0.2em] text-[var(--status-warning-foreground)]'>删除域名</p>
-            <p className='mt-2 text-lg font-semibold text-[var(--status-warning-foreground)]'>{diff.removed_domains.length}</p>
+          <div className="rounded-2xl border border-[var(--status-warning-border)] bg-[var(--status-warning-soft)] px-4 py-4">
+            <p className="text-xs tracking-[0.2em] text-[var(--status-warning-foreground)] uppercase">
+              删除域名
+            </p>
+            <p className="mt-2 text-lg font-semibold text-[var(--status-warning-foreground)]">
+              {diff.removed_domains.length}
+            </p>
           </div>
-          <div className='rounded-2xl border border-[var(--status-info-border)] bg-[var(--status-info-soft)] px-4 py-4'>
-            <p className='text-xs uppercase tracking-[0.2em] text-[var(--status-info-foreground)]'>修改域名</p>
-            <p className='mt-2 text-lg font-semibold text-[var(--status-info-foreground)]'>{diff.modified_domains.length}</p>
+          <div className="rounded-2xl border border-[var(--status-info-border)] bg-[var(--status-info-soft)] px-4 py-4">
+            <p className="text-xs tracking-[0.2em] text-[var(--status-info-foreground)] uppercase">
+              修改域名
+            </p>
+            <p className="mt-2 text-lg font-semibold text-[var(--status-info-foreground)]">
+              {diff.modified_domains.length}
+            </p>
           </div>
         </div>
 
-        <div className='grid gap-5 xl:grid-cols-3'>
-          <DiffList title='新增域名' items={diff.added_domains} />
-          <DiffList title='删除域名' items={diff.removed_domains} />
-          <DiffList title='修改域名' items={diff.modified_domains} />
+        {!canPublish ? (
+          <InlineMessage
+            tone="info"
+            message="当前规则与已激活版本一致，已阻止重复发布。"
+          />
+        ) : null}
+
+        <div className="grid gap-5 xl:grid-cols-3">
+          <DiffList title="新增域名" items={diff.added_domains} />
+          <DiffList title="删除域名" items={diff.removed_domains} />
+          <DiffList title="修改域名" items={diff.modified_domains} />
         </div>
 
         <div>
-          <div className='mb-2 flex flex-wrap items-center justify-between gap-3'>
-            <p className='text-sm font-semibold text-[var(--foreground-primary)]'>渲染结果</p>
-            <p className='text-xs text-[var(--foreground-secondary)]'>Checksum：{preview.checksum}</p>
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm font-semibold text-[var(--foreground-primary)]">
+              渲染结果
+            </p>
+            <p className="text-xs text-[var(--foreground-secondary)]">
+              Checksum：{preview.checksum}
+            </p>
           </div>
-          <CodeBlock className='max-h-[32rem] whitespace-pre-wrap'>{preview.rendered_config}</CodeBlock>
+          <CodeBlock className="max-h-[32rem] whitespace-pre-wrap">
+            {preview.rendered_config}
+          </CodeBlock>
         </div>
 
         <div>
-          <p className='mb-2 text-sm font-semibold text-[var(--foreground-primary)]'>支持文件</p>
+          <p className="mb-2 text-sm font-semibold text-[var(--foreground-primary)]">
+            支持文件
+          </p>
           <SupportFilesList files={preview.support_files} />
         </div>
 
-        <div className='flex flex-wrap gap-3'>
-          <PrimaryButton type='button' onClick={onConfirm} disabled={isPublishing}>
+        <div className="flex flex-wrap gap-3">
+          <PrimaryButton
+            type="button"
+            onClick={onConfirm}
+            disabled={isPublishing || !canPublish}
+          >
             {isPublishing ? '发布中...' : '确认发布'}
           </PrimaryButton>
-          <SecondaryButton type='button' onClick={onCancel} disabled={isPublishing}>
+          <SecondaryButton
+            type="button"
+            onClick={onCancel}
+            disabled={isPublishing}
+          >
             取消预览
           </SecondaryButton>
         </div>
@@ -212,7 +312,9 @@ function PublishPreviewCard({
 export function ConfigVersionsPage() {
   const queryClient = useQueryClient();
   const [feedback, setFeedback] = useState<FeedbackState | null>(null);
-  const [selectedVersion, setSelectedVersion] = useState<ConfigVersionItem | null>(null);
+  const [selectedVersionId, setSelectedVersionId] = useState<number | null>(
+    null,
+  );
   const [publishPreview, setPublishPreview] = useState<{
     preview: ConfigPreviewResult;
     diff: ConfigDiffResult;
@@ -224,12 +326,24 @@ export function ConfigVersionsPage() {
     queryFn: getConfigVersions,
   });
 
+  const versions = useMemo(
+    () => versionsQuery.data ?? [],
+    [versionsQuery.data],
+  );
+  const selectedVersion = useMemo(
+    () => versions.find((item) => item.id === selectedVersionId) ?? null,
+    [selectedVersionId, versions],
+  );
+
   const publishMutation = useMutation({
     mutationFn: publishConfigVersion,
     onSuccess: async (version) => {
-      setFeedback({ tone: 'success', message: `发布成功，版本 ${version.version}` });
+      setFeedback({
+        tone: 'success',
+        message: `发布成功，版本 ${version.version}`,
+      });
       setPublishPreview(null);
-      setSelectedVersion(version);
+      setSelectedVersionId(version.id);
       await queryClient.invalidateQueries({ queryKey: versionsQueryKey });
     },
     onError: (error) => {
@@ -240,8 +354,11 @@ export function ConfigVersionsPage() {
   const activateMutation = useMutation({
     mutationFn: activateConfigVersion,
     onSuccess: async (version) => {
-      setFeedback({ tone: 'success', message: `已激活版本 ${version.version}` });
-      setSelectedVersion(version);
+      setFeedback({
+        tone: 'success',
+        message: `已激活版本 ${version.version}`,
+      });
+      setSelectedVersionId(version.id);
       await queryClient.invalidateQueries({ queryKey: versionsQueryKey });
     },
     onError: (error) => {
@@ -254,7 +371,10 @@ export function ConfigVersionsPage() {
     setIsPreviewLoading(true);
 
     try {
-      const [preview, diff] = await Promise.all([getConfigVersionPreview(), getConfigVersionDiff()]);
+      const [preview, diff] = await Promise.all([
+        getConfigVersionPreview(),
+        getConfigVersionDiff(),
+      ]);
       setPublishPreview({ preview, diff });
     } catch (error) {
       setFeedback({ tone: 'danger', message: getErrorMessage(error) });
@@ -276,23 +396,27 @@ export function ConfigVersionsPage() {
     activateMutation.mutate(version.id);
   };
 
-  const versions = versionsQuery.data || [];
-
   return (
-    <div className='space-y-6'>
-      <PageHeader
-        title='配置版本'
-        description='查看历史快照、预览待发布配置差异，并在需要时重新激活旧版本。'
-        action={
-          <PrimaryButton type='button' onClick={handleOpenPublishPreview} disabled={isPreviewLoading}>
-            {isPreviewLoading ? '加载预览中...' : '预览并发布'}
-          </PrimaryButton>
-        }
-      />
+    <>
+      <div className="space-y-6">
+        <PageHeader
+          title="配置版本"
+          description="查看历史快照、预览待发布配置差异，并在需要时重新激活旧版本。"
+          action={
+            <PrimaryButton
+              type="button"
+              onClick={handleOpenPublishPreview}
+              disabled={isPreviewLoading}
+            >
+              {isPreviewLoading ? '加载预览中...' : '预览并发布'}
+            </PrimaryButton>
+          }
+        />
 
-      {feedback ? <InlineMessage tone={feedback.tone} message={feedback.message} /> : null}
+        {feedback ? (
+          <InlineMessage tone={feedback.tone} message={feedback.message} />
+        ) : null}
 
-      <div className='grid gap-6'>
         {publishPreview ? (
           <PublishPreviewCard
             preview={publishPreview.preview}
@@ -302,75 +426,106 @@ export function ConfigVersionsPage() {
             onCancel={() => setPublishPreview(null)}
           />
         ) : null}
+
+        <AppCard
+          title="历史版本"
+          description="发布成功后会立即刷新列表，不再需要手动刷新页面。"
+          action={
+            <SecondaryButton
+              type="button"
+              onClick={() =>
+                void queryClient.invalidateQueries({
+                  queryKey: versionsQueryKey,
+                })
+              }
+            >
+              刷新列表
+            </SecondaryButton>
+          }
+        >
+          {versionsQuery.isLoading ? (
+            <LoadingState />
+          ) : versionsQuery.isError ? (
+            <ErrorState
+              title="版本列表加载失败"
+              description={getErrorMessage(versionsQuery.error)}
+            />
+          ) : versions.length === 0 ? (
+            <EmptyState
+              title="暂无历史版本"
+              description="当前还没有可查看的发布记录，请先从反代规则页触发一次发布。"
+            />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-[var(--border-default)] text-left text-sm">
+                <thead>
+                  <tr className="text-[var(--foreground-secondary)]">
+                    <th className="px-3 py-3 font-medium">版本号</th>
+                    <th className="px-3 py-3 font-medium">状态</th>
+                    <th className="px-3 py-3 font-medium">创建人</th>
+                    <th className="px-3 py-3 font-medium">Checksum</th>
+                    <th className="px-3 py-3 font-medium">创建时间</th>
+                    <th className="px-3 py-3 font-medium">操作</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--border-default)]">
+                  {versions.map((version) => (
+                    <tr key={version.id} className="align-top">
+                      <td className="px-3 py-4 font-medium text-[var(--foreground-primary)]">
+                        {version.version}
+                      </td>
+                      <td className="px-3 py-4">
+                        <StatusBadge
+                          label={version.is_active ? '当前激活' : '历史版本'}
+                          variant={version.is_active ? 'success' : 'info'}
+                        />
+                      </td>
+                      <td className="px-3 py-4 text-[var(--foreground-secondary)]">
+                        {version.created_by || '系统'}
+                      </td>
+                      <td
+                        className="px-3 py-4 text-[var(--foreground-secondary)]"
+                        title={version.checksum}
+                      >
+                        {truncateChecksum(version.checksum)}
+                      </td>
+                      <td className="px-3 py-4 text-[var(--foreground-secondary)]">
+                        {formatDateTime(version.created_at)}
+                      </td>
+                      <td className="px-3 py-4">
+                        <div className="flex flex-wrap gap-2">
+                          <SecondaryButton
+                            type="button"
+                            onClick={() => setSelectedVersionId(version.id)}
+                            className="px-3 py-2 text-xs"
+                          >
+                            查看快照
+                          </SecondaryButton>
+                          {!version.is_active ? (
+                            <PrimaryButton
+                              type="button"
+                              onClick={() => handleActivate(version)}
+                              disabled={activateMutation.isPending}
+                              className="px-3 py-2 text-xs"
+                            >
+                              重新激活
+                            </PrimaryButton>
+                          ) : null}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </AppCard>
       </div>
 
-      <AppCard title='历史版本'>
-        {versionsQuery.isLoading ? (
-          <LoadingState />
-        ) : versionsQuery.isError ? (
-          <ErrorState title='版本列表加载失败' description={getErrorMessage(versionsQuery.error)} />
-        ) : versions.length === 0 ? (
-          <EmptyState title='暂无历史版本' description='当前还没有可查看的发布记录，请先从反代规则页触发一次发布。' />
-        ) : (
-          <div className='overflow-x-auto'>
-            <table className='min-w-full divide-y divide-[var(--border-default)] text-left text-sm'>
-              <thead>
-                <tr className='text-[var(--foreground-secondary)]'>
-                  <th className='px-3 py-3 font-medium'>版本号</th>
-                  <th className='px-3 py-3 font-medium'>状态</th>
-                  <th className='px-3 py-3 font-medium'>创建人</th>
-                  <th className='px-3 py-3 font-medium'>Checksum</th>
-                  <th className='px-3 py-3 font-medium'>创建时间</th>
-                  <th className='px-3 py-3 font-medium'>操作</th>
-                </tr>
-              </thead>
-              <tbody className='divide-y divide-[var(--border-default)]'>
-                {versions.map((version) => (
-                  <tr key={version.id} className='align-top'>
-                    <td className='px-3 py-4 font-medium text-[var(--foreground-primary)]'>{version.version}</td>
-                    <td className='px-3 py-4'>
-                      <StatusBadge
-                        label={version.is_active ? '当前激活' : '历史版本'}
-                        variant={version.is_active ? 'success' : 'info'}
-                      />
-                    </td>
-                    <td className='px-3 py-4 text-[var(--foreground-secondary)]'>{version.created_by || '系统'}</td>
-                    <td className='px-3 py-4 text-[var(--foreground-secondary)]' title={version.checksum}>
-                      {truncateChecksum(version.checksum)}
-                    </td>
-                    <td className='px-3 py-4 text-[var(--foreground-secondary)]'>
-                      {formatDateTime(version.created_at)}
-                    </td>
-                    <td className='px-3 py-4'>
-                      <div className='flex flex-wrap gap-2'>
-                        <SecondaryButton
-                          type='button'
-                          onClick={() => setSelectedVersion(version)}
-                          className='px-3 py-2 text-xs'
-                        >
-                          查看快照
-                        </SecondaryButton>
-                        {!version.is_active ? (
-                          <PrimaryButton
-                            type='button'
-                            onClick={() => handleActivate(version)}
-                            disabled={activateMutation.isPending}
-                            className='px-3 py-2 text-xs'
-                          >
-                            重新激活
-                          </PrimaryButton>
-                        ) : null}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </AppCard>
-
-      {selectedVersion ? <VersionDetailCard version={selectedVersion} /> : null}
-    </div>
+      <SnapshotModal
+        version={selectedVersion}
+        onClose={() => setSelectedVersionId(null)}
+      />
+    </>
   );
 }

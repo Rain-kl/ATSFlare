@@ -4,7 +4,6 @@ export interface NodeItem {
 	name: string;
 	ip: string;
 	agent_token: string;
-	pending: boolean;
 	auto_update_enabled: boolean;
 	update_requested: boolean;
 	agent_version: string;

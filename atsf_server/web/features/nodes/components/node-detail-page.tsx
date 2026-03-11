@@ -1,0 +1,572 @@
+'use client';
+
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useMemo, useState } from 'react';
+import { useForm, useWatch } from 'react-hook-form';
+import { z } from 'zod';
+
+import { EmptyState } from '@/components/feedback/empty-state';
+import { ErrorState } from '@/components/feedback/error-state';
+import { InlineMessage } from '@/components/feedback/inline-message';
+import { LoadingState } from '@/components/feedback/loading-state';
+import { PageHeader } from '@/components/layout/page-header';
+import { AppModal } from '@/components/ui/app-modal';
+import { AppCard } from '@/components/ui/app-card';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { getPublicStatus } from '@/features/auth/api/public';
+import { getApplyLogs } from '@/features/apply-logs/api/apply-logs';
+import {
+  deleteNode,
+  getNodes,
+  requestNodeAgentUpdate,
+  updateNode,
+} from '@/features/nodes/api/nodes';
+import type { NodeMutationPayload } from '@/features/nodes/types';
+import {
+  CodeBlock,
+  DangerButton,
+  PrimaryButton,
+  ResourceField,
+  ResourceInput,
+  SecondaryButton,
+  ToggleField,
+} from '@/features/shared/components/resource-primitives';
+import { formatDateTime, formatRelativeTime } from '@/lib/utils/date';
+import {
+  buildNodeInstallCommand,
+  getApplyLabel,
+  getApplyVariant,
+  getNodeStatusLabel,
+  getNodeStatusVariant,
+  getServerUrl,
+  getUpdateMode,
+  isMeaningfulTime,
+  shouldShowManualUpdate,
+} from '@/features/nodes/utils';
+
+const nodesQueryKey = ['nodes'];
+
+const nodeSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(1, '请输入节点名')
+    .max(128, '节点名不能超过 128 个字符'),
+  auto_update_enabled: z.boolean(),
+});
+
+type NodeFormValues = z.infer<typeof nodeSchema>;
+
+type FeedbackState = {
+  tone: 'info' | 'success' | 'danger';
+  message: string;
+};
+
+const defaultValues: NodeFormValues = {
+  name: '',
+  auto_update_enabled: false,
+};
+
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : '请求失败，请稍后重试。';
+}
+
+function toPayload(values: NodeFormValues): NodeMutationPayload {
+  return {
+    name: values.name.trim(),
+    auto_update_enabled: values.auto_update_enabled,
+  };
+}
+
+async function copyToClipboard(value: string) {
+  await navigator.clipboard.writeText(value);
+}
+
+export function NodeDetailPage({ nodeId }: { nodeId: string }) {
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const [feedback, setFeedback] = useState<FeedbackState | null>(null);
+  const [isEditorOpen, setIsEditorOpen] = useState(false);
+  const [serverUrl, setServerUrl] = useState('');
+
+  const form = useForm<NodeFormValues>({
+    resolver: zodResolver(nodeSchema),
+    defaultValues,
+  });
+
+  const watchedAutoUpdate = useWatch({
+    control: form.control,
+    name: 'auto_update_enabled',
+  });
+
+  const nodesQuery = useQuery({
+    queryKey: nodesQueryKey,
+    queryFn: getNodes,
+    refetchInterval: 5000,
+  });
+
+  const publicStatusQuery = useQuery({
+    queryKey: ['public-status'],
+    queryFn: getPublicStatus,
+  });
+
+  const node = useMemo(() => {
+    return (
+      (nodesQuery.data ?? []).find((item) => String(item.id) === nodeId) ?? null
+    );
+  }, [nodeId, nodesQuery.data]);
+
+  const applyLogsQuery = useQuery({
+    queryKey: ['apply-logs', node?.node_id ?? ''],
+    queryFn: () => getApplyLogs(node?.node_id),
+    enabled: Boolean(node?.node_id),
+    refetchInterval: 5000,
+  });
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && !serverUrl) {
+      setServerUrl(window.location.origin);
+    }
+  }, [serverUrl]);
+
+  useEffect(() => {
+    if (!node || isEditorOpen) {
+      return;
+    }
+
+    form.reset({
+      name: node.name,
+      auto_update_enabled: node.auto_update_enabled,
+    });
+  }, [form, isEditorOpen, node]);
+
+  const saveMutation = useMutation({
+    mutationFn: async (values: NodeFormValues) =>
+      updateNode(Number(nodeId), toPayload(values)),
+    onSuccess: async (updatedNode) => {
+      setFeedback({ tone: 'success', message: '节点已更新。' });
+      setIsEditorOpen(false);
+      form.reset({
+        name: updatedNode.name,
+        auto_update_enabled: updatedNode.auto_update_enabled,
+      });
+      await queryClient.invalidateQueries({ queryKey: nodesQueryKey });
+    },
+    onError: (error) => {
+      setFeedback({ tone: 'danger', message: getErrorMessage(error) });
+    },
+  });
+
+  const updateAgentMutation = useMutation({
+    mutationFn: () => requestNodeAgentUpdate(Number(nodeId)),
+    onSuccess: async (updatedNode) => {
+      setFeedback({
+        tone: 'success',
+        message: `已向节点 ${updatedNode.name} 下发更新指令。`,
+      });
+      await queryClient.invalidateQueries({ queryKey: nodesQueryKey });
+    },
+    onError: (error) => {
+      setFeedback({ tone: 'danger', message: getErrorMessage(error) });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => deleteNode(Number(nodeId)),
+    onSuccess: async () => {
+      setFeedback({ tone: 'success', message: '节点已删除。' });
+      await queryClient.invalidateQueries({ queryKey: nodesQueryKey });
+      router.push('/node');
+    },
+    onError: (error) => {
+      setFeedback({ tone: 'danger', message: getErrorMessage(error) });
+    },
+  });
+
+  const handleSubmit = form.handleSubmit((values) => {
+    setFeedback(null);
+    saveMutation.mutate(values);
+  });
+
+  const handleDelete = () => {
+    if (!node) {
+      return;
+    }
+
+    if (
+      !window.confirm(
+        `确认删除节点“${node.name}”吗？删除后该节点需要重新创建并重新接入。`,
+      )
+    ) {
+      return;
+    }
+
+    setFeedback(null);
+    deleteMutation.mutate();
+  };
+
+  const handleCopy = async (value: string, message: string) => {
+    try {
+      await copyToClipboard(value);
+      setFeedback({ tone: 'success', message });
+    } catch (error) {
+      setFeedback({ tone: 'danger', message: getErrorMessage(error) });
+    }
+  };
+
+  if (nodesQuery.isLoading) {
+    return <LoadingState />;
+  }
+
+  if (nodesQuery.isError) {
+    return (
+      <ErrorState
+        title="节点详情加载失败"
+        description={getErrorMessage(nodesQuery.error)}
+      />
+    );
+  }
+
+  if (!node) {
+    return (
+      <EmptyState
+        title="节点不存在"
+        description="该节点可能已被删除，或当前 ID 无法匹配到节点记录。"
+      />
+    );
+  }
+
+  const normalizedServerUrl = getServerUrl(serverUrl);
+  const nodeInstallCommand =
+    normalizedServerUrl && node.agent_token
+      ? buildNodeInstallCommand(normalizedServerUrl, node.agent_token)
+      : '';
+  const updateMode = getUpdateMode(node);
+  const serverVersion = publicStatusQuery.data?.version ?? '';
+  const showManualUpdate = shouldShowManualUpdate(
+    node.agent_version || '',
+    serverVersion,
+  );
+  const applyLogs = applyLogsQuery.data ?? [];
+
+  return (
+    <>
+      <div className="space-y-6">
+        <PageHeader
+          title={node.name}
+          description="节点详情每 5 秒自动刷新一次。部署命令、Node ID、Token、更新模式和最近应用记录统一在这里查看。"
+          action={
+            <>
+              <Link
+                href="/node"
+                className="inline-flex items-center justify-center rounded-2xl border border-[var(--border-default)] bg-[var(--control-background)] px-4 py-3 text-sm font-medium text-[var(--foreground-primary)] transition hover:bg-[var(--control-background-hover)]"
+              >
+                返回列表
+              </Link>
+              <SecondaryButton
+                type="button"
+                onClick={() => setIsEditorOpen(true)}
+              >
+                编辑节点
+              </SecondaryButton>
+              {showManualUpdate ? (
+                <PrimaryButton
+                  type="button"
+                  onClick={() => updateAgentMutation.mutate()}
+                  disabled={
+                    updateAgentMutation.isPending || node.update_requested
+                  }
+                >
+                  {node.update_requested ? '等待更新中...' : '手动升级 Agent'}
+                </PrimaryButton>
+              ) : null}
+              <DangerButton
+                type="button"
+                onClick={handleDelete}
+                disabled={deleteMutation.isPending}
+              >
+                删除节点
+              </DangerButton>
+            </>
+          }
+        />
+
+        {feedback ? (
+          <InlineMessage tone={feedback.tone} message={feedback.message} />
+        ) : null}
+
+        <div className="grid gap-4 xl:grid-cols-4">
+          <AppCard title="连接状态">
+            <div className="space-y-3">
+              <StatusBadge
+                label={getNodeStatusLabel(node.status)}
+                variant={getNodeStatusVariant(node.status)}
+              />
+              <p className="text-sm text-[var(--foreground-secondary)]">
+                最近心跳：
+                {isMeaningfulTime(node.last_seen_at)
+                  ? ` ${formatRelativeTime(
+                      node.last_seen_at,
+                    )} · ${formatDateTime(node.last_seen_at)}`
+                  : ' 暂无'}
+              </p>
+            </div>
+          </AppCard>
+
+          <AppCard title="版本信息">
+            <div className="space-y-2 text-sm text-[var(--foreground-secondary)]">
+              <p>Agent：{node.agent_version || 'unknown'}</p>
+              <p>Nginx：{node.nginx_version || 'unknown'}</p>
+              <p>当前配置：{node.current_version || '未应用'}</p>
+            </div>
+          </AppCard>
+
+          <AppCard title="更新模式">
+            <div className="space-y-3">
+              <StatusBadge
+                label={updateMode.label}
+                variant={updateMode.variant}
+              />
+              <p className="text-sm text-[var(--foreground-secondary)]">
+                {node.update_requested
+                  ? '已等待节点在下一次心跳后执行更新。'
+                  : node.auto_update_enabled
+                    ? '节点已启用自动更新。'
+                    : '当前仅支持手动触发更新。'}
+              </p>
+            </div>
+          </AppCard>
+
+          <AppCard title="最近应用">
+            <div className="space-y-3">
+              <StatusBadge
+                label={getApplyLabel(node.latest_apply_result)}
+                variant={getApplyVariant(node.latest_apply_result)}
+              />
+              <p className="text-sm text-[var(--foreground-secondary)]">
+                {isMeaningfulTime(node.latest_apply_at)
+                  ? `${formatRelativeTime(
+                      node.latest_apply_at,
+                    )} · ${formatDateTime(node.latest_apply_at)}`
+                  : '暂无应用记录'}
+              </p>
+            </div>
+          </AppCard>
+        </div>
+
+        <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+          <AppCard
+            title="节点标识与部署"
+            description="Node ID、Token 与部署命令不再在列表中展示，统一收敛到详情页。"
+            action={
+              nodeInstallCommand ? (
+                <PrimaryButton
+                  type="button"
+                  onClick={() =>
+                    void handleCopy(
+                      nodeInstallCommand,
+                      '节点专属部署命令已复制。',
+                    )
+                  }
+                >
+                  复制部署命令
+                </PrimaryButton>
+              ) : null
+            }
+          >
+            <div className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-4">
+                  <p className="text-xs tracking-[0.2em] text-[var(--foreground-muted)] uppercase">
+                    Node ID
+                  </p>
+                  <p className="mt-2 text-sm break-all text-[var(--foreground-primary)]">
+                    {node.node_id}
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-4">
+                  <p className="text-xs tracking-[0.2em] text-[var(--foreground-muted)] uppercase">
+                    Agent Token
+                  </p>
+                  <p className="mt-2 text-sm break-all text-[var(--foreground-primary)]">
+                    {node.agent_token || '暂无'}
+                  </p>
+                </div>
+              </div>
+
+              <ResourceField
+                label="Server URL"
+                hint="默认使用当前控制面来源地址，可按需改为外部访问地址。"
+              >
+                <ResourceInput
+                  value={serverUrl}
+                  onChange={(event) => setServerUrl(event.target.value)}
+                />
+              </ResourceField>
+
+              {nodeInstallCommand ? (
+                <CodeBlock className="whitespace-pre-wrap">
+                  {nodeInstallCommand}
+                </CodeBlock>
+              ) : null}
+            </div>
+          </AppCard>
+
+          <AppCard title="运行信息">
+            <div className="space-y-4 text-sm text-[var(--foreground-secondary)]">
+              <div>
+                <p className="font-medium text-[var(--foreground-primary)]">
+                  IP 地址
+                </p>
+                <p className="mt-1">{node.ip || '暂无'}</p>
+              </div>
+              <div>
+                <p className="font-medium text-[var(--foreground-primary)]">
+                  最近错误
+                </p>
+                <p className="mt-1 break-words whitespace-pre-wrap">
+                  {node.last_error || '无'}
+                </p>
+              </div>
+              <div>
+                <p className="font-medium text-[var(--foreground-primary)]">
+                  创建时间
+                </p>
+                <p className="mt-1">{formatDateTime(node.created_at)}</p>
+              </div>
+              <div>
+                <p className="font-medium text-[var(--foreground-primary)]">
+                  更新时间
+                </p>
+                <p className="mt-1">{formatDateTime(node.updated_at)}</p>
+              </div>
+            </div>
+          </AppCard>
+        </div>
+
+        <AppCard
+          title="最近应用记录"
+          description="仅展示当前节点的应用历史。"
+          action={
+            <Link
+              href={`/apply-log?node_id=${encodeURIComponent(node.node_id)}`}
+              className="inline-flex items-center justify-center rounded-2xl border border-[var(--border-default)] bg-[var(--control-background)] px-4 py-3 text-sm font-medium text-[var(--foreground-primary)] transition hover:bg-[var(--control-background-hover)]"
+            >
+              查看完整记录
+            </Link>
+          }
+        >
+          {applyLogsQuery.isLoading ? (
+            <LoadingState />
+          ) : applyLogsQuery.isError ? (
+            <ErrorState
+              title="应用记录加载失败"
+              description={getErrorMessage(applyLogsQuery.error)}
+            />
+          ) : applyLogs.length === 0 ? (
+            <EmptyState
+              title="暂无应用记录"
+              description="当前节点还没有上报过配置应用结果。"
+            />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-[var(--border-default)] text-left text-sm">
+                <thead>
+                  <tr className="text-[var(--foreground-secondary)]">
+                    <th className="px-3 py-3 font-medium">版本</th>
+                    <th className="px-3 py-3 font-medium">结果</th>
+                    <th className="px-3 py-3 font-medium">时间</th>
+                    <th className="px-3 py-3 font-medium">消息</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--border-default)]">
+                  {applyLogs.slice(0, 10).map((log) => (
+                    <tr key={log.id} className="align-top">
+                      <td className="px-3 py-4 text-[var(--foreground-primary)]">
+                        {log.version}
+                      </td>
+                      <td className="px-3 py-4">
+                        <StatusBadge
+                          label={log.result === 'success' ? '成功' : '失败'}
+                          variant={
+                            log.result === 'success' ? 'success' : 'danger'
+                          }
+                        />
+                      </td>
+                      <td className="px-3 py-4 text-[var(--foreground-secondary)]">
+                        {formatRelativeTime(log.created_at)} ·{' '}
+                        {formatDateTime(log.created_at)}
+                      </td>
+                      <td className="px-3 py-4 text-[var(--foreground-secondary)]">
+                        <p className="max-w-80 break-words whitespace-pre-wrap">
+                          {log.message || '—'}
+                        </p>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </AppCard>
+      </div>
+
+      <AppModal
+        isOpen={isEditorOpen}
+        onClose={() => setIsEditorOpen(false)}
+        title="编辑节点"
+        description="更新模式和节点名都在详情页维护。"
+        footer={
+          <div className="flex flex-wrap justify-end gap-3">
+            <SecondaryButton
+              type="button"
+              onClick={() => setIsEditorOpen(false)}
+              disabled={saveMutation.isPending}
+            >
+              取消
+            </SecondaryButton>
+            <PrimaryButton
+              type="submit"
+              form="node-detail-editor-form"
+              disabled={saveMutation.isPending}
+            >
+              {saveMutation.isPending ? '保存中...' : '保存修改'}
+            </PrimaryButton>
+          </div>
+        }
+      >
+        <form
+          id="node-detail-editor-form"
+          className="space-y-5"
+          onSubmit={handleSubmit}
+        >
+          <ResourceField
+            label="节点名"
+            hint="示例：shanghai-edge-1"
+            error={form.formState.errors.name?.message}
+          >
+            <ResourceInput
+              placeholder="shanghai-edge-1"
+              {...form.register('name')}
+            />
+          </ResourceField>
+
+          <ToggleField
+            label="启用自动更新"
+            description="开启后 Agent 心跳返回会提示节点自动执行自更新。"
+            checked={watchedAutoUpdate}
+            onChange={(checked) =>
+              form.setValue('auto_update_enabled', checked, {
+                shouldDirty: true,
+                shouldValidate: true,
+              })
+            }
+          />
+        </form>
+      </AppModal>
+    </>
+  );
+}

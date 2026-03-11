@@ -7,14 +7,15 @@ import (
 	"atsflare/service"
 	"bytes"
 	"encoding/json"
-	"github.com/gin-contrib/sessions"
-	"github.com/gin-contrib/sessions/cookie"
-	"github.com/gin-gonic/gin"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/gin-contrib/sessions"
+	"github.com/gin-contrib/sessions/cookie"
+	"github.com/gin-gonic/gin"
 )
 
 func TestPhase2RateLimitOptionsHotReload(t *testing.T) {
@@ -180,8 +181,8 @@ func TestPhase2AgentLifecycle(t *testing.T) {
 	})
 	var createdNode service.NodeView
 	decodeResponseData(t, createdNodeResp, &createdNode)
-	if createdNode.AgentToken == "" || !createdNode.Pending {
-		t.Fatal("expected created node to expose agent token while pending")
+	if createdNode.AgentToken == "" || createdNode.Status != service.NodeStatusPending {
+		t.Fatal("expected created node to expose agent token with pending status")
 	}
 
 	heartbeatPayload := map[string]any{
@@ -237,8 +238,8 @@ func TestPhase2AgentLifecycle(t *testing.T) {
 	if len(nodes) != 1 {
 		t.Fatalf("expected 1 node, got %d", len(nodes))
 	}
-	if nodes[0].Pending {
-		t.Fatal("expected registered node to clear pending state")
+	if nodes[0].Status != service.NodeStatusOnline {
+		t.Fatal("expected registered node to become online")
 	}
 	if nodes[0].AgentToken != createdNode.AgentToken {
 		t.Fatal("expected node auth token to remain stable after occupancy")
@@ -394,7 +395,7 @@ func TestPhase2GlobalDiscoveryRegistration(t *testing.T) {
 	if len(nodes) != 1 {
 		t.Fatalf("expected 1 discovered node, got %d", len(nodes))
 	}
-	if nodes[0].Name != "bulk-edge-1" || nodes[0].AgentToken != registration.AgentToken || nodes[0].Pending {
+	if nodes[0].Name != "bulk-edge-1" || nodes[0].AgentToken != registration.AgentToken || nodes[0].Status != service.NodeStatusOnline {
 		t.Fatal("expected discovered node to be created online with issued agent token")
 	}
 }

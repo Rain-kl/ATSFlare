@@ -18,6 +18,7 @@ export function getApiUrl(path: string) {
 
 export async function apiRequest<T>(path: string, init?: RequestInit) {
   const headers = new Headers(init?.headers ?? {});
+  const method = init?.method?.toUpperCase() ?? 'GET';
 
   if (!(init?.body instanceof FormData) && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json');
@@ -26,6 +27,7 @@ export async function apiRequest<T>(path: string, init?: RequestInit) {
   const response = await fetch(getApiUrl(path), {
     credentials: 'include',
     headers,
+    cache: method === 'GET' ? 'no-store' : init?.cache,
     ...init,
   });
 
@@ -38,7 +40,10 @@ export async function apiRequest<T>(path: string, init?: RequestInit) {
   }
 
   if (!response.ok) {
-    throw new ApiError(payload?.message || `请求失败（${response.status}）`, response.status);
+    throw new ApiError(
+      payload?.message || `请求失败（${response.status}）`,
+      response.status,
+    );
   }
 
   if (!payload) {

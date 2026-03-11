@@ -73,6 +73,24 @@ func TestPhase1PublishLifecycle(t *testing.T) {
 		t.Fatal("expected published version to contain snapshot, rendered config and checksum")
 	}
 
+	repeatPublishReq := httptest.NewRequest(http.MethodPost, "/api/config-versions/publish", nil)
+	repeatPublishReq.Header.Set("Authorization", "Bearer "+token)
+	repeatPublishRecorder := httptest.NewRecorder()
+	engine.ServeHTTP(repeatPublishRecorder, repeatPublishReq)
+	if repeatPublishRecorder.Code != http.StatusOK {
+		t.Fatalf("unexpected status %d for repeated publish: %s", repeatPublishRecorder.Code, repeatPublishRecorder.Body.String())
+	}
+	var repeatPublishResp apiResponse
+	if err := json.Unmarshal(repeatPublishRecorder.Body.Bytes(), &repeatPublishResp); err != nil {
+		t.Fatalf("failed to unmarshal repeated publish response: %v", err)
+	}
+	if repeatPublishResp.Success {
+		t.Fatal("expected repeated publish without route changes to be rejected")
+	}
+	if !strings.Contains(repeatPublishResp.Message, "当前规则没有变更") {
+		t.Fatalf("unexpected repeated publish message: %s", repeatPublishResp.Message)
+	}
+
 	initialSnapshot := version1.SnapshotJSON
 	initialRendered := version1.RenderedConfig
 

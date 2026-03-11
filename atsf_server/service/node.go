@@ -178,7 +178,6 @@ func buildNodeView(node *model.Node) *NodeView {
 		LastError:         node.LastError,
 		CreatedAt:         node.CreatedAt,
 		UpdatedAt:         node.UpdatedAt,
-		Pending:           status == NodeStatusPending,
 		AutoUpdateEnabled: node.AutoUpdateEnabled,
 		UpdateRequested:   node.UpdateRequested,
 	}

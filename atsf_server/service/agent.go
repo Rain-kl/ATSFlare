@@ -63,7 +63,6 @@ type NodeView struct {
 	Name               string     `json:"name"`
 	IP                 string     `json:"ip"`
 	AgentToken         string     `json:"agent_token"`
-	Pending            bool       `json:"pending"`
 	AutoUpdateEnabled  bool       `json:"auto_update_enabled"`
 	UpdateRequested    bool       `json:"update_requested"`
 	AgentVersion       string     `json:"agent_version"`
