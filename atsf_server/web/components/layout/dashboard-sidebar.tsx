@@ -21,13 +21,13 @@ export function DashboardSidebar() {
       )}
     >
       <div className='flex h-full flex-col gap-6'>
-        <div className='flex items-center gap-3 rounded-2xl border border-[var(--border-default)] bg-white/5 px-3 py-3'>
-          <div className='flex h-11 w-11 items-center justify-center rounded-2xl bg-sky-400/15 text-lg font-semibold text-sky-200'>
+        <div className='flex items-center gap-3 rounded-2xl border border-[var(--border-default)] bg-[var(--surface-muted)] px-3 py-3'>
+          <div className='flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--brand-primary-soft)] text-lg font-semibold text-[var(--brand-primary)]'>
             AF
           </div>
           {!isSidebarCollapsed ? (
             <div>
-              <p className='text-sm font-semibold text-white'>ATSFlare</p>
+              <p className='text-sm font-semibold text-[var(--foreground-primary)]'>ATSFlare</p>
               <p className='text-xs text-[var(--foreground-secondary)]'>控制面新版工程</p>
             </div>
           ) : null}
@@ -44,11 +44,11 @@ export function DashboardSidebar() {
                 className={cn(
                   'flex items-start gap-3 rounded-2xl border px-3 py-3 transition-colors',
                   active
-                    ? 'border-sky-300/30 bg-sky-400/10 text-white'
-                    : 'border-transparent text-[var(--foreground-secondary)] hover:border-[var(--border-default)] hover:bg-white/5 hover:text-white',
+                    ? 'border-[var(--border-strong)] bg-[var(--accent-soft)] text-[var(--foreground-primary)]'
+                    : 'border-transparent text-[var(--foreground-secondary)] hover:border-[var(--border-default)] hover:bg-[var(--surface-muted)] hover:text-[var(--foreground-primary)]',
                 )}
               >
-                <span className='mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white/5 text-xs font-semibold'>
+                <span className='mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[var(--control-background)] text-xs font-semibold'>
                   {item.shortLabel.slice(0, 1)}
                 </span>
                 {!isSidebarCollapsed ? (
@@ -65,7 +65,7 @@ export function DashboardSidebar() {
         </nav>
 
         {!isSidebarCollapsed ? (
-          <div className='rounded-2xl border border-emerald-400/15 bg-emerald-500/10 px-4 py-4 text-xs leading-6 text-emerald-100/90'>
+          <div className='rounded-2xl border border-[var(--status-success-border)] bg-[var(--status-success-soft)] px-4 py-4 text-xs leading-6 text-[var(--status-success-foreground)]'>
             阶段 1 已完成目录骨架、静态导出与基础布局初始化。
           </div>
         ) : null}

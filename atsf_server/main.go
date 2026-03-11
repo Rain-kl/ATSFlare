@@ -16,7 +16,7 @@ import (
 	"strconv"
 )
 
-//go:embed web/build
+//go:embed all:web/build
 var buildFS embed.FS
 
 //go:embed web/build/index.html

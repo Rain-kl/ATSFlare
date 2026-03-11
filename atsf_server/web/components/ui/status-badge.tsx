@@ -1,10 +1,14 @@
 import { cn } from '@/lib/utils/cn';
 
 const variantClasses = {
-  success: 'border-emerald-400/25 bg-emerald-500/15 text-emerald-200',
-  warning: 'border-amber-400/25 bg-amber-500/15 text-amber-200',
-  danger: 'border-rose-400/25 bg-rose-500/15 text-rose-200',
-  info: 'border-sky-400/25 bg-sky-500/15 text-sky-200',
+  success:
+    'border-[var(--status-success-border)] bg-[var(--status-success-soft)] text-[var(--status-success-foreground)]',
+  warning:
+    'border-[var(--status-warning-border)] bg-[var(--status-warning-soft)] text-[var(--status-warning-foreground)]',
+  danger:
+    'border-[var(--status-danger-border)] bg-[var(--status-danger-soft)] text-[var(--status-danger-foreground)]',
+  info:
+    'border-[var(--status-info-border)] bg-[var(--status-info-soft)] text-[var(--status-info-foreground)]',
 } as const;
 
 interface StatusBadgeProps {

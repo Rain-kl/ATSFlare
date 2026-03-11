@@ -1,5 +1,6 @@
 'use client';
 
+import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { getCurrentNavigationItem } from '@/lib/utils/navigation';
 import { publicEnv } from '@/lib/env/public-env';
 import { useAppShellStore } from '@/store/app-shell';
@@ -18,20 +19,21 @@ export function DashboardTopbar() {
           <button
             type='button'
             onClick={toggleSidebar}
-            className='inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-[var(--border-default)] bg-white/5 text-lg text-white transition hover:bg-white/10'
+            className='inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-[var(--border-default)] bg-[var(--control-background)] text-lg text-[var(--foreground-primary)] transition hover:bg-[var(--control-background-hover)]'
             aria-label='切换侧边栏'
           >
             ≡
           </button>
           <div>
             <p className='text-xs uppercase tracking-[0.24em] text-[var(--foreground-secondary)]'>当前模块</p>
-            <h2 className='text-lg font-semibold text-white'>
+            <h2 className='text-lg font-semibold text-[var(--foreground-primary)]'>
               {currentItem?.label ?? 'ATSFlare 控制台'}
             </h2>
           </div>
         </div>
 
         <div className='flex items-center gap-3 text-sm text-[var(--foreground-secondary)]'>
+          <ThemeToggle />
           <span className='rounded-full border border-[var(--border-default)] px-3 py-1.5'>
             静态导出模式
           </span>

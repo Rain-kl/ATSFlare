@@ -31,9 +31,9 @@ export function DashboardOverview() {
           {readinessItems.map((item) => (
             <div
               key={item.title}
-              className='rounded-2xl border border-[var(--border-default)] bg-white/5 p-4'
+              className='rounded-2xl border border-[var(--border-default)] bg-[var(--surface-muted)] p-4'
             >
-              <p className='text-base font-semibold text-white'>{item.title}</p>
+              <p className='text-base font-semibold text-[var(--foreground-primary)]'>{item.title}</p>
               <p className='mt-2 text-sm leading-6 text-[var(--foreground-secondary)]'>
                 {item.description}
               </p>
@@ -49,9 +49,9 @@ export function DashboardOverview() {
               <Link
                 key={item.href}
                 href={item.href}
-                className='rounded-2xl border border-[var(--border-default)] bg-white/5 p-4 transition hover:border-sky-300/30 hover:bg-sky-400/10'
+                className='rounded-2xl border border-[var(--border-default)] bg-[var(--surface-muted)] p-4 transition hover:border-[var(--border-strong)] hover:bg-[var(--accent-soft)]'
               >
-                <p className='text-sm font-semibold text-white'>{item.label}</p>
+                <p className='text-sm font-semibold text-[var(--foreground-primary)]'>{item.label}</p>
                 <p className='mt-2 text-sm leading-6 text-[var(--foreground-secondary)]'>
                   {item.description}
                 </p>
