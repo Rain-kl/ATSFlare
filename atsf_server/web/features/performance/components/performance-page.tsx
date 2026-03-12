@@ -111,6 +111,13 @@ function isCacheLevelsValue(value: string) {
   return /^\d{1,2}(?::\d{1,2}){0,2}$/.test(value.trim());
 }
 
+function extractMainConfigLines(content: string, matcher: RegExp) {
+  return content
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line && matcher.test(line));
+}
+
 export function PerformancePage() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
@@ -357,16 +364,6 @@ export function PerformancePage() {
 
   const handleCacheSave = () => {
     void runBusyAction('performance-cache', async () => {
-      if (!isPositiveInteger(performanceFields.OpenRestyGzipMinLength)) {
-        throw new Error('gzip_min_length 必须为大于 0 的整数。');
-      }
-      const gzipLevel = Number.parseInt(
-        performanceFields.OpenRestyGzipCompLevel,
-        10,
-      );
-      if (Number.isNaN(gzipLevel) || gzipLevel < 1 || gzipLevel > 9) {
-        throw new Error('gzip_comp_level 必须在 1 到 9 之间。');
-      }
       if (performanceFields.OpenRestyCacheEnabled) {
         if (!performanceFields.OpenRestyCachePath.trim()) {
           throw new Error('启用缓存时必须填写 proxy_cache_path 目录。');
@@ -388,18 +385,6 @@ export function PerformancePage() {
 
       await saveOptionEntries(
         [
-          [
-            'OpenRestyGzipEnabled',
-            String(performanceFields.OpenRestyGzipEnabled),
-          ],
-          [
-            'OpenRestyGzipMinLength',
-            performanceFields.OpenRestyGzipMinLength.trim(),
-          ],
-          [
-            'OpenRestyGzipCompLevel',
-            performanceFields.OpenRestyGzipCompLevel.trim(),
-          ],
           ['OpenRestyCachePath', performanceFields.OpenRestyCachePath.trim()],
           [
             'OpenRestyCacheLevels',
@@ -435,6 +420,39 @@ export function PerformancePage() {
           ],
         ],
         'OpenResty 压缩与缓存参数已保存。',
+      );
+    });
+  };
+
+  const handleGzipSave = () => {
+    void runBusyAction('performance-gzip', async () => {
+      if (!isPositiveInteger(performanceFields.OpenRestyGzipMinLength)) {
+        throw new Error('gzip_min_length 必须为大于 0 的整数。');
+      }
+      const gzipLevel = Number.parseInt(
+        performanceFields.OpenRestyGzipCompLevel,
+        10,
+      );
+      if (Number.isNaN(gzipLevel) || gzipLevel < 1 || gzipLevel > 9) {
+        throw new Error('gzip_comp_level 必须在 1 到 9 之间。');
+      }
+
+      await saveOptionEntries(
+        [
+          [
+            'OpenRestyGzipEnabled',
+            String(performanceFields.OpenRestyGzipEnabled),
+          ],
+          [
+            'OpenRestyGzipMinLength',
+            performanceFields.OpenRestyGzipMinLength.trim(),
+          ],
+          [
+            'OpenRestyGzipCompLevel',
+            performanceFields.OpenRestyGzipCompLevel.trim(),
+          ],
+        ],
+        'OpenResty 压缩参数已保存。',
       );
     });
   };
@@ -494,6 +512,15 @@ export function PerformancePage() {
       />
     );
   }
+
+  const cachePreviewLines = extractMainConfigLines(
+    preview.main_config,
+    /proxy_cache_path|proxy_cache_key|proxy_cache_lock(?:_timeout)?|proxy_cache_use_stale/,
+  );
+  const gzipPreviewLines = extractMainConfigLines(
+    preview.main_config,
+    /gzip(?:_| )/,
+  );
 
   return (
     <div className="space-y-6">
@@ -812,169 +839,295 @@ export function PerformancePage() {
               </div>
             </AppCard>
 
-            <AppCard
-              title="OpenResty 压缩与缓存"
-              description="缓存能力仍限定在单节点反代优化场景，不扩展为独立缓存产品。"
-              action={
-                <PrimaryButton
-                  type="button"
-                  onClick={handleCacheSave}
-                  disabled={busyKey === 'performance-cache'}
-                >
-                  {busyKey === 'performance-cache'
-                    ? '保存中...'
-                    : '保存压缩与缓存'}
-                </PrimaryButton>
-              }
-            >
-              <div className="space-y-5">
-                <div className="grid gap-5 md:grid-cols-2">
-                  <ToggleField
-                    label="gzip"
-                    description="是否启用 gzip on。"
-                    checked={performanceFields.OpenRestyGzipEnabled}
-                    onChange={(checked) =>
-                      setPerformanceFields((previous) => ({
-                        ...previous,
-                        OpenRestyGzipEnabled: checked,
-                      }))
-                    }
-                  />
-                  <ToggleField
-                    label="proxy cache"
-                    description="是否启用单节点代理缓存。"
-                    checked={performanceFields.OpenRestyCacheEnabled}
-                    onChange={(checked) =>
-                      setPerformanceFields((previous) => ({
-                        ...previous,
-                        OpenRestyCacheEnabled: checked,
-                      }))
-                    }
-                  />
-                  <ResourceField label="gzip_min_length">
-                    <ResourceInput
-                      type="number"
-                      value={performanceFields.OpenRestyGzipMinLength}
-                      onChange={(event) =>
+            <div className="space-y-6">
+              <AppCard
+                title="OpenResty 压缩"
+                description="单独维护 gzip 相关参数，避免与缓存配置混在一起。"
+                action={
+                  <PrimaryButton
+                    type="button"
+                    onClick={handleGzipSave}
+                    disabled={busyKey === 'performance-gzip'}
+                  >
+                    {busyKey === 'performance-gzip'
+                      ? '保存中...'
+                      : '保存压缩设置'}
+                  </PrimaryButton>
+                }
+              >
+                <div className="space-y-5">
+                  <div className="grid gap-5 md:grid-cols-2">
+                    <ToggleField
+                      label="gzip"
+                      description="是否启用 gzip on。"
+                      checked={performanceFields.OpenRestyGzipEnabled}
+                      onChange={(checked) =>
                         setPerformanceFields((previous) => ({
                           ...previous,
-                          OpenRestyGzipMinLength: event.target.value,
+                          OpenRestyGzipEnabled: checked,
                         }))
                       }
                     />
-                  </ResourceField>
-                  <ResourceField label="gzip_comp_level">
-                    <ResourceInput
-                      type="number"
-                      min="1"
-                      max="9"
-                      value={performanceFields.OpenRestyGzipCompLevel}
-                      onChange={(event) =>
-                        setPerformanceFields((previous) => ({
-                          ...previous,
-                          OpenRestyGzipCompLevel: event.target.value,
-                        }))
-                      }
-                    />
-                  </ResourceField>
+                    <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-4">
+                      <p className="text-xs tracking-[0.2em] text-[var(--foreground-muted)] uppercase">
+                        当前压缩预览
+                      </p>
+                      {gzipPreviewLines.length > 0 ? (
+                        <CodeBlock className="mt-3 text-xs leading-6 whitespace-pre-wrap">
+                          {gzipPreviewLines.join('\n')}
+                        </CodeBlock>
+                      ) : (
+                        <p className="mt-3 text-sm leading-6 text-[var(--foreground-secondary)]">
+                          当前主配置预览中没有压缩指令。
+                        </p>
+                      )}
+                    </div>
+                    <ResourceField label="gzip_min_length">
+                      <ResourceInput
+                        type="number"
+                        value={performanceFields.OpenRestyGzipMinLength}
+                        onChange={(event) =>
+                          setPerformanceFields((previous) => ({
+                            ...previous,
+                            OpenRestyGzipMinLength: event.target.value,
+                          }))
+                        }
+                      />
+                    </ResourceField>
+                    <ResourceField label="gzip_comp_level">
+                      <ResourceInput
+                        type="number"
+                        min="1"
+                        max="9"
+                        value={performanceFields.OpenRestyGzipCompLevel}
+                        onChange={(event) =>
+                          setPerformanceFields((previous) => ({
+                            ...previous,
+                            OpenRestyGzipCompLevel: event.target.value,
+                          }))
+                        }
+                      />
+                    </ResourceField>
+                  </div>
                 </div>
-                <div className="grid gap-5 md:grid-cols-2">
-                  <ResourceField label="proxy_cache_path">
-                    <ResourceInput
-                      value={performanceFields.OpenRestyCachePath}
-                      onChange={(event) =>
+              </AppCard>
+
+              <AppCard
+                title="OpenResty 缓存"
+                description="缓存能力仍限定在单节点反代优化场景，不扩展为独立缓存产品。"
+                action={
+                  <div className="flex flex-wrap gap-2">
+                    <SecondaryButton
+                      type="button"
+                      onClick={() =>
                         setPerformanceFields((previous) => ({
                           ...previous,
-                          OpenRestyCachePath: event.target.value,
+                          OpenRestyCacheEnabled:
+                            !previous.OpenRestyCacheEnabled,
                         }))
                       }
-                      placeholder="/var/cache/openresty/atsflare"
-                    />
-                  </ResourceField>
-                  <ResourceField label="levels">
-                    <ResourceInput
-                      value={performanceFields.OpenRestyCacheLevels}
-                      onChange={(event) =>
+                    >
+                      {performanceFields.OpenRestyCacheEnabled
+                        ? '先关闭缓存'
+                        : '先启用缓存'}
+                    </SecondaryButton>
+                    <PrimaryButton
+                      type="button"
+                      onClick={handleCacheSave}
+                      disabled={busyKey === 'performance-cache'}
+                    >
+                      {busyKey === 'performance-cache'
+                        ? '保存中...'
+                        : performanceFields.OpenRestyCacheEnabled
+                          ? '保存缓存设置'
+                          : '保存为关闭状态'}
+                    </PrimaryButton>
+                  </div>
+                }
+              >
+                <div className="space-y-5">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-4">
+                      <p className="text-xs tracking-[0.2em] text-[var(--foreground-muted)] uppercase">
+                        缓存状态
+                      </p>
+                      <div className="mt-3 flex flex-wrap items-center gap-3">
+                        <StatusBadge
+                          label={
+                            performanceFields.OpenRestyCacheEnabled
+                              ? '已启用，主配置会渲染缓存指令'
+                              : '已关闭，主配置不会渲染缓存指令'
+                          }
+                          variant={
+                            performanceFields.OpenRestyCacheEnabled
+                              ? 'success'
+                              : 'warning'
+                          }
+                        />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setPerformanceFields((previous) => ({
+                              ...previous,
+                              OpenRestyCacheEnabled:
+                                !previous.OpenRestyCacheEnabled,
+                            }))
+                          }
+                          className={[
+                            'inline-flex items-center rounded-full px-3 py-1.5 text-xs font-medium transition',
+                            performanceFields.OpenRestyCacheEnabled
+                              ? 'bg-[var(--status-danger-soft)] text-[var(--status-danger-foreground)]'
+                              : 'bg-[var(--brand-primary-soft)] text-[var(--brand-primary)]',
+                          ].join(' ')}
+                        >
+                          {performanceFields.OpenRestyCacheEnabled
+                            ? '点击关闭'
+                            : '点击启用'}
+                        </button>
+                      </div>
+                      <p className="mt-3 text-xs leading-5 text-[var(--foreground-secondary)]">
+                        `max_size` 会跟随 `proxy_cache_path`
+                        一起渲染，不会单独占一行。
+                      </p>
+                    </div>
+
+                    <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-4">
+                      <p className="text-xs tracking-[0.2em] text-[var(--foreground-muted)] uppercase">
+                        当前缓存预览
+                      </p>
+                      {cachePreviewLines.length > 0 ? (
+                        <CodeBlock className="mt-3 text-xs leading-6 whitespace-pre-wrap">
+                          {cachePreviewLines.join('\n')}
+                        </CodeBlock>
+                      ) : (
+                        <p className="mt-3 text-sm leading-6 text-[var(--foreground-secondary)]">
+                          当前主配置预览中没有缓存指令。启用缓存并保存后，会出现
+                          `proxy_cache_path ... max_size=...;` 这一行。
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div
+                    className={[
+                      'grid gap-5 transition md:grid-cols-2',
+                      performanceFields.OpenRestyCacheEnabled
+                        ? 'opacity-100'
+                        : 'opacity-60',
+                    ].join(' ')}
+                  >
+                    <ResourceField
+                      label="proxy_cache_path"
+                      hint={
+                        performanceFields.OpenRestyCacheEnabled
+                          ? '缓存目录，启用缓存时必填。'
+                          : '缓存关闭时暂不生效。'
+                      }
+                    >
+                      <ResourceInput
+                        value={performanceFields.OpenRestyCachePath}
+                        disabled={!performanceFields.OpenRestyCacheEnabled}
+                        onChange={(event) =>
+                          setPerformanceFields((previous) => ({
+                            ...previous,
+                            OpenRestyCachePath: event.target.value,
+                          }))
+                        }
+                        placeholder="/var/cache/openresty/atsflare"
+                      />
+                    </ResourceField>
+                    <ResourceField label="levels">
+                      <ResourceInput
+                        value={performanceFields.OpenRestyCacheLevels}
+                        disabled={!performanceFields.OpenRestyCacheEnabled}
+                        onChange={(event) =>
+                          setPerformanceFields((previous) => ({
+                            ...previous,
+                            OpenRestyCacheLevels: event.target.value,
+                          }))
+                        }
+                        placeholder="1:2"
+                      />
+                    </ResourceField>
+                    <ResourceField label="inactive">
+                      <ResourceInput
+                        value={performanceFields.OpenRestyCacheInactive}
+                        disabled={!performanceFields.OpenRestyCacheEnabled}
+                        onChange={(event) =>
+                          setPerformanceFields((previous) => ({
+                            ...previous,
+                            OpenRestyCacheInactive: event.target.value,
+                          }))
+                        }
+                        placeholder="30m"
+                      />
+                    </ResourceField>
+                    <ResourceField label="max_size">
+                      <ResourceInput
+                        value={performanceFields.OpenRestyCacheMaxSize}
+                        disabled={!performanceFields.OpenRestyCacheEnabled}
+                        onChange={(event) =>
+                          setPerformanceFields((previous) => ({
+                            ...previous,
+                            OpenRestyCacheMaxSize: event.target.value,
+                          }))
+                        }
+                        placeholder="1g"
+                      />
+                    </ResourceField>
+                    <ResourceField label="cache key template">
+                      <ResourceInput
+                        value={performanceFields.OpenRestyCacheKeyTemplate}
+                        disabled={!performanceFields.OpenRestyCacheEnabled}
+                        onChange={(event) =>
+                          setPerformanceFields((previous) => ({
+                            ...previous,
+                            OpenRestyCacheKeyTemplate: event.target.value,
+                          }))
+                        }
+                      />
+                    </ResourceField>
+                    <ToggleField
+                      label="proxy_cache_lock"
+                      description="是否启用 proxy_cache_lock。"
+                      checked={performanceFields.OpenRestyCacheLockEnabled}
+                      disabled={!performanceFields.OpenRestyCacheEnabled}
+                      onChange={(checked) =>
                         setPerformanceFields((previous) => ({
                           ...previous,
-                          OpenRestyCacheLevels: event.target.value,
-                        }))
-                      }
-                      placeholder="1:2"
-                    />
-                  </ResourceField>
-                  <ResourceField label="inactive">
-                    <ResourceInput
-                      value={performanceFields.OpenRestyCacheInactive}
-                      onChange={(event) =>
-                        setPerformanceFields((previous) => ({
-                          ...previous,
-                          OpenRestyCacheInactive: event.target.value,
-                        }))
-                      }
-                      placeholder="30m"
-                    />
-                  </ResourceField>
-                  <ResourceField label="max_size">
-                    <ResourceInput
-                      value={performanceFields.OpenRestyCacheMaxSize}
-                      onChange={(event) =>
-                        setPerformanceFields((previous) => ({
-                          ...previous,
-                          OpenRestyCacheMaxSize: event.target.value,
-                        }))
-                      }
-                      placeholder="1g"
-                    />
-                  </ResourceField>
-                  <ResourceField label="cache key template">
-                    <ResourceInput
-                      value={performanceFields.OpenRestyCacheKeyTemplate}
-                      onChange={(event) =>
-                        setPerformanceFields((previous) => ({
-                          ...previous,
-                          OpenRestyCacheKeyTemplate: event.target.value,
+                          OpenRestyCacheLockEnabled: checked,
                         }))
                       }
                     />
-                  </ResourceField>
-                  <ToggleField
-                    label="proxy_cache_lock"
-                    description="是否启用 proxy_cache_lock。"
-                    checked={performanceFields.OpenRestyCacheLockEnabled}
-                    onChange={(checked) =>
-                      setPerformanceFields((previous) => ({
-                        ...previous,
-                        OpenRestyCacheLockEnabled: checked,
-                      }))
-                    }
-                  />
-                  <ResourceField label="proxy_cache_lock_timeout">
-                    <ResourceInput
-                      value={performanceFields.OpenRestyCacheLockTimeout}
-                      onChange={(event) =>
-                        setPerformanceFields((previous) => ({
-                          ...previous,
-                          OpenRestyCacheLockTimeout: event.target.value,
-                        }))
-                      }
-                      placeholder="5s"
-                    />
-                  </ResourceField>
-                  <ResourceField label="proxy_cache_use_stale">
-                    <ResourceInput
-                      value={performanceFields.OpenRestyCacheUseStale}
-                      onChange={(event) =>
-                        setPerformanceFields((previous) => ({
-                          ...previous,
-                          OpenRestyCacheUseStale: event.target.value,
-                        }))
-                      }
-                    />
-                  </ResourceField>
+                    <ResourceField label="proxy_cache_lock_timeout">
+                      <ResourceInput
+                        value={performanceFields.OpenRestyCacheLockTimeout}
+                        disabled={!performanceFields.OpenRestyCacheEnabled}
+                        onChange={(event) =>
+                          setPerformanceFields((previous) => ({
+                            ...previous,
+                            OpenRestyCacheLockTimeout: event.target.value,
+                          }))
+                        }
+                        placeholder="5s"
+                      />
+                    </ResourceField>
+                    <ResourceField label="proxy_cache_use_stale">
+                      <ResourceInput
+                        value={performanceFields.OpenRestyCacheUseStale}
+                        disabled={!performanceFields.OpenRestyCacheEnabled}
+                        onChange={(event) =>
+                          setPerformanceFields((previous) => ({
+                            ...previous,
+                            OpenRestyCacheUseStale: event.target.value,
+                          }))
+                        }
+                      />
+                    </ResourceField>
+                  </div>
                 </div>
-              </div>
-            </AppCard>
+              </AppCard>
+            </div>
           </div>
         </div>
       ) : (
