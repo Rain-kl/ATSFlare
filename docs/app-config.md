@@ -13,6 +13,8 @@ Server 当前支持两类启动配置：
 
 此外，部分运行时参数已迁入数据库 `Option` 表，可在管理端设置页中热更新，例如 Agent 运行参数与限流阈值。
 
+第五版（0.5.x）计划继续复用 `Option` 表承载 OpenResty 性能优化参数与缓存参数，不单独引入新的配置中心。
+
 ### 1.1 Server 命令行参数
 
 启动示例：
@@ -117,6 +119,49 @@ volumes:
 * 限流窗口上限不能超过 `RateLimitKeyExpirationDuration`，当前为 20 分钟
 * 限流按来源 IP 统计，若前置了 Nginx/CDN/LB，应正确透传真实客户端 IP
 
+### 1.2.2 第五版规划中的 OpenResty 优化配置项
+
+以下配置项用于第五版开发文档定义，目标是在管理端「运维设置」中统一维护，并参与版本渲染。除特别说明外，均计划保存在 `Option` 表中。
+
+| 配置项 | 作用 | 计划默认值 |
+| --- | --- | --- |
+| `OpenRestyWorkerProcesses` | `worker_processes` 配置；支持 `auto` 或正整数 | `auto` |
+| `OpenRestyWorkerConnections` | `events { worker_connections }` 上限 | `4096` |
+| `OpenRestyWorkerRlimitNofile` | `worker_rlimit_nofile` 上限 | `65535` |
+| `OpenRestyEventsUse` | `events { use ... }` 指令；为空表示不显式渲染 | 空 |
+| `OpenRestyEventsMultiAcceptEnabled` | 是否启用 `multi_accept on` | `false` |
+| `OpenRestyKeepaliveTimeout` | `keepalive_timeout` 秒数 | `65` |
+| `OpenRestyKeepaliveRequests` | `keepalive_requests` 上限 | `1000` |
+| `OpenRestyClientHeaderTimeout` | `client_header_timeout` 秒数 | `15` |
+| `OpenRestyClientBodyTimeout` | `client_body_timeout` 秒数 | `15` |
+| `OpenRestySendTimeout` | `send_timeout` 秒数 | `30` |
+| `OpenRestyProxyConnectTimeout` | `proxy_connect_timeout` 秒数 | `5` |
+| `OpenRestyProxySendTimeout` | `proxy_send_timeout` 秒数 | `60` |
+| `OpenRestyProxyReadTimeout` | `proxy_read_timeout` 秒数 | `60` |
+| `OpenRestyProxyBufferingEnabled` | 是否启用 `proxy_buffering` | `true` |
+| `OpenRestyProxyBuffers` | `proxy_buffers` 组合值，例如 `16 16k` | `16 16k` |
+| `OpenRestyProxyBufferSize` | `proxy_buffer_size` | `8k` |
+| `OpenRestyProxyBusyBuffersSize` | `proxy_busy_buffers_size` | `64k` |
+| `OpenRestyGzipEnabled` | 是否启用 `gzip on` | `true` |
+| `OpenRestyGzipMinLength` | `gzip_min_length` 字节数 | `1024` |
+| `OpenRestyGzipCompLevel` | `gzip_comp_level` | `5` |
+| `OpenRestyCacheEnabled` | 是否启用代理缓存 | `false` |
+| `OpenRestyCachePath` | `proxy_cache_path` 目录 | 空 |
+| `OpenRestyCacheLevels` | `proxy_cache_path levels=` 值 | `1:2` |
+| `OpenRestyCacheInactive` | `proxy_cache_path inactive=` 时长 | `30m` |
+| `OpenRestyCacheMaxSize` | `proxy_cache_path max_size=` 大小 | `1g` |
+| `OpenRestyCacheKeyTemplate` | 缓存 Key 模板 | `$scheme$proxy_host$request_uri` |
+| `OpenRestyCacheLockEnabled` | 是否启用 `proxy_cache_lock` | `true` |
+| `OpenRestyCacheLockTimeout` | `proxy_cache_lock_timeout` 时长 | `5s` |
+| `OpenRestyCacheUseStale` | `proxy_cache_use_stale` 场景列表 | `error timeout updating http_500 http_502 http_503 http_504` |
+
+说明：
+
+* 第五版第一批仅开放稳定、可校验、可回滚的常用性能项；更多指令后续按相同模式扩展
+* 所有大小、时长、布尔和整数参数都应在 Server 保存前完成校验
+* `OpenRestyCacheEnabled=false` 时，缓存目录与缓存参数应允许留空或回退到默认值
+* 任何包含路径的配置项都必须在 Agent 落盘前再次校验可写性与安全边界
+
 ### 1.3 前端构建环境变量
 
 新版管理端位于 `atsf_server/web`，构建时支持以下公开环境变量：
@@ -190,6 +235,7 @@ go run ./cmd/agent -config ./agent.json
 	"node_ip": "192.168.1.20",
 	"data_dir": "./data",
 	"openresty_path": "/usr/local/openresty/nginx/sbin/openresty",
+	"main_config_path": "/usr/local/openresty/nginx/conf/nginx.conf",
 	"route_config_path": "/usr/local/openresty/nginx/conf/conf.d/atsflare_routes.conf",
 	"cert_dir": "/usr/local/openresty/nginx/conf/certs",
 	"openresty_cert_dir": "/usr/local/openresty/nginx/conf/certs",
@@ -214,6 +260,7 @@ go run ./cmd/agent -config ./agent.json
 | `openresty_docker_image` | Docker 模式下用于初始化/管理的 OpenResty 镜像 | 否 | `openresty/openresty:alpine` | `openresty/openresty:alpine` |
 | `docker_binary` | Docker 可执行文件名或路径 | 否 | `docker` | `/usr/bin/docker` |
 | `data_dir` | Agent 数据目录，用于存储托管配置、证书和状态文件 | 否 | 配置文件所在目录下的 `data` 子目录 | `./data` |
+| `main_config_path` | 第五版主配置接管时 OpenResty 主配置文件写入路径 | 第五版本机模式建议必填 | Docker 模式可使用受管默认路径；本机模式建议显式设置 | `/usr/local/openresty/nginx/conf/nginx.conf` |
 | `route_config_path` | 路由配置文件写入路径 | 否 | 默认为 `data_dir` 下托管路径 | `/etc/nginx/conf.d/atsflare_routes.conf` |
 | `cert_dir` | Agent 在本机写入证书文件的目录 | 否 | 默认为 `data_dir` 下托管证书目录 | `./data/etc/nginx/certs` |
 | `openresty_cert_dir` | OpenResty 实际读取证书的目录 | 否 | 本机模式默认等于 `cert_dir`；Docker 模式默认 `/etc/nginx/atsflare-certs` | `/usr/local/openresty/nginx/conf/certs` |
@@ -231,7 +278,7 @@ go run ./cmd/agent -config ./agent.json
 * `node_name` 与 `node_ip` 未填写时会自动探测；若自动探测失败，配置校验会报错
 * 未配置 `openresty_path` 时，默认为 Docker OpenResty 模式
 * 配置保存时，`agent_version`、`nginx_version` 由程序运行时维护，不需要写入 JSON
-* 本机模式下的 `route_config_path` 需与节点主配置文件的 include 规则保持一致
+* 第五版主配置接管完成后，本机模式下应优先通过 `main_config_path` 由 Agent 写入受管主配置，而不是依赖节点手工维护 include 规则
 
 ### 2.4 Agent 托管路径默认值
 
@@ -239,6 +286,7 @@ go run ./cmd/agent -config ./agent.json
 
 | 字段 | 默认值 |
 | --- | --- |
+| `main_config_path` | 第五版 Docker 模式默认可落在 `data_dir/etc/nginx/nginx.conf`；本机模式建议显式配置 |
 | `route_config_path` | `data_dir/etc/nginx/conf.d/atsflare_routes.conf` |
 | `cert_dir` | `data_dir/etc/nginx/certs` |
 | `state_path` | `data_dir/var/lib/atsflare/agent-state.json` |
@@ -272,6 +320,7 @@ Docker OpenResty 模式下：
 	"server_url": "http://127.0.0.1:3000",
 	"agent_token": "replace-with-node-auth-token",
 	"openresty_path": "/usr/local/openresty/nginx/sbin/openresty",
+	"main_config_path": "/usr/local/openresty/nginx/conf/nginx.conf",
 	"route_config_path": "/usr/local/openresty/nginx/conf/conf.d/atsflare_routes.conf",
 	"cert_dir": "/usr/local/openresty/nginx/conf/certs",
 	"openresty_cert_dir": "/usr/local/openresty/nginx/conf/certs"
