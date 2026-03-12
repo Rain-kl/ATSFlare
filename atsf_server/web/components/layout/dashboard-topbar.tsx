@@ -345,7 +345,6 @@ export function DashboardTopbar() {
         isOpen={isVersionModalOpen}
         onClose={() => setIsVersionModalOpen(false)}
         currentVersion={currentVersion}
-        frontendVersion={publicEnv.appVersion}
         release={selectedRelease}
         selectedChannel={selectedReleaseChannel}
         uploadedBinary={uploadedBinary}

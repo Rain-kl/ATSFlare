@@ -384,10 +384,6 @@ export function ProxyRoutesPage() {
     () => certificatesQuery.data ?? [],
     [certificatesQuery.data],
   );
-  const certificateMap = useMemo(
-    () => new Map(certificates.map((item) => [item.id, item])),
-    [certificates],
-  );
 
   const handleReset = () => {
     setFeedback(null);
@@ -495,9 +491,6 @@ export function ProxyRoutesPage() {
                 <tbody className="divide-y divide-[var(--border-default)]">
                   {routes.map((route) => {
                     const headers = parseCustomHeaders(route.custom_headers);
-                    const certificate = route.cert_id
-                      ? certificateMap.get(route.cert_id)
-                      : null;
 
                     return (
                       <tr key={route.id} className="align-top">

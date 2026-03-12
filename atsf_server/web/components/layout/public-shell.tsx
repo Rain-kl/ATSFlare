@@ -1,7 +1,6 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 
-import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { publicEnv } from '@/lib/env/public-env';
 
 interface PublicShellProps {

@@ -6,7 +6,6 @@ import { useQueries } from '@tanstack/react-query';
 import { ErrorState } from '@/components/feedback/error-state';
 import { LoadingState } from '@/components/feedback/loading-state';
 import { AppCard } from '@/components/ui/app-card';
-import { StatusBadge } from '@/components/ui/status-badge';
 import { getConfigVersions } from '@/features/config-versions/api/config-versions';
 import type { ConfigVersionItem } from '@/features/config-versions/types';
 import { getManagedDomains } from '@/features/managed-domains/api/managed-domains';
