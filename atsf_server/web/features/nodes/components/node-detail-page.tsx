@@ -344,19 +344,31 @@ export function NodeDetailPage({ nodeId }: { nodeId: string }) {
     updateAgentMutation.mutate(selectedAgentRelease ?? null);
   };
 
+  const isRefreshing = nodesQuery.isFetching || applyLogsQuery.isFetching;
+
+  const handleRefresh = async () => {
+    setFeedback(null);
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: nodesQueryKey }),
+      queryClient.invalidateQueries({
+        queryKey: ['apply-logs', node.node_id],
+      }),
+    ]);
+  };
+
   return (
     <>
       <div className="space-y-6">
         <PageHeader
           title={node.name}
-          description="节点详情每 5 秒自动刷新一次。部署命令、Node ID、Token、更新模式和最近应用记录统一在这里查看。"
+          description="节点详情"
           action={
             <>
               <Link
                 href="/node"
                 className="inline-flex items-center justify-center rounded-2xl border border-[var(--border-default)] bg-[var(--control-background)] px-4 py-3 text-sm font-medium text-[var(--foreground-primary)] transition hover:bg-[var(--control-background-hover)]"
               >
-                返回列表
+                返回
               </Link>
               <SecondaryButton
                 type="button"
@@ -364,30 +376,26 @@ export function NodeDetailPage({ nodeId }: { nodeId: string }) {
               >
                 编辑节点
               </SecondaryButton>
+              <SecondaryButton
+                type="button"
+                onClick={() => void handleRefresh()}
+                disabled={isRefreshing}
+              >
+                {isRefreshing ? '刷新中...' : '刷新'}
+              </SecondaryButton>
               <PrimaryButton
                 type="button"
                 onClick={handleOpenAgentUpdateModal}
                 disabled={updateAgentMutation.isPending}
               >
-                {node.update_requested ? '查看 Agent 更新' : 'Agent 更新'}
+                {node.update_requested ? '查看升级' : '升级'}
               </PrimaryButton>
-              <SecondaryButton
-                type="button"
-                onClick={handleRestartOpenresty}
-                disabled={restartOpenrestyMutation.isPending}
-              >
-                {restartOpenrestyMutation.isPending
-                  ? '下发重启中...'
-                  : node.restart_openresty_requested
-                    ? '等待 OpenResty 重启'
-                    : '重启 OpenResty'}
-              </SecondaryButton>
               <DangerButton
                 type="button"
                 onClick={handleDelete}
                 disabled={deleteMutation.isPending}
               >
-                删除节点
+                删除
               </DangerButton>
             </>
           }
@@ -420,20 +428,6 @@ export function NodeDetailPage({ nodeId }: { nodeId: string }) {
               <p>Agent：{node.agent_version || 'unknown'}</p>
               <p>Nginx：{node.nginx_version || 'unknown'}</p>
               <p>当前配置：{node.current_version || '未应用'}</p>
-            </div>
-          </AppCard>
-
-          <AppCard title="OpenResty 健康">
-            <div className="space-y-3">
-              <StatusBadge
-                label={getOpenrestyStatusLabel(node.openresty_status)}
-                variant={getOpenrestyStatusVariant(node.openresty_status)}
-              />
-              <p className="text-sm text-[var(--foreground-secondary)]">
-                {node.restart_openresty_requested
-                  ? '已等待节点在下一次心跳后执行 OpenResty 重启。'
-                  : node.openresty_message || '当前未上报额外错误。'}
-              </p>
             </div>
           </AppCard>
 
@@ -470,10 +464,60 @@ export function NodeDetailPage({ nodeId }: { nodeId: string }) {
           </AppCard>
         </div>
 
+        <AppCard
+          title="OpenResty 健康与控制"
+          description="OpenResty 当前健康状态。"
+          action={
+            <div className="flex flex-wrap gap-3">
+              <PrimaryButton
+                type="button"
+                onClick={handleRestartOpenresty}
+                disabled={restartOpenrestyMutation.isPending}
+              >
+                {restartOpenrestyMutation.isPending
+                  ? '下发重启中...'
+                  : node.restart_openresty_requested
+                    ? '等待 OpenResty 重启'
+                    : '重启 OpenResty'}
+              </PrimaryButton>
+            </div>
+          }
+        >
+          <div className="grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)]">
+            <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-4">
+              <p className="text-xs tracking-[0.2em] text-[var(--foreground-muted)] uppercase">
+                健康状态
+              </p>
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <StatusBadge
+                  label={getOpenrestyStatusLabel(node.openresty_status)}
+                  variant={getOpenrestyStatusVariant(node.openresty_status)}
+                />
+                {node.restart_openresty_requested ? (
+                  <StatusBadge label="等待重启执行" variant="warning" />
+                ) : null}
+              </div>
+              <p className="mt-3 text-sm text-[var(--foreground-secondary)]">
+                {node.restart_openresty_requested
+                  ? '已等待节点在下一次心跳后执行 OpenResty 重启。'
+                  : '系统会在每次心跳前自动采集健康状态。'}
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-4">
+              <p className="text-xs tracking-[0.2em] text-[var(--foreground-muted)] uppercase">
+                状态消息
+              </p>
+              <p className="mt-3 text-sm leading-6 break-words whitespace-pre-wrap text-[var(--foreground-secondary)]">
+                {node.openresty_message || '当前未上报额外错误。'}
+              </p>
+            </div>
+          </div>
+        </AppCard>
+
         <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
           <AppCard
             title="节点标识与部署"
-            description="Node ID、Token 与部署命令不再在列表中展示，统一收敛到详情页。"
             action={
               nodeInstallCommand ? (
                 <PrimaryButton
@@ -638,7 +682,7 @@ export function NodeDetailPage({ nodeId }: { nodeId: string }) {
       <AppModal
         isOpen={isEditorOpen}
         onClose={() => setIsEditorOpen(false)}
-        title="编辑节点"
+        title="编辑"
         description="更新模式和节点名都在详情页维护。"
         footer={
           <div className="flex flex-wrap justify-end gap-3">

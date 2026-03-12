@@ -279,9 +279,6 @@ export function NodesPage() {
                               node.openresty_status,
                             )}
                           />
-                          <p className="max-w-64 text-xs break-words whitespace-pre-wrap text-[var(--foreground-secondary)]">
-                            {node.openresty_message || '无额外错误'}
-                          </p>
                         </div>
                       </td>
                       <td className="px-3 py-4 text-[var(--foreground-secondary)]">

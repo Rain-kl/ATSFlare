@@ -416,7 +416,7 @@ func (m *Manager) backup() (*backupState, error) {
 		return nil, err
 	}
 	state.Files = files
-	log.Printf("nginx backup captured: route_exists=%t support_files=%d", state.RouteExisted, len(state.Files))
+	log.Printf("backup captured: route_exists=%t support_files=%d", state.RouteExisted, len(state.Files))
 	return state, nil
 }
 
@@ -450,7 +450,6 @@ func (m *Manager) restore(state *backupState) error {
 			return err
 		}
 	}
-	log.Printf("nginx backup restored")
 	return nil
 }
 
@@ -458,7 +457,6 @@ func (m *Manager) writeSupportFiles(supportFiles []protocol.SupportFile) error {
 	if m.CertDir == "" {
 		return nil
 	}
-	log.Printf("writing nginx support files: cert_dir=%s count=%d", m.CertDir, len(supportFiles))
 	if err := os.RemoveAll(m.CertDir); err != nil && !os.IsNotExist(err) {
 		return err
 	}
@@ -474,7 +472,6 @@ func (m *Manager) writeSupportFiles(supportFiles []protocol.SupportFile) error {
 			return err
 		}
 	}
-	log.Printf("nginx support files written: cert_dir=%s count=%d", m.CertDir, len(supportFiles))
 	return nil
 }
 

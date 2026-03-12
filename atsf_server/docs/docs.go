@@ -1589,8 +1589,6 @@ var SwaggerInfo = &swag.Spec{
 	Description:      "ATSFlare Server 管理端与 Agent API 文档。",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
-	LeftDelim:        "{{",
-	RightDelim:       "}}",
 }
 
 func init() {

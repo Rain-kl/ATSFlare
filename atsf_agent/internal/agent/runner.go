@@ -113,12 +113,9 @@ func (r *Runner) Run(ctx context.Context) error {
 			if !r.hasAgentToken() {
 				continue
 			}
-			log.Printf("agent sync tick: node_id=%s", nodeID)
 			if err = r.SyncService.SyncOnce(ctx); err != nil {
 				r.recordSyncError(err)
 				log.Printf("agent sync failed: %v", err)
-			} else {
-				log.Printf("agent sync completed")
 			}
 		}
 	}

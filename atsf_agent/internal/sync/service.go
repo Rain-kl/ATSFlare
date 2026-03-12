@@ -51,7 +51,6 @@ func (s *Service) sync(ctx context.Context, startup bool) error {
 	if startup {
 		mode = "startup"
 	}
-	log.Printf("sync started: mode=%s", mode)
 	snapshot, err := s.stateStore.Load()
 	if err != nil {
 		return err
@@ -61,12 +60,10 @@ func (s *Service) sync(ctx context.Context, startup bool) error {
 		log.Printf("fetch active config failed: mode=%s error=%v", mode, err)
 		return err
 	}
-	log.Printf("active config fetched: mode=%s version=%s checksum=%s support_files=%d", mode, config.Version, config.Checksum, len(config.SupportFiles))
 	currentChecksum, err := s.nginxManager.CurrentChecksum()
 	if err != nil {
 		return err
 	}
-	log.Printf("current local checksum loaded: mode=%s checksum=%s", mode, currentChecksum)
 	if currentChecksum == config.Checksum {
 		log.Printf("local openresty config already up to date: mode=%s version=%s", mode, config.Version)
 		if startup {

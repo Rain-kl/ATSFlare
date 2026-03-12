@@ -62,10 +62,10 @@ export function getUpdateMode(node: NodeItem) {
   }
 
   if (node.auto_update_enabled) {
-    return { label: '自动更新', variant: 'success' as const };
+    return { label: '自动', variant: 'success' as const };
   }
 
-  return { label: '手动更新', variant: 'info' as const };
+  return { label: '手动', variant: 'info' as const };
 }
 
 export function getOpenrestyStatusVariant(status: NodeItem['openresty_status']) {
