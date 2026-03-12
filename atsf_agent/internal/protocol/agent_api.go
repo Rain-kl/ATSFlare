@@ -19,6 +19,8 @@ type AgentSettings struct {
 	AutoUpdate        bool   `json:"auto_update"`
 	UpdateRepo        string `json:"update_repo"`
 	UpdateNow         bool   `json:"update_now"`
+	UpdateChannel     string `json:"update_channel"`
+	UpdateTag         string `json:"update_tag"`
 }
 
 type NodePayload struct {

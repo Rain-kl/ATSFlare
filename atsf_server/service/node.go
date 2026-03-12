@@ -3,6 +3,7 @@ package service
 import (
 	"atsflare/common"
 	"atsflare/model"
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
@@ -13,6 +14,25 @@ import (
 type NodeInput struct {
 	Name              string `json:"name"`
 	AutoUpdateEnabled bool   `json:"auto_update_enabled"`
+}
+
+type NodeAgentUpdateInput struct {
+	Channel string `json:"channel"`
+	TagName string `json:"tag_name"`
+}
+
+type NodeAgentReleaseInfo struct {
+	TagName          string `json:"tag_name"`
+	Body             string `json:"body"`
+	HTMLURL          string `json:"html_url"`
+	PublishedAt      string `json:"published_at"`
+	CurrentVersion   string `json:"current_version"`
+	HasUpdate        bool   `json:"has_update"`
+	Channel          string `json:"channel"`
+	Prerelease       bool   `json:"prerelease"`
+	UpdateRequested  bool   `json:"update_requested"`
+	RequestedChannel string `json:"requested_channel"`
+	RequestedTag     string `json:"requested_tag"`
 }
 
 type NodeBootstrapView struct {
@@ -84,16 +104,44 @@ func DeleteNode(id uint) error {
 	return node.Delete()
 }
 
-func RequestNodeAgentUpdate(id uint) (*NodeView, error) {
+func GetNodeAgentRelease(ctx context.Context, id uint, channel string) (*NodeAgentReleaseInfo, error) {
 	node, err := model.GetNodeByID(id)
 	if err != nil {
 		return nil, err
 	}
-	node.UpdateRequested = true
-	if err = model.DB.Model(node).Update("update_requested", true).Error; err != nil {
+	release, err := fetchLatestGitHubRelease(ctx, common.AgentUpdateRepo, normalizeReleaseChannel(channel))
+	if err != nil {
 		return nil, err
 	}
-	common.SysLog("agent manual update requested: node_id=" + node.NodeID + " name=" + node.Name)
+	return buildNodeAgentReleaseView(node, release, normalizeReleaseChannel(channel)), nil
+}
+
+func RequestNodeAgentUpdate(id uint, input NodeAgentUpdateInput) (*NodeView, error) {
+	node, err := model.GetNodeByID(id)
+	if err != nil {
+		return nil, err
+	}
+	channel := normalizeReleaseChannel(input.Channel)
+	tagName := strings.TrimSpace(input.TagName)
+	if tagName != "" {
+		release, releaseErr := fetchGitHubReleaseByTag(context.Background(), common.AgentUpdateRepo, tagName)
+		if releaseErr != nil {
+			return nil, releaseErr
+		}
+		if channel == ReleaseChannelPreview && !release.Prerelease {
+			return nil, errors.New("指定版本不是 preview 发布")
+		}
+		if channel == ReleaseChannelStable && release.Prerelease {
+			return nil, errors.New("正式版更新不能选择 preview 发布")
+		}
+	}
+	node.UpdateRequested = true
+	node.UpdateChannel = channel.String()
+	node.UpdateTag = tagName
+	if err = model.DB.Model(node).Select("update_requested", "update_channel", "update_tag").Updates(node).Error; err != nil {
+		return nil, err
+	}
+	common.SysLog("agent manual update requested: node_id=" + node.NodeID + " name=" + node.Name + " channel=" + channel.String() + " tag=" + tagName)
 	return buildNodeView(node), nil
 }
 
@@ -170,6 +218,8 @@ func buildNodeView(node *model.Node) *NodeView {
 		Name:              node.Name,
 		IP:                node.IP,
 		AgentToken:        node.AgentToken,
+		UpdateChannel:     strings.TrimSpace(node.UpdateChannel),
+		UpdateTag:         strings.TrimSpace(node.UpdateTag),
 		AgentVersion:      node.AgentVersion,
 		NginxVersion:      node.NginxVersion,
 		Status:            status,
@@ -181,6 +231,30 @@ func buildNodeView(node *model.Node) *NodeView {
 		AutoUpdateEnabled: node.AutoUpdateEnabled,
 		UpdateRequested:   node.UpdateRequested,
 	}
+	if view.UpdateChannel == "" {
+		view.UpdateChannel = ReleaseChannelStable.String()
+	}
+	return view
+}
+
+func buildNodeAgentReleaseView(node *model.Node, release *githubReleaseResponse, channel ReleaseChannel) *NodeAgentReleaseInfo {
+	currentVersion := strings.TrimSpace(node.AgentVersion)
+	view := &NodeAgentReleaseInfo{
+		CurrentVersion:   currentVersion,
+		Channel:          channel.String(),
+		UpdateRequested:  node.UpdateRequested,
+		RequestedChannel: normalizeReleaseChannel(node.UpdateChannel).String(),
+		RequestedTag:     strings.TrimSpace(node.UpdateTag),
+	}
+	if release == nil {
+		return view
+	}
+	view.TagName = release.TagName
+	view.Body = release.Body
+	view.HTMLURL = release.HTMLURL
+	view.PublishedAt = release.PublishedAt
+	view.Prerelease = release.Prerelease
+	view.HasUpdate = isVersionNewer(currentVersion, release.TagName)
 	return view
 }
 

@@ -50,6 +50,8 @@ type AgentSettings struct {
 	AutoUpdate        bool   `json:"auto_update"`
 	UpdateRepo        string `json:"update_repo"`
 	UpdateNow         bool   `json:"update_now"`
+	UpdateChannel     string `json:"update_channel"`
+	UpdateTag         string `json:"update_tag"`
 }
 
 type HeartbeatResponse struct {
@@ -65,6 +67,8 @@ type NodeView struct {
 	AgentToken         string     `json:"agent_token"`
 	AutoUpdateEnabled  bool       `json:"auto_update_enabled"`
 	UpdateRequested    bool       `json:"update_requested"`
+	UpdateChannel      string     `json:"update_channel"`
+	UpdateTag          string     `json:"update_tag"`
 	AgentVersion       string     `json:"agent_version"`
 	NginxVersion       string     `json:"nginx_version"`
 	Status             string     `json:"status"`
@@ -90,9 +94,13 @@ func HeartbeatNode(node *model.Node, payload AgentNodePayload) (*HeartbeatRespon
 		return nil, err
 	}
 	updateNow := node.UpdateRequested
+	updateChannel := normalizeReleaseChannel(node.UpdateChannel)
+	updateTag := strings.TrimSpace(node.UpdateTag)
 	applyNodeRuntime(node, payload, true)
 	node.UpdateRequested = false
-	if err := model.DB.Model(node).Select("ip", "agent_version", "nginx_version", "status", "current_version", "last_seen_at", "last_error", "update_requested").Updates(node).Error; err != nil {
+	node.UpdateChannel = ReleaseChannelStable.String()
+	node.UpdateTag = ""
+	if err := model.DB.Model(node).Select("ip", "agent_version", "nginx_version", "status", "current_version", "last_seen_at", "last_error", "update_requested", "update_channel", "update_tag").Updates(node).Error; err != nil {
 		return nil, err
 	}
 	return &HeartbeatResponse{
@@ -103,6 +111,8 @@ func HeartbeatNode(node *model.Node, payload AgentNodePayload) (*HeartbeatRespon
 			AutoUpdate:        node.AutoUpdateEnabled,
 			UpdateRepo:        common.AgentUpdateRepo,
 			UpdateNow:         updateNow,
+			UpdateChannel:     updateChannel.String(),
+			UpdateTag:         updateTag,
 		},
 	}, nil
 }

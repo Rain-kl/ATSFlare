@@ -93,10 +93,12 @@ docker compose up -d
 
 版本升级说明：
 
-* Root 用户可在管理端顶栏点击「版本」检查 GitHub 最新 Release
+* Root 用户可在管理端顶栏点击「版本」默认检查正式版 GitHub Release
+* 若需尝试 preview 版本，可在同一弹窗中手动检查 preview 发布并选择是否升级
 * 当前运行的是 Release 二进制且二进制目录可写时，可直接在弹窗内触发 Server 自升级
-* 自升级会下载匹配当前平台的 `atsflare-server-*` 资产，替换当前二进制并自动重启进程
+* Server 自升级会下载匹配当前平台的 `atsflare-server-*` 资产，替换当前二进制并自动重启进程
 * 也可在同一弹窗中手动上传 Server 二进制，服务端先检测上传文件版本，前端确认后再执行替换与重启
+* 节点 Agent 默认仅跟随正式版自动更新；如需 preview 版本，可在节点详情中手动检查 preview 发布并下发更新
 
 ### 2.4 首次登录
 

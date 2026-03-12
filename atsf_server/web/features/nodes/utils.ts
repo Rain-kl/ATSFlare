@@ -54,6 +54,10 @@ export function getApplyLabel(result: NodeItem['latest_apply_result']) {
 
 export function getUpdateMode(node: NodeItem) {
   if (node.update_requested) {
+    if (node.update_channel === 'preview') {
+      return { label: '等待预览更新', variant: 'warning' as const };
+    }
+
     return { label: '等待更新', variant: 'warning' as const };
   }
 

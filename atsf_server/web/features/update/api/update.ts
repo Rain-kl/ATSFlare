@@ -2,16 +2,20 @@ import { apiRequest } from '@/lib/api/client';
 
 import type {
   LatestReleaseInfo,
+  ReleaseChannel,
   UploadedServerBinaryInfo,
 } from '@/features/update/types';
 
-export function getLatestRelease() {
-  return apiRequest<LatestReleaseInfo>('/update/latest-release');
+export function getLatestRelease(channel: ReleaseChannel = 'stable') {
+  return apiRequest<LatestReleaseInfo>(
+    `/update/latest-release?channel=${channel}`,
+  );
 }
 
-export function upgradeServer() {
+export function upgradeServer(channel: ReleaseChannel = 'stable') {
   return apiRequest<LatestReleaseInfo>('/update/upgrade', {
     method: 'POST',
+    body: JSON.stringify({ channel }),
   });
 }
 

@@ -24,7 +24,13 @@ type SyncService interface {
 }
 
 type Updater interface {
-	CheckAndUpdate(ctx context.Context, repo string) error
+	CheckAndUpdate(ctx context.Context, repo string, options UpdateOptions) error
+}
+
+type UpdateOptions struct {
+	Channel string
+	TagName string
+	Force   bool
 }
 
 type Runner struct {
@@ -37,6 +43,8 @@ type Runner struct {
 	autoUpdate bool
 	updateNow  bool
 	updateRepo string
+	updateChan string
+	updateTag  string
 }
 
 func (r *Runner) Run(ctx context.Context) error {
@@ -133,17 +141,33 @@ func (r *Runner) applySettings(settings *protocol.AgentSettings) bool {
 	r.autoUpdate = settings.AutoUpdate
 	r.updateNow = settings.UpdateNow
 	r.updateRepo = strings.TrimSpace(settings.UpdateRepo)
+	r.updateChan = strings.TrimSpace(settings.UpdateChannel)
+	r.updateTag = strings.TrimSpace(settings.UpdateTag)
 	return changed
 }
 
 func (r *Runner) tryAutoUpdate(ctx context.Context) {
-	shouldCheck := r.autoUpdate || r.updateNow
+	force := r.updateNow
+	shouldCheck := r.autoUpdate || force
 	r.updateNow = false
+	r.updateTag = strings.TrimSpace(r.updateTag)
 	if !shouldCheck || r.Updater == nil || r.updateRepo == "" {
 		return
 	}
-	if err := r.Updater.CheckAndUpdate(ctx, r.updateRepo); err != nil {
+	channel := "stable"
+	if force && r.updateChan != "" {
+		channel = r.updateChan
+	}
+	if err := r.Updater.CheckAndUpdate(ctx, r.updateRepo, UpdateOptions{
+		Channel: channel,
+		TagName: r.updateTag,
+		Force:   force,
+	}); err != nil {
 		log.Printf("agent update check failed: %v", err)
+	}
+	if force {
+		r.updateTag = ""
+		r.updateChan = ""
 	}
 }
 

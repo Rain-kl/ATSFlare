@@ -2,6 +2,8 @@ package controller
 
 import (
 	"atsflare/service"
+	"errors"
+	"io"
 	"net/http"
 	"strings"
 
@@ -12,6 +14,10 @@ type confirmManualUpgradeRequest struct {
 	UploadToken string `json:"upload_token"`
 }
 
+type serverUpgradeRequest struct {
+	Channel string `json:"channel"`
+}
+
 // GetLatestRelease godoc
 // @Summary Get latest GitHub release
 // @Tags Update
@@ -19,7 +25,7 @@ type confirmManualUpgradeRequest struct {
 // @Success 200 {object} map[string]interface{}
 // @Router /api/update/latest-release [get]
 func GetLatestRelease(c *gin.Context) {
-	release, err := service.GetLatestServerRelease(c.Request.Context())
+	release, err := service.GetLatestServerRelease(c.Request.Context(), c.Query("channel"))
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
@@ -42,7 +48,17 @@ func GetLatestRelease(c *gin.Context) {
 // @Success 200 {object} map[string]interface{}
 // @Router /api/update/upgrade [post]
 func UpgradeServer(c *gin.Context) {
-	release, err := service.ScheduleServerUpgrade()
+	var request serverUpgradeRequest
+	if c.Request.ContentLength > 0 {
+		if err := c.ShouldBindJSON(&request); err != nil && !errors.Is(err, io.EOF) {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"success": false,
+				"message": "无效的参数",
+			})
+			return
+		}
+	}
+	release, err := service.ScheduleServerUpgrade(request.Channel)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,

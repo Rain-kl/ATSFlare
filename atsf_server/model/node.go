@@ -10,6 +10,8 @@ type Node struct {
 	AgentToken        string    `json:"-" gorm:"size:128;index"`
 	AutoUpdateEnabled bool      `json:"auto_update_enabled" gorm:"not null;default:false"`
 	UpdateRequested   bool      `json:"update_requested" gorm:"not null;default:false"`
+	UpdateChannel     string    `json:"update_channel" gorm:"size:16;not null;default:'stable'"`
+	UpdateTag         string    `json:"update_tag" gorm:"size:64"`
 	AgentVersion      string    `json:"agent_version" gorm:"size:64;not null"`
 	NginxVersion      string    `json:"nginx_version" gorm:"size:64"`
 	Status            string    `json:"status" gorm:"size:16;not null;default:'offline'"`

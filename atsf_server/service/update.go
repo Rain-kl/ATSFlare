@@ -20,7 +20,17 @@ import (
 	"time"
 )
 
-const latestReleaseURL = "https://api.github.com/repos/Rain-kl/ATSFlare/releases/latest"
+const (
+	serverReleaseRepo     = "Rain-kl/ATSFlare"
+	githubReleasesAPIBase = "https://api.github.com/repos/%s/releases"
+)
+
+type ReleaseChannel string
+
+const (
+	ReleaseChannelStable  ReleaseChannel = "stable"
+	ReleaseChannelPreview ReleaseChannel = "preview"
+)
 
 var updateHTTPClient = &http.Client{
 	Timeout: 30 * time.Second,
@@ -45,6 +55,8 @@ type LatestServerRelease struct {
 	Body             string `json:"body"`
 	HTMLURL          string `json:"html_url"`
 	PublishedAt      string `json:"published_at"`
+	Channel          string `json:"channel"`
+	Prerelease       bool   `json:"prerelease"`
 	CurrentVersion   string `json:"current_version"`
 	HasUpdate        bool   `json:"has_update"`
 	UpgradeSupported bool   `json:"upgrade_supported"`
@@ -56,6 +68,8 @@ type githubReleaseResponse struct {
 	Body        string        `json:"body"`
 	HTMLURL     string        `json:"html_url"`
 	PublishedAt string        `json:"published_at"`
+	Prerelease  bool          `json:"prerelease"`
+	Draft       bool          `json:"draft"`
 	Assets      []githubAsset `json:"assets"`
 }
 
@@ -92,22 +106,24 @@ type manualServerBinaryCandidate struct {
 	UploadedAt      time.Time
 }
 
-func GetLatestServerRelease(ctx context.Context) (*LatestServerRelease, error) {
-	release, err := fetchLatestRelease(ctx)
+func GetLatestServerRelease(ctx context.Context, channel string) (*LatestServerRelease, error) {
+	normalizedChannel := normalizeReleaseChannel(channel)
+	release, err := fetchLatestRelease(ctx, normalizedChannel)
 	if err != nil {
 		return nil, err
 	}
-	return buildLatestServerReleaseView(release), nil
+	return buildLatestServerReleaseView(release, normalizedChannel), nil
 }
 
-func ScheduleServerUpgrade() (*LatestServerRelease, error) {
+func ScheduleServerUpgrade(channel string) (*LatestServerRelease, error) {
+	normalizedChannel := normalizeReleaseChannel(channel)
 	serverUpgradeState.Lock()
 	if serverUpgradeState.inProgress {
 		serverUpgradeState.Unlock()
 		return nil, fmt.Errorf("服务升级已在执行中，请稍后再试")
 	}
 
-	prepared, err := prepareServerUpgrade(context.Background())
+	prepared, err := prepareServerUpgrade(context.Background(), normalizedChannel)
 	if err != nil {
 		serverUpgradeState.Unlock()
 		return nil, err
@@ -248,13 +264,25 @@ func ConfirmManualServerUpgrade(uploadToken string) (*UploadedServerBinary, erro
 	return info, nil
 }
 
-func fetchLatestRelease(ctx context.Context) (*githubReleaseResponse, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, latestReleaseURL, nil)
+func fetchLatestRelease(ctx context.Context, channel ReleaseChannel) (*githubReleaseResponse, error) {
+	return fetchLatestGitHubRelease(ctx, serverReleaseRepo, channel)
+}
+
+func fetchLatestGitHubRelease(ctx context.Context, repo string, channel ReleaseChannel) (*githubReleaseResponse, error) {
+	switch normalizeReleaseChannel(string(channel)) {
+	case ReleaseChannelPreview:
+		return fetchLatestPreviewGitHubRelease(ctx, repo)
+	default:
+		return fetchLatestStableGitHubRelease(ctx, repo)
+	}
+}
+
+func fetchLatestStableGitHubRelease(ctx context.Context, repo string) (*githubReleaseResponse, error) {
+	url := fmt.Sprintf(githubReleasesAPIBase+"/latest", strings.TrimSpace(repo))
+	req, err := newGitHubReleaseRequest(ctx, url)
 	if err != nil {
 		return nil, fmt.Errorf("创建更新请求失败")
 	}
-	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("User-Agent", "ATSFlare-Server")
 
 	resp, err := updateHTTPClient.Do(req)
 	if err != nil {
@@ -266,14 +294,86 @@ func fetchLatestRelease(ctx context.Context) (*githubReleaseResponse, error) {
 		return nil, fmt.Errorf("GitHub 返回异常状态: %s", resp.Status)
 	}
 
+	return decodeGitHubRelease(resp.Body)
+}
+
+func fetchLatestPreviewGitHubRelease(ctx context.Context, repo string) (*githubReleaseResponse, error) {
+	url := fmt.Sprintf(githubReleasesAPIBase+"?per_page=20", strings.TrimSpace(repo))
+	req, err := newGitHubReleaseRequest(ctx, url)
+	if err != nil {
+		return nil, fmt.Errorf("创建更新请求失败")
+	}
+
+	resp, err := updateHTTPClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("获取 preview 版本失败: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("GitHub 返回异常状态: %s", resp.Status)
+	}
+
+	var releases []githubReleaseResponse
+	if err = json.NewDecoder(resp.Body).Decode(&releases); err != nil {
+		return nil, fmt.Errorf("解析 preview 版本信息失败")
+	}
+	for _, release := range releases {
+		if release.Draft || !release.Prerelease {
+			continue
+		}
+		releaseCopy := release
+		return &releaseCopy, nil
+	}
+	return nil, fmt.Errorf("当前没有可用的 preview 发布")
+}
+
+func fetchGitHubReleaseByTag(ctx context.Context, repo string, tag string) (*githubReleaseResponse, error) {
+	tag = strings.TrimSpace(tag)
+	if tag == "" {
+		return nil, fmt.Errorf("缺少发布版本号")
+	}
+	url := fmt.Sprintf(githubReleasesAPIBase+"/tags/%s", strings.TrimSpace(repo), tag)
+	req, err := newGitHubReleaseRequest(ctx, url)
+	if err != nil {
+		return nil, fmt.Errorf("创建更新请求失败")
+	}
+
+	resp, err := updateHTTPClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("获取指定版本失败: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, fmt.Errorf("未找到指定版本: %s", tag)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("GitHub 返回异常状态: %s", resp.Status)
+	}
+
+	return decodeGitHubRelease(resp.Body)
+}
+
+func newGitHubReleaseRequest(ctx context.Context, url string) (*http.Request, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("User-Agent", "ATSFlare-Server")
+	return req, nil
+}
+
+func decodeGitHubRelease(reader io.Reader) (*githubReleaseResponse, error) {
 	var release githubReleaseResponse
-	if err = json.NewDecoder(resp.Body).Decode(&release); err != nil {
+	if err := json.NewDecoder(reader).Decode(&release); err != nil {
 		return nil, fmt.Errorf("解析最新版本信息失败")
 	}
 	return &release, nil
 }
 
-func buildLatestServerReleaseView(release *githubReleaseResponse) *LatestServerRelease {
+func buildLatestServerReleaseView(release *githubReleaseResponse, channel ReleaseChannel) *LatestServerRelease {
 	currentVersion := strings.TrimSpace(common.Version)
 	isDevBuild := currentVersion == "" || strings.EqualFold(currentVersion, "dev")
 	hasUpdate := false
@@ -286,6 +386,7 @@ func buildLatestServerReleaseView(release *githubReleaseResponse) *LatestServerR
 	serverUpgradeState.Unlock()
 
 	view := &LatestServerRelease{
+		Channel:          channel.String(),
 		CurrentVersion:   currentVersion,
 		HasUpdate:        hasUpdate,
 		UpgradeSupported: !isDevBuild && runtime.GOOS != "windows",
@@ -296,17 +397,18 @@ func buildLatestServerReleaseView(release *githubReleaseResponse) *LatestServerR
 		view.Body = release.Body
 		view.HTMLURL = release.HTMLURL
 		view.PublishedAt = release.PublishedAt
+		view.Prerelease = release.Prerelease
 	}
 	return view
 }
 
-func prepareServerUpgrade(ctx context.Context) (*preparedServerUpgrade, error) {
-	release, err := fetchLatestRelease(ctx)
+func prepareServerUpgrade(ctx context.Context, channel ReleaseChannel) (*preparedServerUpgrade, error) {
+	release, err := fetchLatestRelease(ctx, channel)
 	if err != nil {
 		return nil, err
 	}
 
-	view := buildLatestServerReleaseView(release)
+	view := buildLatestServerReleaseView(release, channel)
 	if !view.HasUpdate {
 		return nil, fmt.Errorf("当前已是最新版本")
 	}
@@ -411,40 +513,54 @@ func serverAssetName(goos string, goarch string) string {
 	return name
 }
 
-func isVersionNewer(current string, latest string) bool {
-	currentParts := parseVersionParts(current)
-	latestParts := parseVersionParts(latest)
-	maxLen := len(currentParts)
-	if len(latestParts) > maxLen {
-		maxLen = len(latestParts)
+func normalizeReleaseChannel(channel string) ReleaseChannel {
+	switch strings.ToLower(strings.TrimSpace(channel)) {
+	case string(ReleaseChannelPreview):
+		return ReleaseChannelPreview
+	default:
+		return ReleaseChannelStable
 	}
-
-	for i := 0; i < maxLen; i++ {
-		currentPart := 0
-		latestPart := 0
-		if i < len(currentParts) {
-			currentPart = currentParts[i]
-		}
-		if i < len(latestParts) {
-			latestPart = latestParts[i]
-		}
-		if latestPart > currentPart {
-			return true
-		}
-		if latestPart < currentPart {
-			return false
-		}
-	}
-	return false
 }
 
-func parseVersionParts(version string) []int {
+func (channel ReleaseChannel) String() string {
+	if channel == ReleaseChannelPreview {
+		return string(ReleaseChannelPreview)
+	}
+	return string(ReleaseChannelStable)
+}
+
+func isVersionNewer(current string, latest string) bool {
+	currentInfo := parseVersionInfo(current)
+	latestInfo := parseVersionInfo(latest)
+	if currentInfo.IsDev {
+		return latestInfo.Valid
+	}
+	if !currentInfo.Valid || !latestInfo.Valid {
+		return false
+	}
+	return compareVersionInfo(currentInfo, latestInfo) < 0
+}
+
+type versionInfo struct {
+	Valid      bool
+	IsDev      bool
+	Numbers    []int
+	Prerelease []string
+}
+
+func parseVersionInfo(version string) versionInfo {
 	normalized := strings.TrimSpace(strings.TrimPrefix(version, "v"))
 	if normalized == "" || normalized == "dev" {
-		return nil
+		return versionInfo{IsDev: strings.EqualFold(normalized, "dev")}
+	}
+	base := normalized
+	prerelease := ""
+	if separator := strings.IndexRune(normalized, '-'); separator >= 0 {
+		base = normalized[:separator]
+		prerelease = normalized[separator+1:]
 	}
 
-	segments := strings.Split(normalized, ".")
+	segments := strings.Split(base, ".")
 	parts := make([]int, 0, len(segments))
 	for _, segment := range segments {
 		segment = strings.TrimSpace(segment)
@@ -466,12 +582,100 @@ func parseVersionParts(version string) []int {
 		}
 		value, err := strconv.Atoi(numeric.String())
 		if err != nil {
-			parts = append(parts, 0)
-			continue
+			return versionInfo{}
 		}
 		parts = append(parts, value)
 	}
-	return parts
+	info := versionInfo{Valid: len(parts) > 0, Numbers: parts}
+	if prerelease != "" {
+		info.Prerelease = splitPrereleaseIdentifiers(prerelease)
+	}
+	return info
+}
+
+func splitPrereleaseIdentifiers(value string) []string {
+	parts := strings.FieldsFunc(strings.TrimSpace(value), func(r rune) bool {
+		return r == '.' || r == '-'
+	})
+	filtered := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			filtered = append(filtered, part)
+		}
+	}
+	return filtered
+}
+
+func compareVersionInfo(left versionInfo, right versionInfo) int {
+	maxLen := len(left.Numbers)
+	if len(right.Numbers) > maxLen {
+		maxLen = len(right.Numbers)
+	}
+	for index := 0; index < maxLen; index++ {
+		leftValue := 0
+		rightValue := 0
+		if index < len(left.Numbers) {
+			leftValue = left.Numbers[index]
+		}
+		if index < len(right.Numbers) {
+			rightValue = right.Numbers[index]
+		}
+		if leftValue < rightValue {
+			return -1
+		}
+		if leftValue > rightValue {
+			return 1
+		}
+	}
+
+	if len(left.Prerelease) == 0 && len(right.Prerelease) == 0 {
+		return 0
+	}
+	if len(left.Prerelease) == 0 {
+		return 1
+	}
+	if len(right.Prerelease) == 0 {
+		return -1
+	}
+
+	maxLen = len(left.Prerelease)
+	if len(right.Prerelease) > maxLen {
+		maxLen = len(right.Prerelease)
+	}
+	for index := 0; index < maxLen; index++ {
+		if index >= len(left.Prerelease) {
+			return -1
+		}
+		if index >= len(right.Prerelease) {
+			return 1
+		}
+		leftPart := left.Prerelease[index]
+		rightPart := right.Prerelease[index]
+		leftNumber, leftErr := strconv.Atoi(leftPart)
+		rightNumber, rightErr := strconv.Atoi(rightPart)
+		switch {
+		case leftErr == nil && rightErr == nil:
+			if leftNumber < rightNumber {
+				return -1
+			}
+			if leftNumber > rightNumber {
+				return 1
+			}
+		case leftErr == nil && rightErr != nil:
+			return -1
+		case leftErr != nil && rightErr == nil:
+			return 1
+		default:
+			if leftPart < rightPart {
+				return -1
+			}
+			if leftPart > rightPart {
+				return 1
+			}
+		}
+	}
+	return 0
 }
 
 func buildUploadedServerBinaryView(fileName string, currentVersion string, detectedVersion string, uploadedAt time.Time) *UploadedServerBinary {

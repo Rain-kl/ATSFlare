@@ -16,15 +16,18 @@ import { PageHeader } from '@/components/layout/page-header';
 import { AppModal } from '@/components/ui/app-modal';
 import { AppCard } from '@/components/ui/app-card';
 import { StatusBadge } from '@/components/ui/status-badge';
-import { getPublicStatus } from '@/features/auth/api/public';
 import { getApplyLogs } from '@/features/apply-logs/api/apply-logs';
 import {
   deleteNode,
+  getNodeAgentRelease,
   getNodes,
   requestNodeAgentUpdate,
   updateNode,
 } from '@/features/nodes/api/nodes';
-import type { NodeMutationPayload } from '@/features/nodes/types';
+import type {
+  NodeAgentReleaseInfo,
+  NodeMutationPayload,
+} from '@/features/nodes/types';
 import {
   CodeBlock,
   DangerButton,
@@ -34,6 +37,7 @@ import {
   SecondaryButton,
   ToggleField,
 } from '@/features/shared/components/resource-primitives';
+import type { ReleaseChannel } from '@/features/update/types';
 import { formatDateTime, formatRelativeTime } from '@/lib/utils/date';
 import {
   buildNodeInstallCommand,
@@ -44,7 +48,6 @@ import {
   getServerUrl,
   getUpdateMode,
   isMeaningfulTime,
-  shouldShowManualUpdate,
 } from '@/features/nodes/utils';
 
 const nodesQueryKey = ['nodes'];
@@ -90,6 +93,11 @@ export function NodeDetailPage({ nodeId }: { nodeId: string }) {
   const queryClient = useQueryClient();
   const [feedback, setFeedback] = useState<FeedbackState | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
+  const [isAgentUpdateModalOpen, setIsAgentUpdateModalOpen] = useState(false);
+  const [selectedReleaseChannel, setSelectedReleaseChannel] =
+    useState<ReleaseChannel>('stable');
+  const [agentUpdateFeedback, setAgentUpdateFeedback] =
+    useState<FeedbackState | null>(null);
   const [serverUrl, setServerUrl] = useState('');
 
   const form = useForm<NodeFormValues>({
@@ -108,9 +116,16 @@ export function NodeDetailPage({ nodeId }: { nodeId: string }) {
     refetchInterval: 5000,
   });
 
-  const publicStatusQuery = useQuery({
-    queryKey: ['public-status'],
-    queryFn: getPublicStatus,
+  const stableAgentReleaseQuery = useQuery({
+    queryKey: ['node-agent-release', nodeId, 'stable'],
+    queryFn: () => getNodeAgentRelease(Number(nodeId), 'stable'),
+    enabled: false,
+  });
+
+  const previewAgentReleaseQuery = useQuery({
+    queryKey: ['node-agent-release', nodeId, 'preview'],
+    queryFn: () => getNodeAgentRelease(Number(nodeId), 'preview'),
+    enabled: false,
   });
 
   const node = useMemo(() => {
@@ -161,16 +176,29 @@ export function NodeDetailPage({ nodeId }: { nodeId: string }) {
   });
 
   const updateAgentMutation = useMutation({
-    mutationFn: () => requestNodeAgentUpdate(Number(nodeId)),
+    mutationFn: (release: NodeAgentReleaseInfo | null) =>
+      requestNodeAgentUpdate(Number(nodeId), {
+        channel: release?.channel ?? selectedReleaseChannel,
+        tag_name:
+          release?.channel === 'preview'
+            ? release.tag_name || undefined
+            : undefined,
+      }),
     onSuccess: async (updatedNode) => {
       setFeedback({
         tone: 'success',
-        message: `已向节点 ${updatedNode.name} 下发更新指令。`,
+        message: `已向节点 ${updatedNode.name} 下发${updatedNode.update_channel === 'preview' ? '预览版' : '正式版'}更新指令。`,
+      });
+      setAgentUpdateFeedback({
+        tone: 'success',
+        message: `节点将在下一次心跳后执行${updatedNode.update_channel === 'preview' ? '预览版' : '正式版'} Agent 更新。`,
       });
       await queryClient.invalidateQueries({ queryKey: nodesQueryKey });
     },
     onError: (error) => {
-      setFeedback({ tone: 'danger', message: getErrorMessage(error) });
+      const message = getErrorMessage(error);
+      setFeedback({ tone: 'danger', message });
+      setAgentUpdateFeedback({ tone: 'danger', message });
     },
   });
 
@@ -245,12 +273,42 @@ export function NodeDetailPage({ nodeId }: { nodeId: string }) {
       ? buildNodeInstallCommand(normalizedServerUrl, node.agent_token)
       : '';
   const updateMode = getUpdateMode(node);
-  const serverVersion = publicStatusQuery.data?.version ?? '';
-  const showManualUpdate = shouldShowManualUpdate(
-    node.agent_version || '',
-    serverVersion,
-  );
+  const selectedAgentRelease =
+    selectedReleaseChannel === 'preview'
+      ? previewAgentReleaseQuery.data
+      : stableAgentReleaseQuery.data;
+  const selectedAgentReleaseError =
+    selectedReleaseChannel === 'preview'
+      ? previewAgentReleaseQuery.error
+      : stableAgentReleaseQuery.error;
+  const isCheckingAgentRelease =
+    selectedReleaseChannel === 'preview'
+      ? previewAgentReleaseQuery.isFetching
+      : stableAgentReleaseQuery.isFetching;
   const applyLogs = applyLogsQuery.data ?? [];
+
+  const handleOpenAgentUpdateModal = () => {
+    setAgentUpdateFeedback(null);
+    setSelectedReleaseChannel('stable');
+    setIsAgentUpdateModalOpen(true);
+    void stableAgentReleaseQuery.refetch();
+  };
+
+  const handleCheckStableAgentRelease = () => {
+    setAgentUpdateFeedback(null);
+    setSelectedReleaseChannel('stable');
+    void stableAgentReleaseQuery.refetch();
+  };
+
+  const handleCheckPreviewAgentRelease = () => {
+    setAgentUpdateFeedback(null);
+    setSelectedReleaseChannel('preview');
+    void previewAgentReleaseQuery.refetch();
+  };
+
+  const handleRequestAgentUpdate = () => {
+    updateAgentMutation.mutate(selectedAgentRelease ?? null);
+  };
 
   return (
     <>
@@ -272,17 +330,13 @@ export function NodeDetailPage({ nodeId }: { nodeId: string }) {
               >
                 编辑节点
               </SecondaryButton>
-              {showManualUpdate ? (
-                <PrimaryButton
-                  type="button"
-                  onClick={() => updateAgentMutation.mutate()}
-                  disabled={
-                    updateAgentMutation.isPending || node.update_requested
-                  }
-                >
-                  {node.update_requested ? '等待更新中...' : '手动升级 Agent'}
-                </PrimaryButton>
-              ) : null}
+              <PrimaryButton
+                type="button"
+                onClick={handleOpenAgentUpdateModal}
+                disabled={updateAgentMutation.isPending}
+              >
+                {node.update_requested ? '查看 Agent 更新' : 'Agent 更新'}
+              </PrimaryButton>
               <DangerButton
                 type="button"
                 onClick={handleDelete}
@@ -332,9 +386,9 @@ export function NodeDetailPage({ nodeId }: { nodeId: string }) {
               />
               <p className="text-sm text-[var(--foreground-secondary)]">
                 {node.update_requested
-                  ? '已等待节点在下一次心跳后执行更新。'
+                  ? `已等待节点在下一次心跳后执行${node.update_channel === 'preview' ? '预览版' : '正式版'}更新。`
                   : node.auto_update_enabled
-                    ? '节点已启用自动更新。'
+                    ? '节点已启用正式版自动更新。'
                     : '当前仅支持手动触发更新。'}
               </p>
             </div>
@@ -566,6 +620,184 @@ export function NodeDetailPage({ nodeId }: { nodeId: string }) {
             }
           />
         </form>
+      </AppModal>
+
+      <AppModal
+        isOpen={isAgentUpdateModalOpen}
+        onClose={() => setIsAgentUpdateModalOpen(false)}
+        title="Agent 更新"
+        description="默认检查正式版；你也可以手动检查 preview 发布，并选择向当前节点下发对应版本的升级指令。"
+        footer={
+          <div className="flex flex-wrap justify-end gap-3">
+            <SecondaryButton
+              type="button"
+              onClick={handleCheckStableAgentRelease}
+              disabled={isCheckingAgentRelease || updateAgentMutation.isPending}
+            >
+              {isCheckingAgentRelease && selectedReleaseChannel === 'stable'
+                ? '检查中...'
+                : '检查正式版'}
+            </SecondaryButton>
+            <SecondaryButton
+              type="button"
+              onClick={handleCheckPreviewAgentRelease}
+              disabled={isCheckingAgentRelease || updateAgentMutation.isPending}
+            >
+              {isCheckingAgentRelease && selectedReleaseChannel === 'preview'
+                ? '检查中...'
+                : '检查预览版'}
+            </SecondaryButton>
+            <PrimaryButton
+              type="button"
+              onClick={handleRequestAgentUpdate}
+              disabled={
+                !selectedAgentRelease?.has_update ||
+                updateAgentMutation.isPending ||
+                isCheckingAgentRelease ||
+                node.update_requested
+              }
+            >
+              {updateAgentMutation.isPending
+                ? '下发中...'
+                : selectedReleaseChannel === 'preview'
+                  ? '升级到预览版'
+                  : '升级到正式版'}
+            </PrimaryButton>
+          </div>
+        }
+      >
+        <div className="space-y-6">
+          {agentUpdateFeedback ? (
+            <InlineMessage
+              tone={agentUpdateFeedback.tone}
+              message={agentUpdateFeedback.message}
+            />
+          ) : null}
+
+          <div className="grid gap-4 md:grid-cols-3">
+            <AppCard title="当前 Agent 版本">
+              <p className="text-sm font-medium text-[var(--foreground-primary)]">
+                {node.agent_version || 'unknown'}
+              </p>
+            </AppCard>
+            <AppCard title="检查通道">
+              <div className="flex flex-wrap items-center gap-3">
+                <p className="text-sm font-medium text-[var(--foreground-primary)]">
+                  {selectedReleaseChannel === 'preview' ? '预览版' : '正式版'}
+                </p>
+                <StatusBadge
+                  label={
+                    selectedReleaseChannel === 'preview' ? 'Preview' : 'Stable'
+                  }
+                  variant={
+                    selectedReleaseChannel === 'preview' ? 'warning' : 'info'
+                  }
+                />
+              </div>
+            </AppCard>
+            <AppCard title="更新状态">
+              <StatusBadge
+                label={
+                  node.update_requested
+                    ? node.update_channel === 'preview'
+                      ? '等待预览更新'
+                      : '等待更新'
+                    : '未下发'
+                }
+                variant={node.update_requested ? 'warning' : 'info'}
+              />
+            </AppCard>
+          </div>
+
+          {isCheckingAgentRelease && !selectedAgentRelease ? (
+            <LoadingState />
+          ) : null}
+          {!isCheckingAgentRelease && selectedAgentReleaseError ? (
+            <ErrorState
+              title="Agent 版本检查失败"
+              description={getErrorMessage(selectedAgentReleaseError)}
+            />
+          ) : null}
+          {!isCheckingAgentRelease &&
+          !selectedAgentReleaseError &&
+          !selectedAgentRelease ? (
+            <EmptyState
+              title="尚未检查 Agent 更新"
+              description="点击“检查正式版”或“检查预览版”后，会在这里显示对应发布信息。"
+            />
+          ) : null}
+
+          {selectedAgentRelease ? (
+            <AppCard
+              title={`GitHub ${selectedReleaseChannel === 'preview' ? '预览版' : '正式版'} · ${selectedAgentRelease.tag_name || '未找到版本'}`}
+              description={
+                selectedAgentRelease.published_at
+                  ? `发布时间：${formatRelativeTime(selectedAgentRelease.published_at)} · ${formatDateTime(selectedAgentRelease.published_at)}`
+                  : '未提供发布时间'
+              }
+            >
+              <div className="space-y-4">
+                <div className="flex flex-wrap items-center gap-3">
+                  <StatusBadge
+                    label={
+                      selectedAgentRelease.has_update
+                        ? '发现可升级版本'
+                        : '当前已是最新版本'
+                    }
+                    variant={
+                      selectedAgentRelease.has_update ? 'warning' : 'success'
+                    }
+                  />
+                  {selectedAgentRelease.prerelease ? (
+                    <StatusBadge label="Preview 发布" variant="warning" />
+                  ) : (
+                    <StatusBadge label="正式发布" variant="info" />
+                  )}
+                  {node.update_requested ? (
+                    <StatusBadge
+                      label={`已下发${node.update_channel === 'preview' ? '预览版' : '正式版'}更新`}
+                      variant="warning"
+                    />
+                  ) : null}
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <p className="text-xs text-[var(--foreground-secondary)]">
+                      当前版本
+                    </p>
+                    <p className="mt-1 text-sm font-medium text-[var(--foreground-primary)]">
+                      {selectedAgentRelease.current_version || 'unknown'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-[var(--foreground-secondary)]">
+                      目标版本
+                    </p>
+                    <p className="mt-1 text-sm font-medium text-[var(--foreground-primary)]">
+                      {selectedAgentRelease.tag_name || '未找到'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-4 text-sm leading-6 whitespace-pre-wrap text-[var(--foreground-secondary)]">
+                  {selectedAgentRelease.body || '暂无更新说明'}
+                </div>
+
+                {selectedAgentRelease.html_url ? (
+                  <a
+                    href={selectedAgentRelease.html_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-sm font-medium text-[var(--brand-primary)] transition hover:opacity-80"
+                  >
+                    查看发布详情
+                  </a>
+                ) : null}
+              </div>
+            </AppCard>
+          ) : null}
+        </div>
       </AppModal>
     </>
   );

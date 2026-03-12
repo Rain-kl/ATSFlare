@@ -14,7 +14,10 @@ import {
   uploadServerBinary,
 } from '@/features/update/api/update';
 import { VersionUpgradeModal } from '@/features/update/components/version-upgrade-modal';
-import type { UploadedServerBinaryInfo } from '@/features/update/types';
+import type {
+  ReleaseChannel,
+  UploadedServerBinaryInfo,
+} from '@/features/update/types';
 import { publicEnv } from '@/lib/env/public-env';
 import { useAppShellStore } from '@/store/app-shell';
 
@@ -31,6 +34,8 @@ export function DashboardTopbar() {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isVersionModalOpen, setIsVersionModalOpen] = useState(false);
+  const [selectedReleaseChannel, setSelectedReleaseChannel] =
+    useState<ReleaseChannel>('stable');
   const [versionFeedback, setVersionFeedback] = useState<string | null>(null);
   const [manualUpgradeStatus, setManualUpgradeStatus] = useState<string | null>(
     null,
@@ -48,23 +53,32 @@ export function DashboardTopbar() {
     queryFn: getPublicStatus,
   });
 
-  const latestReleaseQuery = useQuery({
-    queryKey: ['update', 'latest-release'],
-    queryFn: getLatestRelease,
+  const stableReleaseQuery = useQuery({
+    queryKey: ['update', 'latest-release', 'stable'],
+    queryFn: () => getLatestRelease('stable'),
     enabled: isRoot,
     refetchInterval: 60 * 60 * 1000,
   });
 
+  const previewReleaseQuery = useQuery({
+    queryKey: ['update', 'latest-release', 'preview'],
+    queryFn: () => getLatestRelease('preview'),
+    enabled: false,
+  });
+
   const upgradeMutation = useMutation({
-    mutationFn: upgradeServer,
+    mutationFn: (channel: ReleaseChannel) => upgradeServer(channel),
     onSuccess: (release) => {
       setUploadedBinary(null);
       setManualUpgradeStatus(null);
       setManualUpgradeError(null);
       setVersionFeedback(
-        `服务升级任务已启动，目标版本 ${release.tag_name}。页面可能短暂不可用。`,
+        `服务升级任务已启动，目标版本 ${release.tag_name}（${release.channel === 'preview' ? '预览版' : '正式版'}）。页面可能短暂不可用。`,
       );
-      void latestReleaseQuery.refetch();
+      void stableReleaseQuery.refetch();
+      if (release.channel === 'preview') {
+        void previewReleaseQuery.refetch();
+      }
     },
     onError: (error) => {
       setVersionFeedback(
@@ -99,7 +113,8 @@ export function DashboardTopbar() {
       setManualUpgradeStatus(
         `手动升级任务已启动，目标版本 ${candidate.detected_version}。页面可能短暂不可用。`,
       );
-      void latestReleaseQuery.refetch();
+      void stableReleaseQuery.refetch();
+      void previewReleaseQuery.refetch();
     },
     onError: (error) => {
       setManualUpgradeStatus(null);
@@ -154,12 +169,13 @@ export function DashboardTopbar() {
   };
 
   const handleOpenVersionModal = () => {
+    setSelectedReleaseChannel('stable');
     setVersionFeedback(null);
     setManualUpgradeStatus(null);
     setManualUpgradeError(null);
     setIsVersionModalOpen(true);
     if (isRoot) {
-      void latestReleaseQuery.refetch();
+      void stableReleaseQuery.refetch();
     }
   };
 
@@ -167,7 +183,23 @@ export function DashboardTopbar() {
     setVersionFeedback(null);
     setManualUpgradeStatus(null);
     setManualUpgradeError(null);
-    upgradeMutation.mutate();
+    upgradeMutation.mutate(selectedReleaseChannel);
+  };
+
+  const handleCheckStableRelease = () => {
+    setSelectedReleaseChannel('stable');
+    setVersionFeedback(null);
+    if (isRoot) {
+      void stableReleaseQuery.refetch();
+    }
+  };
+
+  const handleCheckPreviewRelease = () => {
+    setSelectedReleaseChannel('preview');
+    setVersionFeedback(null);
+    if (isRoot) {
+      void previewReleaseQuery.refetch();
+    }
   };
 
   const handleUploadBinary = (binary: File) => {
@@ -188,8 +220,19 @@ export function DashboardTopbar() {
     confirmManualUpgradeMutation.mutate(uploadedBinary.upload_token);
   };
 
-  const release = latestReleaseQuery.data;
-  const hasUpdate = Boolean(isRoot && release?.has_update);
+  const selectedRelease =
+    selectedReleaseChannel === 'preview'
+      ? previewReleaseQuery.data
+      : stableReleaseQuery.data;
+  const selectedReleaseError =
+    selectedReleaseChannel === 'preview'
+      ? previewReleaseQuery.error
+      : stableReleaseQuery.error;
+  const isSelectedReleaseError =
+    selectedReleaseChannel === 'preview'
+      ? previewReleaseQuery.isError
+      : stableReleaseQuery.isError;
+  const hasUpdate = Boolean(isRoot && stableReleaseQuery.data?.has_update);
   const currentVersion = publicStatusQuery.data?.version || 'unknown';
   const versionLabel = hasUpdate
     ? `版本 ${publicEnv.appVersion} · 可升级`
@@ -199,9 +242,9 @@ export function DashboardTopbar() {
     : 'border-[var(--border-default)]';
   const versionErrorMessage =
     versionFeedback ||
-    (latestReleaseQuery.isError
-      ? latestReleaseQuery.error instanceof Error
-        ? latestReleaseQuery.error.message
+    (isSelectedReleaseError
+      ? selectedReleaseError instanceof Error
+        ? selectedReleaseError.message
         : '版本检查失败，请稍后重试。'
       : undefined);
   const manualUpgradeErrorMessage = manualUpgradeError ?? undefined;
@@ -283,23 +326,29 @@ export function DashboardTopbar() {
         currentVersion={currentVersion}
         frontendVersion={publicEnv.appVersion}
         startTime={publicStatusQuery.data?.start_time}
-        release={release}
+        release={selectedRelease}
+        selectedChannel={selectedReleaseChannel}
         uploadedBinary={uploadedBinary}
-        isLoading={latestReleaseQuery.isLoading && !release && isRoot}
+        isLoading={
+          (selectedReleaseChannel === 'preview'
+            ? previewReleaseQuery.isLoading && !previewReleaseQuery.data
+            : stableReleaseQuery.isLoading && !stableReleaseQuery.data) &&
+          isRoot
+        }
         releaseErrorMessage={versionErrorMessage}
         manualStatusMessage={manualUpgradeStatus ?? undefined}
         manualErrorMessage={manualUpgradeErrorMessage}
         canUpgrade={isRoot}
-        isChecking={latestReleaseQuery.isFetching}
+        isChecking={
+          selectedReleaseChannel === 'preview'
+            ? previewReleaseQuery.isFetching
+            : stableReleaseQuery.isFetching
+        }
         isUpgrading={upgradeMutation.isPending}
         isUploadingBinary={uploadBinaryMutation.isPending}
         isConfirmingManualUpgrade={confirmManualUpgradeMutation.isPending}
-        onRefresh={() => {
-          setVersionFeedback(null);
-          if (isRoot) {
-            void latestReleaseQuery.refetch();
-          }
-        }}
+        onCheckStable={handleCheckStableRelease}
+        onCheckPreview={handleCheckPreviewRelease}
         onUpgrade={handleUpgrade}
         onUploadBinary={handleUploadBinary}
         onConfirmManualUpgrade={handleConfirmManualUpgrade}

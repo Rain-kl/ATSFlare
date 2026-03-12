@@ -38,6 +38,9 @@ func TestIsVersionNewer(t *testing.T) {
 		{name: "same version", current: "v1.2.3", latest: "v1.2.3", expected: false},
 		{name: "older remote", current: "v1.3.0", latest: "v1.2.9", expected: false},
 		{name: "double digit segment", current: "v1.9.9", latest: "v1.10.0", expected: true},
+		{name: "stable newer than prerelease", current: "v1.2.3-rc.1", latest: "v1.2.3", expected: true},
+		{name: "prerelease not newer than same stable", current: "v1.2.3", latest: "v1.2.3-rc.1", expected: false},
+		{name: "newer prerelease sequence", current: "v1.2.3-rc.1", latest: "v1.2.3-rc.2", expected: true},
 		{name: "dev build", current: "dev", latest: "v0.4.0", expected: true},
 	}
 
@@ -70,7 +73,7 @@ func TestBuildLatestServerReleaseView(t *testing.T) {
 		Body:        "release notes",
 		HTMLURL:     "https://github.com/Rain-kl/ATSFlare/releases/tag/v0.5.0",
 		PublishedAt: "2026-03-11T00:00:00Z",
-	})
+	}, ReleaseChannelStable)
 
 	if view.CurrentVersion != "v0.4.0" {
 		t.Fatalf("unexpected current version: %s", view.CurrentVersion)
@@ -83,6 +86,9 @@ func TestBuildLatestServerReleaseView(t *testing.T) {
 	}
 	if view.TagName != "v0.5.0" {
 		t.Fatalf("unexpected tag name: %s", view.TagName)
+	}
+	if view.Channel != ReleaseChannelStable.String() {
+		t.Fatalf("unexpected channel: %s", view.Channel)
 	}
 }
 
@@ -98,13 +104,38 @@ func TestBuildLatestServerReleaseViewDevBuild(t *testing.T) {
 
 	view := buildLatestServerReleaseView(&githubReleaseResponse{
 		TagName: "v0.5.0",
-	})
+	}, ReleaseChannelStable)
 
 	if view.HasUpdate {
 		t.Fatal("expected dev build not to report update availability")
 	}
 	if view.UpgradeSupported {
 		t.Fatal("expected dev build not to support self-upgrade")
+	}
+}
+
+func TestBuildLatestServerReleaseViewPreview(t *testing.T) {
+	originalVersion := common.Version
+	common.Version = "v0.5.0-rc.1"
+	t.Cleanup(func() {
+		common.Version = originalVersion
+		resetServerUpgradeTestState(t)
+	})
+
+	view := buildLatestServerReleaseView(&githubReleaseResponse{
+		TagName:     "v0.5.0-rc.2",
+		Prerelease:  true,
+		PublishedAt: "2026-03-12T00:00:00Z",
+	}, ReleaseChannelPreview)
+
+	if !view.HasUpdate {
+		t.Fatal("expected preview release to be newer")
+	}
+	if !view.Prerelease {
+		t.Fatal("expected preview flag to be true")
+	}
+	if view.Channel != ReleaseChannelPreview.String() {
+		t.Fatalf("unexpected channel: %s", view.Channel)
 	}
 }
 

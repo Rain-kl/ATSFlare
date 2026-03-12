@@ -77,9 +77,11 @@ func TestLatestReleaseProxy(t *testing.T) {
 	if loginRecorder.Code != http.StatusOK {
 		t.Fatalf("unexpected login status code: %d", loginRecorder.Code)
 	}
+	loginResult := loginRecorder.Result()
+	defer loginResult.Body.Close()
 
 	req := httptest.NewRequest(http.MethodGet, "/api/update/latest-release", nil)
-	for _, cookieValue := range loginRecorder.Result().Cookies() {
+	for _, cookieValue := range loginResult.Cookies() {
 		req.AddCookie(cookieValue)
 	}
 
@@ -133,8 +135,10 @@ func loginRootAndBuildEngine(t *testing.T) (*gin.Engine, []*http.Cookie) {
 	if loginRecorder.Code != http.StatusOK {
 		t.Fatalf("unexpected login status code: %d", loginRecorder.Code)
 	}
+	loginResult := loginRecorder.Result()
+	defer loginResult.Body.Close()
 
-	return engine, loginRecorder.Result().Cookies()
+	return engine, loginResult.Cookies()
 }
 
 func fakeManualServerBinary(version string) (string, []byte) {

@@ -11,6 +11,7 @@ import { AppModal } from '@/components/ui/app-modal';
 import { StatusBadge } from '@/components/ui/status-badge';
 import type {
   LatestReleaseInfo,
+  ReleaseChannel,
   UploadedServerBinaryInfo,
 } from '@/features/update/types';
 import {
@@ -28,6 +29,7 @@ interface VersionUpgradeModalProps {
   frontendVersion: string;
   startTime?: number;
   release: LatestReleaseInfo | null | undefined;
+  selectedChannel: ReleaseChannel;
   uploadedBinary: UploadedServerBinaryInfo | null;
   isLoading: boolean;
   releaseErrorMessage?: string;
@@ -38,7 +40,8 @@ interface VersionUpgradeModalProps {
   isUpgrading: boolean;
   isUploadingBinary: boolean;
   isConfirmingManualUpgrade: boolean;
-  onRefresh: () => void;
+  onCheckStable: () => void;
+  onCheckPreview: () => void;
   onUpgrade: () => void;
   onUploadBinary: (file: File) => void;
   onConfirmManualUpgrade: () => void;
@@ -64,6 +67,7 @@ export function VersionUpgradeModal({
   frontendVersion,
   startTime,
   release,
+  selectedChannel,
   uploadedBinary,
   isLoading,
   releaseErrorMessage,
@@ -74,13 +78,16 @@ export function VersionUpgradeModal({
   isUpgrading,
   isUploadingBinary,
   isConfirmingManualUpgrade,
-  onRefresh,
+  onCheckStable,
+  onCheckPreview,
   onUpgrade,
   onUploadBinary,
   onConfirmManualUpgrade,
 }: VersionUpgradeModalProps) {
   const upgradeBadge = getUpgradeBadge(release);
   const [selectedBinary, setSelectedBinary] = useState<File | null>(null);
+  const selectedChannelLabel =
+    selectedChannel === 'preview' ? '预览版' : '正式版';
 
   useEffect(() => {
     if (!isOpen) {
@@ -93,17 +100,28 @@ export function VersionUpgradeModal({
       isOpen={isOpen}
       onClose={onClose}
       title="版本"
-      description="在这里检查 GitHub 最新版本，或手动上传 Server 二进制并确认升级。升级开始后服务会短暂重启。"
+      description="默认检查正式版更新；你也可以手动检查 preview 发布并选择升级，或上传 Server 二进制确认升级。升级开始后服务会短暂重启。"
       size="lg"
       footer={
         canUpgrade ? (
           <div className="flex flex-wrap justify-end gap-3">
             <SecondaryButton
               type="button"
-              onClick={onRefresh}
+              onClick={onCheckStable}
               disabled={isChecking || isUpgrading || isUploadingBinary}
             >
-              {isChecking ? '检查中...' : '检查更新'}
+              {isChecking && selectedChannel === 'stable'
+                ? '检查中...'
+                : '检查正式版'}
+            </SecondaryButton>
+            <SecondaryButton
+              type="button"
+              onClick={onCheckPreview}
+              disabled={isChecking || isUpgrading || isUploadingBinary}
+            >
+              {isChecking && selectedChannel === 'preview'
+                ? '检查中...'
+                : '检查预览版'}
             </SecondaryButton>
             <PrimaryButton
               type="button"
@@ -149,7 +167,9 @@ export function VersionUpgradeModal({
                 ? '升级中...'
                 : release?.in_progress
                   ? '升级中...'
-                  : '立即升级'}
+                  : selectedChannel === 'preview'
+                    ? '升级到预览版'
+                    : '升级到正式版'}
             </PrimaryButton>
           </div>
         ) : undefined
@@ -174,9 +194,15 @@ export function VersionUpgradeModal({
             </div>
           </AppCard>
           <AppCard title="最新版本">
-            <p className="text-sm font-medium text-[var(--foreground-primary)]">
-              {release?.tag_name || '未检查'}
-            </p>
+            <div className="flex flex-wrap items-center gap-3">
+              <p className="text-sm font-medium text-[var(--foreground-primary)]">
+                {release?.tag_name || '未检查'}
+              </p>
+              <StatusBadge
+                label={selectedChannelLabel}
+                variant={selectedChannel === 'preview' ? 'warning' : 'info'}
+              />
+            </div>
           </AppCard>
           <AppCard title="启动时间">
             <p className="text-sm font-medium text-[var(--foreground-primary)]">
@@ -191,13 +217,13 @@ export function VersionUpgradeModal({
         ) : null}
         {!isLoading && !releaseErrorMessage && !release ? (
           <EmptyState
-            title="尚未检查更新"
-            description="点击“检查更新”后会在这里展示最新 GitHub Release 信息。"
+            title={`尚未检查${selectedChannelLabel}`}
+            description={`点击“检查${selectedChannelLabel}”后会在这里展示对应 GitHub Release 信息。`}
           />
         ) : null}
         {!isLoading && !releaseErrorMessage && release ? (
           <AppCard
-            title={`GitHub Release · ${release.tag_name}`}
+            title={`GitHub ${selectedChannelLabel} · ${release.tag_name}`}
             description={
               release.published_at
                 ? `发布时间：${formatRelativeTime(release.published_at)} · ${formatDateTime(release.published_at)}`
@@ -210,6 +236,11 @@ export function VersionUpgradeModal({
                   label={release.has_update ? '发现新版本' : '已经是最新版本'}
                   variant={release.has_update ? 'warning' : 'success'}
                 />
+                {release.prerelease ? (
+                  <StatusBadge label="Preview 发布" variant="warning" />
+                ) : (
+                  <StatusBadge label="正式发布" variant="info" />
+                )}
                 {!release.upgrade_supported ? (
                   <StatusBadge
                     label="当前平台不支持自动升级"
