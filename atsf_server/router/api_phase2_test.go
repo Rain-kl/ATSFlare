@@ -186,19 +186,24 @@ func TestPhase2AgentLifecycle(t *testing.T) {
 	}
 
 	heartbeatPayload := map[string]any{
-		"node_id":         "spoofed-node-id",
-		"name":            "shanghai-edge-1",
-		"ip":              "10.0.0.9",
-		"agent_version":   "0.1.1",
-		"nginx_version":   "1.27.1.2",
-		"current_version": "",
-		"last_error":      "",
+		"node_id":           "spoofed-node-id",
+		"name":              "shanghai-edge-1",
+		"ip":                "10.0.0.9",
+		"agent_version":     "0.1.1",
+		"nginx_version":     "1.27.1.2",
+		"openresty_status":  service.OpenrestyStatusUnhealthy,
+		"openresty_message": "docker run openresty failed: bind 80 already allocated",
+		"current_version":   "",
+		"last_error":        "",
 	}
 	resp := performAgentJSONRequestWithToken(t, engine, createdNode.AgentToken, http.MethodPost, "/api/agent/nodes/heartbeat", heartbeatPayload)
 	var registeredNode model.Node
 	decodeResponseData(t, resp, &registeredNode)
 	if registeredNode.IP != "10.0.0.9" || registeredNode.AgentVersion != "0.1.1" || registeredNode.NodeID != createdNode.NodeID {
 		t.Fatal("expected heartbeat to update node metadata")
+	}
+	if registeredNode.OpenrestyStatus != service.OpenrestyStatusUnhealthy {
+		t.Fatal("expected heartbeat to update openresty status")
 	}
 
 	activeConfigResp := performAgentJSONRequestWithToken(t, engine, createdNode.AgentToken, http.MethodGet, "/api/agent/config-versions/active", nil)
@@ -252,6 +257,45 @@ func TestPhase2AgentLifecycle(t *testing.T) {
 	}
 	if nodes[0].LastError != "openresty reload failed" {
 		t.Fatal("expected node last_error to reflect failed apply")
+	}
+	if nodes[0].OpenrestyStatus != service.OpenrestyStatusUnhealthy {
+		t.Fatal("expected node list to expose openresty status")
+	}
+	if nodes[0].OpenrestyMessage != "docker run openresty failed: bind 80 already allocated" {
+		t.Fatal("expected node list to expose openresty message")
+	}
+
+	restartResp := performJSONRequest(t, engine, adminToken, http.MethodPost, "/api/nodes/"+toString(createdNode.ID)+"/openresty-restart", nil)
+	decodeResponseData(t, restartResp, &createdNode)
+	if !createdNode.RestartOpenrestyRequested {
+		t.Fatal("expected openresty restart request flag to be set")
+	}
+
+	rawHeartbeatPayload, err := json.Marshal(heartbeatPayload)
+	if err != nil {
+		t.Fatalf("failed to marshal heartbeat payload: %v", err)
+	}
+	restartHeartbeatReq := httptest.NewRequest(http.MethodPost, "/api/agent/nodes/heartbeat", bytes.NewReader(rawHeartbeatPayload))
+	restartHeartbeatReq.Header.Set("Content-Type", "application/json")
+	restartHeartbeatReq.Header.Set("X-Agent-Token", createdNode.AgentToken)
+	restartHeartbeatRecorder := httptest.NewRecorder()
+	engine.ServeHTTP(restartHeartbeatRecorder, restartHeartbeatReq)
+	if restartHeartbeatRecorder.Code != http.StatusOK {
+		t.Fatalf("unexpected heartbeat status %d: %s", restartHeartbeatRecorder.Code, restartHeartbeatRecorder.Body.String())
+	}
+	var restartHeartbeatBody struct {
+		Success       bool                  `json:"success"`
+		Message       string                `json:"message"`
+		AgentSettings service.AgentSettings `json:"agent_settings"`
+	}
+	if err = json.Unmarshal(restartHeartbeatRecorder.Body.Bytes(), &restartHeartbeatBody); err != nil {
+		t.Fatalf("failed to decode heartbeat response: %v", err)
+	}
+	if !restartHeartbeatBody.Success {
+		t.Fatalf("expected heartbeat request success, got %s", restartHeartbeatBody.Message)
+	}
+	if !restartHeartbeatBody.AgentSettings.RestartOpenrestyNow {
+		t.Fatal("expected heartbeat response to instruct openresty restart")
 	}
 
 	logsResp := performJSONRequest(t, engine, adminToken, http.MethodGet, "/api/apply-logs/?node_id="+createdNode.NodeID, nil)

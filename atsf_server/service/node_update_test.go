@@ -62,28 +62,31 @@ func TestHeartbeatNodeReturnsPreviewUpdateSettings(t *testing.T) {
 	setupServiceTestDB(t)
 
 	node := &model.Node{
-		NodeID:            "node-preview-1",
-		Name:              "preview-edge-1",
-		IP:                "10.0.0.8",
-		AgentToken:        "agent-token",
-		AgentVersion:      "v0.4.0",
-		NginxVersion:      "1.27.1.2",
-		Status:            NodeStatusOnline,
-		UpdateRequested:   true,
-		UpdateChannel:     "preview",
-		UpdateTag:         "v0.5.0-rc.1",
-		AutoUpdateEnabled: false,
+		NodeID:                    "node-preview-1",
+		Name:                      "preview-edge-1",
+		IP:                        "10.0.0.8",
+		AgentToken:                "agent-token",
+		AgentVersion:              "v0.4.0",
+		NginxVersion:              "1.27.1.2",
+		Status:                    NodeStatusOnline,
+		UpdateRequested:           true,
+		UpdateChannel:             "preview",
+		UpdateTag:                 "v0.5.0-rc.1",
+		RestartOpenrestyRequested: true,
+		AutoUpdateEnabled:         false,
 	}
 	if err := node.Insert(); err != nil {
 		t.Fatalf("failed to seed node: %v", err)
 	}
 
 	resp, err := HeartbeatNode(node, AgentNodePayload{
-		NodeID:       node.NodeID,
-		Name:         node.Name,
-		IP:           node.IP,
-		AgentVersion: node.AgentVersion,
-		NginxVersion: node.NginxVersion,
+		NodeID:           node.NodeID,
+		Name:             node.Name,
+		IP:               node.IP,
+		AgentVersion:     node.AgentVersion,
+		NginxVersion:     node.NginxVersion,
+		OpenrestyStatus:  OpenrestyStatusUnhealthy,
+		OpenrestyMessage: "port 80 already allocated",
 	})
 	if err != nil {
 		t.Fatalf("expected heartbeat to succeed: %v", err)
@@ -100,6 +103,15 @@ func TestHeartbeatNodeReturnsPreviewUpdateSettings(t *testing.T) {
 	if resp.AgentSettings.UpdateTag != "v0.5.0-rc.1" {
 		t.Fatalf("unexpected update tag: %s", resp.AgentSettings.UpdateTag)
 	}
+	if !resp.AgentSettings.RestartOpenrestyNow {
+		t.Fatal("expected restart_openresty_now to be true")
+	}
+	if resp.Node.OpenrestyStatus != OpenrestyStatusUnhealthy {
+		t.Fatalf("expected unhealthy openresty status, got %s", resp.Node.OpenrestyStatus)
+	}
+	if resp.Node.OpenrestyMessage != "port 80 already allocated" {
+		t.Fatalf("unexpected openresty message: %s", resp.Node.OpenrestyMessage)
+	}
 
 	storedNode, err := model.GetNodeByID(node.ID)
 	if err != nil {
@@ -113,5 +125,25 @@ func TestHeartbeatNodeReturnsPreviewUpdateSettings(t *testing.T) {
 	}
 	if storedNode.UpdateTag != "" {
 		t.Fatalf("expected update tag to be cleared, got %s", storedNode.UpdateTag)
+	}
+	if storedNode.RestartOpenrestyRequested {
+		t.Fatal("expected restart_openresty_requested to be reset after heartbeat")
+	}
+}
+
+func TestRequestNodeOpenrestyRestart(t *testing.T) {
+	setupServiceTestDB(t)
+
+	node, err := CreateNode(NodeInput{Name: "restart-edge-1"})
+	if err != nil {
+		t.Fatalf("failed to create node: %v", err)
+	}
+
+	updated, err := RequestNodeOpenrestyRestart(node.ID)
+	if err != nil {
+		t.Fatalf("expected openresty restart request to succeed: %v", err)
+	}
+	if !updated.RestartOpenrestyRequested {
+		t.Fatal("expected restart_openresty_requested to be true")
 	}
 }

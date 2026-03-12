@@ -36,6 +36,8 @@ import {
   getApplyVariant,
   getNodeStatusLabel,
   getNodeStatusVariant,
+  getOpenrestyStatusLabel,
+  getOpenrestyStatusVariant,
   isMeaningfulTime,
 } from '@/features/nodes/utils';
 
@@ -236,7 +238,8 @@ export function NodesPage() {
                   <tr className="text-[var(--foreground-secondary)]">
                     <th className="px-3 py-3 font-medium">节点</th>
                     <th className="px-3 py-3 font-medium">状态</th>
-                    <th className="px-3 py-3 font-medium">Agent / Nginx</th>
+                    <th className="px-3 py-3 font-medium">Agent / OpenResty</th>
+                    <th className="px-3 py-3 font-medium">运行健康</th>
                     <th className="px-3 py-3 font-medium">当前版本</th>
                     <th className="px-3 py-3 font-medium">最近应用</th>
                     <th className="px-3 py-3 font-medium">最近心跳</th>
@@ -265,6 +268,21 @@ export function NodesPage() {
                       <td className="px-3 py-4 text-[var(--foreground-secondary)]">
                         {node.agent_version || 'unknown'} /{' '}
                         {node.nginx_version || 'unknown'}
+                      </td>
+                      <td className="px-3 py-4">
+                        <div className="space-y-2">
+                          <StatusBadge
+                            label={getOpenrestyStatusLabel(
+                              node.openresty_status,
+                            )}
+                            variant={getOpenrestyStatusVariant(
+                              node.openresty_status,
+                            )}
+                          />
+                          <p className="max-w-64 text-xs break-words whitespace-pre-wrap text-[var(--foreground-secondary)]">
+                            {node.openresty_message || '无额外错误'}
+                          </p>
+                        </div>
                       </td>
                       <td className="px-3 py-4 text-[var(--foreground-secondary)]">
                         {node.current_version || '未应用'}

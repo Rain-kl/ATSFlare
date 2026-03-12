@@ -68,6 +68,30 @@ export function getUpdateMode(node: NodeItem) {
   return { label: '手动更新', variant: 'info' as const };
 }
 
+export function getOpenrestyStatusVariant(status: NodeItem['openresty_status']) {
+  if (status === 'healthy') {
+    return 'success';
+  }
+
+  if (status === 'unhealthy') {
+    return 'danger';
+  }
+
+  return 'warning';
+}
+
+export function getOpenrestyStatusLabel(status: NodeItem['openresty_status']) {
+  if (status === 'healthy') {
+    return '健康';
+  }
+
+  if (status === 'unhealthy') {
+    return '异常';
+  }
+
+  return '未知';
+}
+
 function parseVersionParts(version: string) {
   const normalized = version.trim().replace(/^v/i, '');
   if (!normalized || normalized.toLowerCase() === 'unknown') {

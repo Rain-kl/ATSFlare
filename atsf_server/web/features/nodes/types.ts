@@ -10,8 +10,11 @@ export interface NodeItem {
   update_requested: boolean;
   update_channel: ReleaseChannel;
   update_tag: string;
+  restart_openresty_requested: boolean;
   agent_version: string;
   nginx_version: string;
+  openresty_status: 'healthy' | 'unhealthy' | 'unknown';
+  openresty_message: string;
   status: 'online' | 'offline' | 'pending';
   current_version: string;
   last_seen_at: string;

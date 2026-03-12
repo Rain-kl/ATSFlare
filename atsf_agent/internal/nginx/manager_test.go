@@ -47,6 +47,14 @@ func (e *fakeExecutor) EnsureRuntime(ctx context.Context, recreate bool) error {
 	return nil
 }
 
+func (e *fakeExecutor) CheckHealth(ctx context.Context) error {
+	return e.testErr
+}
+
+func (e *fakeExecutor) Restart(ctx context.Context) error {
+	return e.reloadErr
+}
+
 func TestPathExecutorCommands(t *testing.T) {
 	runner := &fakeRunner{}
 	executor := &PathExecutor{
@@ -77,6 +85,47 @@ func TestPathExecutorEnsureRuntimeNoop(t *testing.T) {
 	}
 	if err := executor.EnsureRuntime(context.Background(), true); err != nil {
 		t.Fatalf("EnsureRuntime failed: %v", err)
+	}
+}
+
+func TestPathExecutorRestartIgnoresMissingPID(t *testing.T) {
+	runner := &fakeRunner{
+		runFn: func(name string, args ...string) ([]byte, error) {
+			if len(args) == 2 && args[0] == "-s" && args[1] == "quit" {
+				return []byte("openresty: [error] invalid PID number \"\" in \"/usr/local/openresty/nginx/logs/nginx.pid\""), errors.New("exit status 1")
+			}
+			return []byte(""), nil
+		},
+	}
+	executor := &PathExecutor{
+		Path:   "/usr/local/openresty/nginx/sbin/openresty",
+		Runner: runner,
+	}
+	if err := executor.Restart(context.Background()); err != nil {
+		t.Fatalf("Restart failed: %v", err)
+	}
+	if len(runner.calls) != 2 {
+		t.Fatalf("expected 2 restart calls, got %d", len(runner.calls))
+	}
+}
+
+func TestDockerExecutorCheckHealthFailsWhenContainerStopped(t *testing.T) {
+	runner := &fakeRunner{
+		runFn: func(name string, args ...string) ([]byte, error) {
+			return []byte("false"), nil
+		},
+	}
+	executor := &DockerExecutor{
+		DockerBinary:   "docker",
+		ContainerName:  "atsflare-openresty",
+		Image:          "openresty/openresty:alpine",
+		RouteConfigDir: filepath.Clean("/tmp/routes"),
+		CertDir:        filepath.Clean("/tmp/certs"),
+		NginxCertDir:   "/etc/nginx/atsflare-certs",
+		Runner:         runner,
+	}
+	if err := executor.CheckHealth(context.Background()); err == nil {
+		t.Fatal("expected CheckHealth to fail when container is not running")
 	}
 }
 

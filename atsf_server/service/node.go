@@ -145,6 +145,19 @@ func RequestNodeAgentUpdate(id uint, input NodeAgentUpdateInput) (*NodeView, err
 	return buildNodeView(node), nil
 }
 
+func RequestNodeOpenrestyRestart(id uint) (*NodeView, error) {
+	node, err := model.GetNodeByID(id)
+	if err != nil {
+		return nil, err
+	}
+	node.RestartOpenrestyRequested = true
+	if err = model.DB.Model(node).Select("restart_openresty_requested").Updates(node).Error; err != nil {
+		return nil, err
+	}
+	common.SysLog("openresty restart requested: node_id=" + node.NodeID + " name=" + node.Name)
+	return buildNodeView(node), nil
+}
+
 func AuthenticateAgentToken(token string) (*model.Node, error) {
 	token = strings.TrimSpace(token)
 	if token == "" {
@@ -213,23 +226,26 @@ func RotateGlobalDiscoveryToken() (*NodeBootstrapView, error) {
 func buildNodeView(node *model.Node) *NodeView {
 	status := computeNodeStatus(node)
 	view := &NodeView{
-		ID:                node.ID,
-		NodeID:            node.NodeID,
-		Name:              node.Name,
-		IP:                node.IP,
-		AgentToken:        node.AgentToken,
-		UpdateChannel:     strings.TrimSpace(node.UpdateChannel),
-		UpdateTag:         strings.TrimSpace(node.UpdateTag),
-		AgentVersion:      node.AgentVersion,
-		NginxVersion:      node.NginxVersion,
-		Status:            status,
-		CurrentVersion:    node.CurrentVersion,
-		LastSeenAt:        node.LastSeenAt,
-		LastError:         node.LastError,
-		CreatedAt:         node.CreatedAt,
-		UpdatedAt:         node.UpdatedAt,
-		AutoUpdateEnabled: node.AutoUpdateEnabled,
-		UpdateRequested:   node.UpdateRequested,
+		ID:                        node.ID,
+		NodeID:                    node.NodeID,
+		Name:                      node.Name,
+		IP:                        node.IP,
+		AgentToken:                node.AgentToken,
+		UpdateChannel:             strings.TrimSpace(node.UpdateChannel),
+		UpdateTag:                 strings.TrimSpace(node.UpdateTag),
+		RestartOpenrestyRequested: node.RestartOpenrestyRequested,
+		AgentVersion:              node.AgentVersion,
+		NginxVersion:              node.NginxVersion,
+		OpenrestyStatus:           normalizeOpenrestyStatus(node.OpenrestyStatus),
+		OpenrestyMessage:          strings.TrimSpace(node.OpenrestyMessage),
+		Status:                    status,
+		CurrentVersion:            node.CurrentVersion,
+		LastSeenAt:                node.LastSeenAt,
+		LastError:                 node.LastError,
+		CreatedAt:                 node.CreatedAt,
+		UpdatedAt:                 node.UpdatedAt,
+		AutoUpdateEnabled:         node.AutoUpdateEnabled,
+		UpdateRequested:           node.UpdateRequested,
 	}
 	if view.UpdateChannel == "" {
 		view.UpdateChannel = ReleaseChannelStable.String()
@@ -322,6 +338,8 @@ func normalizeAgentNodePayload(payload AgentNodePayload) AgentNodePayload {
 	payload.NginxVersion = strings.TrimSpace(payload.NginxVersion)
 	payload.CurrentVersion = strings.TrimSpace(payload.CurrentVersion)
 	payload.LastError = strings.TrimSpace(payload.LastError)
+	payload.OpenrestyStatus = normalizeOpenrestyStatus(payload.OpenrestyStatus)
+	payload.OpenrestyMessage = strings.TrimSpace(payload.OpenrestyMessage)
 	return payload
 }
 
@@ -344,10 +362,23 @@ func applyNodeRuntime(node *model.Node, payload AgentNodePayload, preserveName b
 	node.IP = strings.TrimSpace(payload.IP)
 	node.AgentVersion = strings.TrimSpace(payload.AgentVersion)
 	node.NginxVersion = strings.TrimSpace(payload.NginxVersion)
+	node.OpenrestyStatus = normalizeOpenrestyStatus(payload.OpenrestyStatus)
+	node.OpenrestyMessage = strings.TrimSpace(payload.OpenrestyMessage)
 	node.Status = NodeStatusOnline
 	node.CurrentVersion = strings.TrimSpace(payload.CurrentVersion)
 	node.LastSeenAt = time.Now()
 	node.LastError = strings.TrimSpace(payload.LastError)
+}
+
+func normalizeOpenrestyStatus(status string) string {
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case OpenrestyStatusHealthy:
+		return OpenrestyStatusHealthy
+	case OpenrestyStatusUnhealthy:
+		return OpenrestyStatusUnhealthy
+	default:
+		return OpenrestyStatusUnknown
+	}
 }
 
 func newRandomToken() (string, error) {

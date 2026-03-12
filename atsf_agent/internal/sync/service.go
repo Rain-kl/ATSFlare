@@ -72,9 +72,14 @@ func (s *Service) sync(ctx context.Context, startup bool) error {
 		if startup {
 			log.Printf("ensuring openresty runtime on startup: version=%s", config.Version)
 			if err = s.nginxManager.EnsureRuntime(ctx, true); err != nil {
+				snapshot.OpenrestyStatus = protocol.OpenrestyStatusUnhealthy
+				snapshot.OpenrestyMessage = err.Error()
+				_ = s.stateStore.Save(snapshot)
 				return err
 			}
 			log.Printf("openresty runtime ensured on startup: version=%s", config.Version)
+			snapshot.OpenrestyStatus = protocol.OpenrestyStatusHealthy
+			snapshot.OpenrestyMessage = ""
 		}
 		snapshot.CurrentVersion = config.Version
 		snapshot.CurrentChecksum = config.Checksum
@@ -90,6 +95,8 @@ func (s *Service) sync(ctx context.Context, startup bool) error {
 	if err = s.nginxManager.Apply(ctx, config.RenderedConfig, config.SupportFiles); err != nil {
 		log.Printf("apply openresty config failed: mode=%s version=%s error=%v", mode, config.Version, err)
 		snapshot.LastError = err.Error()
+		snapshot.OpenrestyStatus = protocol.OpenrestyStatusUnhealthy
+		snapshot.OpenrestyMessage = err.Error()
 		_ = s.stateStore.Save(snapshot)
 		reportErr := s.client.ReportApplyLog(ctx, protocol.ApplyLogPayload{
 			NodeID:  snapshot.NodeID,
@@ -108,6 +115,8 @@ func (s *Service) sync(ctx context.Context, startup bool) error {
 	snapshot.CurrentVersion = config.Version
 	snapshot.CurrentChecksum = config.Checksum
 	snapshot.LastError = ""
+	snapshot.OpenrestyStatus = protocol.OpenrestyStatusHealthy
+	snapshot.OpenrestyMessage = ""
 	if err = s.stateStore.Save(snapshot); err != nil {
 		return err
 	}

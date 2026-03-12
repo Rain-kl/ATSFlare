@@ -27,6 +27,11 @@ type Updater interface {
 	CheckAndUpdate(ctx context.Context, repo string, options UpdateOptions) error
 }
 
+type RuntimeManager interface {
+	CheckHealth(ctx context.Context) error
+	Restart(ctx context.Context) error
+}
+
 type UpdateOptions struct {
 	Channel string
 	TagName string
@@ -39,12 +44,14 @@ type Runner struct {
 	HeartbeatService HeartbeatService
 	SyncService      SyncService
 	Updater          Updater
+	RuntimeManager   RuntimeManager
 
-	autoUpdate bool
-	updateNow  bool
-	updateRepo string
-	updateChan string
-	updateTag  string
+	autoUpdate          bool
+	updateNow           bool
+	updateRepo          string
+	updateChan          string
+	updateTag           string
+	restartOpenrestyNow bool
 }
 
 func (r *Runner) Run(ctx context.Context) error {
@@ -60,12 +67,14 @@ func (r *Runner) Run(ctx context.Context) error {
 		} else {
 			log.Printf("agent startup sync completed")
 		}
+		r.refreshOpenrestyHealth(ctx)
 		settings, hbErr := r.HeartbeatService.Heartbeat(ctx, r.nodePayload(nodeID))
 		if hbErr != nil {
 			log.Printf("agent startup heartbeat failed: %v", hbErr)
 		} else {
 			log.Printf("agent startup heartbeat succeeded: node_id=%s", nodeID)
 			r.applySettings(settings)
+			r.tryRestartOpenresty(ctx)
 		}
 	} else if err = r.tryRegister(ctx, &nodeID); err != nil {
 		log.Printf("agent initial discovery register failed: %v", err)
@@ -88,6 +97,7 @@ func (r *Runner) Run(ctx context.Context) error {
 				}
 				continue
 			}
+			r.refreshOpenrestyHealth(ctx)
 			settings, hbErr := r.HeartbeatService.Heartbeat(ctx, r.nodePayload(nodeID))
 			if hbErr != nil {
 				log.Printf("agent heartbeat failed: %v", hbErr)
@@ -96,6 +106,7 @@ func (r *Runner) Run(ctx context.Context) error {
 					heartbeatTicker.Reset(r.Config.HeartbeatInterval.Duration())
 					syncTicker.Reset(r.Config.SyncInterval.Duration())
 				}
+				r.tryRestartOpenresty(ctx)
 				r.tryAutoUpdate(ctx)
 			}
 		case <-syncTicker.C:
@@ -143,7 +154,26 @@ func (r *Runner) applySettings(settings *protocol.AgentSettings) bool {
 	r.updateRepo = strings.TrimSpace(settings.UpdateRepo)
 	r.updateChan = strings.TrimSpace(settings.UpdateChannel)
 	r.updateTag = strings.TrimSpace(settings.UpdateTag)
+	r.restartOpenrestyNow = settings.RestartOpenrestyNow
 	return changed
+}
+
+func (r *Runner) tryRestartOpenresty(ctx context.Context) {
+	if !r.restartOpenrestyNow {
+		return
+	}
+	r.restartOpenrestyNow = false
+	if r.RuntimeManager == nil {
+		return
+	}
+	log.Printf("agent openresty restart requested by server")
+	if err := r.RuntimeManager.Restart(ctx); err != nil {
+		log.Printf("agent openresty restart failed: %v", err)
+		r.recordOpenrestyUnhealthy(err, false)
+		return
+	}
+	log.Printf("agent openresty restart succeeded")
+	r.recordOpenrestyHealthy()
 }
 
 func (r *Runner) tryAutoUpdate(ctx context.Context) {
@@ -224,15 +254,70 @@ func (r *Runner) recordSyncError(err error) {
 	}
 }
 
+func (r *Runner) refreshOpenrestyHealth(ctx context.Context) {
+	if r.RuntimeManager == nil || r.StateStore == nil {
+		return
+	}
+	if err := r.RuntimeManager.CheckHealth(ctx); err != nil {
+		r.recordOpenrestyUnhealthy(err, true)
+		return
+	}
+	r.recordOpenrestyHealthy()
+}
+
+func (r *Runner) recordOpenrestyHealthy() {
+	if r.StateStore == nil {
+		return
+	}
+	snapshot, err := r.StateStore.Load()
+	if err != nil {
+		log.Printf("load state before recording openresty health failed: %v", err)
+		return
+	}
+	if snapshot.OpenrestyStatus == protocol.OpenrestyStatusHealthy && strings.TrimSpace(snapshot.OpenrestyMessage) == "" {
+		return
+	}
+	snapshot.OpenrestyStatus = protocol.OpenrestyStatusHealthy
+	snapshot.OpenrestyMessage = ""
+	if err = r.StateStore.Save(snapshot); err != nil {
+		log.Printf("save state after recording openresty health failed: %v", err)
+	}
+}
+
+func (r *Runner) recordOpenrestyUnhealthy(err error, fallbackOnly bool) {
+	if err == nil || r.StateStore == nil {
+		return
+	}
+	snapshot, loadErr := r.StateStore.Load()
+	if loadErr != nil {
+		log.Printf("load state before recording openresty error failed: %v", loadErr)
+		return
+	}
+	message := strings.TrimSpace(err.Error())
+	if !fallbackOnly || strings.TrimSpace(snapshot.OpenrestyMessage) == "" {
+		snapshot.OpenrestyMessage = message
+	}
+	snapshot.OpenrestyStatus = protocol.OpenrestyStatusUnhealthy
+	if saveErr := r.StateStore.Save(snapshot); saveErr != nil {
+		log.Printf("save state after recording openresty error failed: %v", saveErr)
+	}
+}
+
 func (r *Runner) nodePayload(nodeID string) protocol.NodePayload {
 	snapshot, _ := r.StateStore.Load()
+	openrestyStatus := strings.TrimSpace(snapshot.OpenrestyStatus)
+	if openrestyStatus == "" {
+		openrestyStatus = protocol.OpenrestyStatusUnknown
+	}
 	return protocol.NodePayload{
-		NodeID:         nodeID,
-		Name:           r.Config.NodeName,
-		IP:             r.Config.NodeIP,
-		AgentVersion:   r.Config.AgentVersion,
-		NginxVersion:   r.Config.NginxVersion,
-		CurrentVersion: snapshot.CurrentVersion,
-		LastError:      snapshot.LastError,
+		NodeID:           nodeID,
+		Name:             r.Config.NodeName,
+		IP:               r.Config.NodeIP,
+		AgentVersion:     r.Config.AgentVersion,
+		NginxVersion:     r.Config.NginxVersion,
+		CurrentVersion:   snapshot.CurrentVersion,
+		LastError:        snapshot.LastError,
+		OpenrestyStatus:  openrestyStatus,
+		OpenrestyMessage: snapshot.OpenrestyMessage,
 	}
 }

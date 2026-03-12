@@ -12,21 +12,26 @@ import (
 )
 
 const (
-	NodeStatusOnline  = "online"
-	NodeStatusOffline = "offline"
-	NodeStatusPending = "pending"
-	ApplyResultOK     = "success"
-	ApplyResultFailed = "failed"
+	NodeStatusOnline         = "online"
+	NodeStatusOffline        = "offline"
+	NodeStatusPending        = "pending"
+	ApplyResultOK            = "success"
+	ApplyResultFailed        = "failed"
+	OpenrestyStatusHealthy   = "healthy"
+	OpenrestyStatusUnhealthy = "unhealthy"
+	OpenrestyStatusUnknown   = "unknown"
 )
 
 type AgentNodePayload struct {
-	NodeID         string `json:"node_id"`
-	Name           string `json:"name"`
-	IP             string `json:"ip"`
-	AgentVersion   string `json:"agent_version"`
-	NginxVersion   string `json:"nginx_version"`
-	CurrentVersion string `json:"current_version"`
-	LastError      string `json:"last_error"`
+	NodeID           string `json:"node_id"`
+	Name             string `json:"name"`
+	IP               string `json:"ip"`
+	AgentVersion     string `json:"agent_version"`
+	NginxVersion     string `json:"nginx_version"`
+	CurrentVersion   string `json:"current_version"`
+	LastError        string `json:"last_error"`
+	OpenrestyStatus  string `json:"openresty_status"`
+	OpenrestyMessage string `json:"openresty_message"`
 }
 
 type ApplyLogPayload struct {
@@ -45,13 +50,14 @@ type AgentConfigResponse struct {
 }
 
 type AgentSettings struct {
-	HeartbeatInterval int    `json:"heartbeat_interval"`
-	SyncInterval      int    `json:"sync_interval"`
-	AutoUpdate        bool   `json:"auto_update"`
-	UpdateRepo        string `json:"update_repo"`
-	UpdateNow         bool   `json:"update_now"`
-	UpdateChannel     string `json:"update_channel"`
-	UpdateTag         string `json:"update_tag"`
+	HeartbeatInterval   int    `json:"heartbeat_interval"`
+	SyncInterval        int    `json:"sync_interval"`
+	AutoUpdate          bool   `json:"auto_update"`
+	UpdateRepo          string `json:"update_repo"`
+	UpdateNow           bool   `json:"update_now"`
+	UpdateChannel       string `json:"update_channel"`
+	UpdateTag           string `json:"update_tag"`
+	RestartOpenrestyNow bool   `json:"restart_openresty_now"`
 }
 
 type HeartbeatResponse struct {
@@ -60,26 +66,29 @@ type HeartbeatResponse struct {
 }
 
 type NodeView struct {
-	ID                 uint       `json:"id"`
-	NodeID             string     `json:"node_id"`
-	Name               string     `json:"name"`
-	IP                 string     `json:"ip"`
-	AgentToken         string     `json:"agent_token"`
-	AutoUpdateEnabled  bool       `json:"auto_update_enabled"`
-	UpdateRequested    bool       `json:"update_requested"`
-	UpdateChannel      string     `json:"update_channel"`
-	UpdateTag          string     `json:"update_tag"`
-	AgentVersion       string     `json:"agent_version"`
-	NginxVersion       string     `json:"nginx_version"`
-	Status             string     `json:"status"`
-	CurrentVersion     string     `json:"current_version"`
-	LastSeenAt         time.Time  `json:"last_seen_at"`
-	LastError          string     `json:"last_error"`
-	LatestApplyResult  string     `json:"latest_apply_result"`
-	LatestApplyMessage string     `json:"latest_apply_message"`
-	LatestApplyAt      *time.Time `json:"latest_apply_at"`
-	CreatedAt          time.Time  `json:"created_at"`
-	UpdatedAt          time.Time  `json:"updated_at"`
+	ID                        uint       `json:"id"`
+	NodeID                    string     `json:"node_id"`
+	Name                      string     `json:"name"`
+	IP                        string     `json:"ip"`
+	AgentToken                string     `json:"agent_token"`
+	AutoUpdateEnabled         bool       `json:"auto_update_enabled"`
+	UpdateRequested           bool       `json:"update_requested"`
+	UpdateChannel             string     `json:"update_channel"`
+	UpdateTag                 string     `json:"update_tag"`
+	RestartOpenrestyRequested bool       `json:"restart_openresty_requested"`
+	AgentVersion              string     `json:"agent_version"`
+	NginxVersion              string     `json:"nginx_version"`
+	OpenrestyStatus           string     `json:"openresty_status"`
+	OpenrestyMessage          string     `json:"openresty_message"`
+	Status                    string     `json:"status"`
+	CurrentVersion            string     `json:"current_version"`
+	LastSeenAt                time.Time  `json:"last_seen_at"`
+	LastError                 string     `json:"last_error"`
+	LatestApplyResult         string     `json:"latest_apply_result"`
+	LatestApplyMessage        string     `json:"latest_apply_message"`
+	LatestApplyAt             *time.Time `json:"latest_apply_at"`
+	CreatedAt                 time.Time  `json:"created_at"`
+	UpdatedAt                 time.Time  `json:"updated_at"`
 }
 
 func RegisterNode(node *model.Node, payload AgentNodePayload) (*AgentRegistrationResponse, error) {
@@ -94,25 +103,28 @@ func HeartbeatNode(node *model.Node, payload AgentNodePayload) (*HeartbeatRespon
 		return nil, err
 	}
 	updateNow := node.UpdateRequested
+	restartOpenrestyNow := node.RestartOpenrestyRequested
 	updateChannel := normalizeReleaseChannel(node.UpdateChannel)
 	updateTag := strings.TrimSpace(node.UpdateTag)
 	applyNodeRuntime(node, payload, true)
 	node.UpdateRequested = false
 	node.UpdateChannel = ReleaseChannelStable.String()
 	node.UpdateTag = ""
-	if err := model.DB.Model(node).Select("ip", "agent_version", "nginx_version", "status", "current_version", "last_seen_at", "last_error", "update_requested", "update_channel", "update_tag").Updates(node).Error; err != nil {
+	node.RestartOpenrestyRequested = false
+	if err := model.DB.Model(node).Select("ip", "agent_version", "nginx_version", "openresty_status", "openresty_message", "status", "current_version", "last_seen_at", "last_error", "update_requested", "update_channel", "update_tag", "restart_openresty_requested").Updates(node).Error; err != nil {
 		return nil, err
 	}
 	return &HeartbeatResponse{
 		Node: node,
 		AgentSettings: &AgentSettings{
-			HeartbeatInterval: common.AgentHeartbeatInterval,
-			SyncInterval:      common.AgentSyncInterval,
-			AutoUpdate:        node.AutoUpdateEnabled,
-			UpdateRepo:        common.AgentUpdateRepo,
-			UpdateNow:         updateNow,
-			UpdateChannel:     updateChannel.String(),
-			UpdateTag:         updateTag,
+			HeartbeatInterval:   common.AgentHeartbeatInterval,
+			SyncInterval:        common.AgentSyncInterval,
+			AutoUpdate:          node.AutoUpdateEnabled,
+			UpdateRepo:          common.AgentUpdateRepo,
+			UpdateNow:           updateNow,
+			UpdateChannel:       updateChannel.String(),
+			UpdateTag:           updateTag,
+			RestartOpenrestyNow: restartOpenrestyNow,
 		},
 	}, nil
 }

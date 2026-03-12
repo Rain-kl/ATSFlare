@@ -216,6 +216,39 @@ func RequestNodeAgentUpdate(c *gin.Context) {
 	})
 }
 
+// RequestNodeOpenrestyRestart godoc
+// @Summary Request openresty restart on node
+// @Tags Nodes
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "Node ID"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Router /api/nodes/{id}/openresty-restart [post]
+func RequestNodeOpenrestyRestart(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil || id == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"message": "无效的参数",
+		})
+		return
+	}
+	node, err := service.RequestNodeOpenrestyRestart(uint(id))
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": err.Error(),
+		})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "",
+		"data":    node,
+	})
+}
+
 // GetNodeAgentRelease godoc
 // @Summary Check latest agent release for node
 // @Tags Nodes

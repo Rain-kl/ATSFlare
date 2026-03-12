@@ -783,6 +783,53 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/nodes/{id}/agent-release": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Nodes"
+                ],
+                "summary": "Check latest agent release for node",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Node ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "stable or preview",
+                        "name": "channel",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
         "/api/nodes/{id}/agent-update": {
             "post": {
                 "security": [
@@ -797,6 +844,47 @@ const docTemplate = `{
                     "Nodes"
                 ],
                 "summary": "Request agent self-update on node",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Node ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/nodes/{id}/openresty-restart": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Nodes"
+                ],
+                "summary": "Request openresty restart on node",
                 "parameters": [
                     {
                         "type": "integer",
@@ -1257,6 +1345,72 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/api/update/manual-upgrade": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Update"
+                ],
+                "summary": "Confirm upgrade with previously uploaded server binary",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/update/manual-upload": {
+            "post": {
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Update"
+                ],
+                "summary": "Upload server binary and inspect version before upgrade",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/update/upgrade": {
+            "post": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Update"
+                ],
+                "summary": "Upgrade server binary from latest GitHub release",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -1293,6 +1447,12 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "node_id": {
+                    "type": "string"
+                },
+                "openresty_message": {
+                    "type": "string"
+                },
+                "openresty_status": {
                     "type": "string"
                 }
             }
@@ -1429,8 +1589,8 @@ var SwaggerInfo = &swag.Spec{
 	Description:      "ATSFlare Server 管理端与 Agent API 文档。",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
-	//LeftDelim:        "{{",
-	//RightDelim:       "}}",
+	LeftDelim:        "{{",
+	RightDelim:       "}}",
 }
 
 func init() {

@@ -171,6 +171,7 @@ Agent：
 禁止：
 
 * 将本地 OpenResty 操作暴露为远程执行接口
+* 用通用 shell/命令执行方式替代受限节点操作接口
 * 在日志中打印完整 Token
 
 ---
@@ -208,8 +209,10 @@ Agent 必须满足：
 * 先执行 `openresty -t`
 * 成功后执行 `openresty -s reload`
 * 失败时自动回滚并上报最终结果
+* 周期性向 Server 回传 OpenResty 当前健康状态与最近运行错误摘要
 * 支持自动注册与 Token 置换
 * 支持接收 Server 下发运行参数
+* 支持接收 Server 下发的受限运行指令，当前仅允许 OpenResty 重启
 * 支持自我更新，但失败不影响心跳与同步
 
 ---

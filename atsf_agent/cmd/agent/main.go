@@ -41,25 +41,27 @@ func main() {
 
 	client := httpclient.New(cfg.ServerURL, cfg.InitialAuthToken(), cfg.RequestTimeout.Duration())
 	stateStore := state.NewStore(cfg.StatePath)
+	runtimeManager := &nginx.Manager{
+		RouteConfigPath: cfg.RouteConfigPath,
+		CertDir:         cfg.CertDir,
+		NginxCertDir:    cfg.OpenrestyCertDir,
+		Executor: nginx.NewExecutor(nginx.ExecutorOptions{
+			NginxPath:       cfg.OpenrestyPath,
+			DockerBinary:    cfg.DockerBinary,
+			ContainerName:   cfg.OpenrestyContainerName,
+			Image:           cfg.OpenrestyDockerImage,
+			RouteConfigPath: cfg.RouteConfigPath,
+			CertDir:         cfg.CertDir,
+			NginxCertDir:    cfg.OpenrestyCertDir,
+		}),
+	}
 	runner := &agent.Runner{
 		Config:           cfg,
 		StateStore:       stateStore,
 		HeartbeatService: heartbeat.New(client),
-		SyncService: syncservice.New(client, &nginx.Manager{
-			RouteConfigPath: cfg.RouteConfigPath,
-			CertDir:         cfg.CertDir,
-			NginxCertDir:    cfg.OpenrestyCertDir,
-			Executor: nginx.NewExecutor(nginx.ExecutorOptions{
-				NginxPath:       cfg.OpenrestyPath,
-				DockerBinary:    cfg.DockerBinary,
-				ContainerName:   cfg.OpenrestyContainerName,
-				Image:           cfg.OpenrestyDockerImage,
-				RouteConfigPath: cfg.RouteConfigPath,
-				CertDir:         cfg.CertDir,
-				NginxCertDir:    cfg.OpenrestyCertDir,
-			}),
-		}, stateStore),
-		Updater: updater.New(),
+		SyncService:      syncservice.New(client, runtimeManager, stateStore),
+		Updater:          updater.New(),
+		RuntimeManager:   runtimeManager,
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)

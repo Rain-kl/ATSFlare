@@ -3,23 +3,26 @@ package model
 import "time"
 
 type Node struct {
-	ID                uint      `json:"id" gorm:"primaryKey"`
-	NodeID            string    `json:"node_id" gorm:"uniqueIndex;size:64;not null"`
-	Name              string    `json:"name" gorm:"size:128;not null"`
-	IP                string    `json:"ip" gorm:"size:64;not null"`
-	AgentToken        string    `json:"-" gorm:"size:128;index"`
-	AutoUpdateEnabled bool      `json:"auto_update_enabled" gorm:"not null;default:false"`
-	UpdateRequested   bool      `json:"update_requested" gorm:"not null;default:false"`
-	UpdateChannel     string    `json:"update_channel" gorm:"size:16;not null;default:'stable'"`
-	UpdateTag         string    `json:"update_tag" gorm:"size:64"`
-	AgentVersion      string    `json:"agent_version" gorm:"size:64;not null"`
-	NginxVersion      string    `json:"nginx_version" gorm:"size:64"`
-	Status            string    `json:"status" gorm:"size:16;not null;default:'offline'"`
-	CurrentVersion    string    `json:"current_version" gorm:"size:32"`
-	LastSeenAt        time.Time `json:"last_seen_at"`
-	LastError         string    `json:"last_error" gorm:"size:1024"`
-	CreatedAt         time.Time `json:"created_at"`
-	UpdatedAt         time.Time `json:"updated_at"`
+	ID                        uint      `json:"id" gorm:"primaryKey"`
+	NodeID                    string    `json:"node_id" gorm:"uniqueIndex;size:64;not null"`
+	Name                      string    `json:"name" gorm:"size:128;not null"`
+	IP                        string    `json:"ip" gorm:"size:64;not null"`
+	AgentToken                string    `json:"-" gorm:"size:128;index"`
+	AutoUpdateEnabled         bool      `json:"auto_update_enabled" gorm:"not null;default:false"`
+	UpdateRequested           bool      `json:"update_requested" gorm:"not null;default:false"`
+	UpdateChannel             string    `json:"update_channel" gorm:"size:16;not null;default:'stable'"`
+	UpdateTag                 string    `json:"update_tag" gorm:"size:64"`
+	RestartOpenrestyRequested bool      `json:"restart_openresty_requested" gorm:"not null;default:false"`
+	AgentVersion              string    `json:"agent_version" gorm:"size:64;not null"`
+	NginxVersion              string    `json:"nginx_version" gorm:"size:64"`
+	OpenrestyStatus           string    `json:"openresty_status" gorm:"size:16;not null;default:'unknown'"`
+	OpenrestyMessage          string    `json:"openresty_message" gorm:"size:2048"`
+	Status                    string    `json:"status" gorm:"size:16;not null;default:'offline'"`
+	CurrentVersion            string    `json:"current_version" gorm:"size:32"`
+	LastSeenAt                time.Time `json:"last_seen_at"`
+	LastError                 string    `json:"last_error" gorm:"size:1024"`
+	CreatedAt                 time.Time `json:"created_at"`
+	UpdatedAt                 time.Time `json:"updated_at"`
 }
 
 func ListNodes() (nodes []*Node, err error) {

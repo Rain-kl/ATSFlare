@@ -21,6 +21,7 @@ import {
   deleteNode,
   getNodeAgentRelease,
   getNodes,
+  requestNodeOpenrestyRestart,
   requestNodeAgentUpdate,
   updateNode,
 } from '@/features/nodes/api/nodes';
@@ -45,6 +46,8 @@ import {
   getApplyVariant,
   getNodeStatusLabel,
   getNodeStatusVariant,
+  getOpenrestyStatusLabel,
+  getOpenrestyStatusVariant,
   getServerUrl,
   getUpdateMode,
   isMeaningfulTime,
@@ -202,6 +205,20 @@ export function NodeDetailPage({ nodeId }: { nodeId: string }) {
     },
   });
 
+  const restartOpenrestyMutation = useMutation({
+    mutationFn: () => requestNodeOpenrestyRestart(Number(nodeId)),
+    onSuccess: async (updatedNode) => {
+      setFeedback({
+        tone: 'success',
+        message: `已向节点 ${updatedNode.name} 下发 OpenResty 重启指令。`,
+      });
+      await queryClient.invalidateQueries({ queryKey: nodesQueryKey });
+    },
+    onError: (error) => {
+      setFeedback({ tone: 'danger', message: getErrorMessage(error) });
+    },
+  });
+
   const deleteMutation = useMutation({
     mutationFn: () => deleteNode(Number(nodeId)),
     onSuccess: async () => {
@@ -234,6 +251,23 @@ export function NodeDetailPage({ nodeId }: { nodeId: string }) {
 
     setFeedback(null);
     deleteMutation.mutate();
+  };
+
+  const handleRestartOpenresty = () => {
+    if (!node) {
+      return;
+    }
+
+    if (
+      !window.confirm(
+        `确认向节点“${node.name}”下发 OpenResty 重启指令吗？该指令会在下一次心跳后执行。`,
+      )
+    ) {
+      return;
+    }
+
+    setFeedback(null);
+    restartOpenrestyMutation.mutate();
   };
 
   const handleCopy = async (value: string, message: string) => {
@@ -337,6 +371,17 @@ export function NodeDetailPage({ nodeId }: { nodeId: string }) {
               >
                 {node.update_requested ? '查看 Agent 更新' : 'Agent 更新'}
               </PrimaryButton>
+              <SecondaryButton
+                type="button"
+                onClick={handleRestartOpenresty}
+                disabled={restartOpenrestyMutation.isPending}
+              >
+                {restartOpenrestyMutation.isPending
+                  ? '下发重启中...'
+                  : node.restart_openresty_requested
+                    ? '等待 OpenResty 重启'
+                    : '重启 OpenResty'}
+              </SecondaryButton>
               <DangerButton
                 type="button"
                 onClick={handleDelete}
@@ -375,6 +420,20 @@ export function NodeDetailPage({ nodeId }: { nodeId: string }) {
               <p>Agent：{node.agent_version || 'unknown'}</p>
               <p>Nginx：{node.nginx_version || 'unknown'}</p>
               <p>当前配置：{node.current_version || '未应用'}</p>
+            </div>
+          </AppCard>
+
+          <AppCard title="OpenResty 健康">
+            <div className="space-y-3">
+              <StatusBadge
+                label={getOpenrestyStatusLabel(node.openresty_status)}
+                variant={getOpenrestyStatusVariant(node.openresty_status)}
+              />
+              <p className="text-sm text-[var(--foreground-secondary)]">
+                {node.restart_openresty_requested
+                  ? '已等待节点在下一次心跳后执行 OpenResty 重启。'
+                  : node.openresty_message || '当前未上报额外错误。'}
+              </p>
             </div>
           </AppCard>
 
@@ -483,6 +542,14 @@ export function NodeDetailPage({ nodeId }: { nodeId: string }) {
                 </p>
                 <p className="mt-1 break-words whitespace-pre-wrap">
                   {node.last_error || '无'}
+                </p>
+              </div>
+              <div>
+                <p className="font-medium text-[var(--foreground-primary)]">
+                  OpenResty 状态消息
+                </p>
+                <p className="mt-1 break-words whitespace-pre-wrap">
+                  {node.openresty_message || '无'}
                 </p>
               </div>
               <div>

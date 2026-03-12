@@ -15,14 +15,16 @@ import (
 )
 
 type fakeHeartbeatService struct {
-	mu             sync.Mutex
-	registerCalls  int
-	heartbeatCalls int
-	registerErr    error
-	registerResp   *protocol.RegisterNodeResponse
-	heartbeatErrs  []error
-	onHeartbeat    func(int)
-	lastToken      string
+	mu                sync.Mutex
+	registerCalls     int
+	heartbeatCalls    int
+	registerErr       error
+	registerResp      *protocol.RegisterNodeResponse
+	heartbeatErrs     []error
+	heartbeatSettings []*protocol.AgentSettings
+	heartbeatPayloads []protocol.NodePayload
+	onHeartbeat       func(int)
+	lastToken         string
 }
 
 func (f *fakeHeartbeatService) Register(ctx context.Context, payload protocol.NodePayload) (*protocol.RegisterNodeResponse, error) {
@@ -36,16 +38,21 @@ func (f *fakeHeartbeatService) Heartbeat(ctx context.Context, payload protocol.N
 	f.mu.Lock()
 	f.heartbeatCalls++
 	callIndex := f.heartbeatCalls
+	f.heartbeatPayloads = append(f.heartbeatPayloads, payload)
 	var err error
 	if len(f.heartbeatErrs) >= callIndex {
 		err = f.heartbeatErrs[callIndex-1]
+	}
+	var settings *protocol.AgentSettings
+	if len(f.heartbeatSettings) >= callIndex {
+		settings = f.heartbeatSettings[callIndex-1]
 	}
 	onHeartbeat := f.onHeartbeat
 	f.mu.Unlock()
 	if onHeartbeat != nil {
 		onHeartbeat(callIndex)
 	}
-	return nil, err
+	return settings, err
 }
 
 func (f *fakeHeartbeatService) SetToken(token string) {
@@ -61,6 +68,30 @@ type fakeSyncService struct {
 	startupCalls   int
 	syncOnceCalls  int
 	onSyncOnceCall func(int)
+}
+
+type fakeRuntimeManager struct {
+	mu                   sync.Mutex
+	healthErr            error
+	restartErr           error
+	restartCalls         int
+	clearHealthOnRestart bool
+}
+
+func (f *fakeRuntimeManager) CheckHealth(ctx context.Context) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.healthErr
+}
+
+func (f *fakeRuntimeManager) Restart(ctx context.Context) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.restartCalls++
+	if f.clearHealthOnRestart && f.restartErr == nil {
+		f.healthErr = nil
+	}
+	return f.restartErr
 }
 
 func (f *fakeSyncService) SyncOnStartup(ctx context.Context) error {
@@ -179,6 +210,71 @@ func TestRunnerDoesNotExitOnHeartbeatOrSyncError(t *testing.T) {
 	}
 	if snapshot.LastError != "openresty reload failed" {
 		t.Fatalf("expected sync error to be recorded, got %q", snapshot.LastError)
+	}
+}
+
+func TestRunnerReportsOpenrestyHealthAndExecutesRestart(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	stateStore := state.NewStore(filepath.Join(t.TempDir(), "state.json"))
+	if err := stateStore.Save(&state.Snapshot{
+		OpenrestyStatus:  protocol.OpenrestyStatusUnhealthy,
+		OpenrestyMessage: "docker run openresty failed: bind 80 already allocated",
+	}); err != nil {
+		t.Fatalf("failed to seed state: %v", err)
+	}
+	heartbeatService := &fakeHeartbeatService{
+		heartbeatSettings: []*protocol.AgentSettings{{RestartOpenrestyNow: true}},
+		onHeartbeat: func(callCount int) {
+			if callCount >= 1 {
+				cancel()
+			}
+		},
+	}
+	runtimeManager := &fakeRuntimeManager{
+		healthErr:            errors.New("docker openresty container is not running"),
+		clearHealthOnRestart: true,
+	}
+	runner := &Runner{
+		Config: &config.Config{
+			AgentToken:        "agent-token",
+			NodeName:          "edge-01",
+			NodeIP:            "10.0.0.8",
+			AgentVersion:      config.AgentVersion,
+			NginxVersion:      "1.27.1.2",
+			HeartbeatInterval: config.MillisecondDuration(10 * time.Millisecond),
+			SyncInterval:      config.MillisecondDuration(100 * time.Millisecond),
+		},
+		StateStore:       stateStore,
+		HeartbeatService: heartbeatService,
+		SyncService:      &fakeSyncService{},
+		RuntimeManager:   runtimeManager,
+	}
+
+	err := runner.Run(ctx)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected context cancellation, got %v", err)
+	}
+	if len(heartbeatService.heartbeatPayloads) == 0 {
+		t.Fatal("expected at least one heartbeat payload")
+	}
+	payload := heartbeatService.heartbeatPayloads[0]
+	if payload.OpenrestyStatus != protocol.OpenrestyStatusUnhealthy {
+		t.Fatalf("expected unhealthy openresty status in heartbeat payload, got %q", payload.OpenrestyStatus)
+	}
+	if payload.OpenrestyMessage != "docker run openresty failed: bind 80 already allocated" {
+		t.Fatalf("unexpected openresty message: %q", payload.OpenrestyMessage)
+	}
+	if runtimeManager.restartCalls != 1 {
+		t.Fatalf("expected one openresty restart attempt, got %d", runtimeManager.restartCalls)
+	}
+	snapshot, loadErr := stateStore.Load()
+	if loadErr != nil {
+		t.Fatalf("failed to load state: %v", loadErr)
+	}
+	if snapshot.OpenrestyStatus != protocol.OpenrestyStatusHealthy || snapshot.OpenrestyMessage != "" {
+		t.Fatal("expected restart success to mark openresty healthy")
 	}
 }
 

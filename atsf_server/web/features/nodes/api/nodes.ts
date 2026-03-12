@@ -61,3 +61,9 @@ export function requestNodeAgentUpdate(
     body: JSON.stringify(payload ?? {}),
   });
 }
+
+export function requestNodeOpenrestyRestart(id: number) {
+  return apiRequest<NodeItem>(`/nodes/${id}/openresty-restart`, {
+    method: 'POST',
+  });
+}

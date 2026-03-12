@@ -26,6 +26,7 @@ type fakeManager struct {
 	applyErr           error
 	currentChecksum    string
 	currentChecksumErr error
+	ensureErr          error
 	ensureCalls        []bool
 	applyContents      []string
 	applyFiles         [][]protocol.SupportFile
@@ -41,6 +42,14 @@ func (f *fakeExecutor) Reload(ctx context.Context) error {
 
 func (f *fakeExecutor) EnsureRuntime(ctx context.Context, recreate bool) error {
 	return nil
+}
+
+func (f *fakeExecutor) CheckHealth(ctx context.Context) error {
+	return f.testErr
+}
+
+func (f *fakeExecutor) Restart(ctx context.Context) error {
+	return f.reloadErr
 }
 
 func (f *fakeClient) GetActiveConfig(ctx context.Context) (*protocol.ActiveConfigResponse, error) {
@@ -60,7 +69,7 @@ func (m *fakeManager) Apply(ctx context.Context, content string, supportFiles []
 
 func (m *fakeManager) EnsureRuntime(ctx context.Context, recreate bool) error {
 	m.ensureCalls = append(m.ensureCalls, recreate)
-	return nil
+	return m.ensureErr
 }
 
 func (m *fakeManager) CurrentChecksum() (string, error) {
@@ -215,5 +224,46 @@ func TestSyncOnStartupRecreatesRuntimeWhenChecksumMatches(t *testing.T) {
 	}
 	if snapshot.CurrentChecksum != "checksum-3" || snapshot.CurrentVersion != "20260309-003" {
 		t.Fatal("expected snapshot to be refreshed from active config")
+	}
+	if snapshot.OpenrestyStatus != protocol.OpenrestyStatusHealthy || snapshot.OpenrestyMessage != "" {
+		t.Fatal("expected startup sync to mark openresty healthy")
+	}
+}
+
+func TestSyncOnStartupRecordsRuntimeFailure(t *testing.T) {
+	client := &fakeClient{
+		config: protocol.ActiveConfigResponse{
+			Version:        "20260309-004",
+			Checksum:       "checksum-4",
+			RenderedConfig: "server { listen 83; }",
+			CreatedAt:      time.Now().Format(time.RFC3339),
+		},
+	}
+	stateStore := state.NewStore(filepath.Join(t.TempDir(), "state.json"))
+	nodeID, err := stateStore.EnsureNodeID()
+	if err != nil {
+		t.Fatalf("EnsureNodeID failed: %v", err)
+	}
+	if err = stateStore.Save(&state.Snapshot{NodeID: nodeID}); err != nil {
+		t.Fatalf("failed to seed state: %v", err)
+	}
+
+	manager := &fakeManager{
+		currentChecksum: "checksum-4",
+		ensureErr:       context.DeadlineExceeded,
+	}
+	service := New(client, manager, stateStore)
+	if err = service.SyncOnStartup(context.Background()); err == nil {
+		t.Fatal("expected SyncOnStartup to fail when runtime recreation fails")
+	}
+	snapshot, err := stateStore.Load()
+	if err != nil {
+		t.Fatalf("failed to load state: %v", err)
+	}
+	if snapshot.OpenrestyStatus != protocol.OpenrestyStatusUnhealthy {
+		t.Fatalf("expected unhealthy openresty status, got %q", snapshot.OpenrestyStatus)
+	}
+	if snapshot.OpenrestyMessage == "" {
+		t.Fatal("expected runtime error message to be recorded")
 	}
 }

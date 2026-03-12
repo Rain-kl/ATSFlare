@@ -14,23 +14,32 @@ type HeartbeatAPIResponse struct {
 }
 
 type AgentSettings struct {
-	HeartbeatInterval int    `json:"heartbeat_interval"`
-	SyncInterval      int    `json:"sync_interval"`
-	AutoUpdate        bool   `json:"auto_update"`
-	UpdateRepo        string `json:"update_repo"`
-	UpdateNow         bool   `json:"update_now"`
-	UpdateChannel     string `json:"update_channel"`
-	UpdateTag         string `json:"update_tag"`
+	HeartbeatInterval   int    `json:"heartbeat_interval"`
+	SyncInterval        int    `json:"sync_interval"`
+	AutoUpdate          bool   `json:"auto_update"`
+	UpdateRepo          string `json:"update_repo"`
+	UpdateNow           bool   `json:"update_now"`
+	UpdateChannel       string `json:"update_channel"`
+	UpdateTag           string `json:"update_tag"`
+	RestartOpenrestyNow bool   `json:"restart_openresty_now"`
 }
 
+const (
+	OpenrestyStatusHealthy   = "healthy"
+	OpenrestyStatusUnhealthy = "unhealthy"
+	OpenrestyStatusUnknown   = "unknown"
+)
+
 type NodePayload struct {
-	NodeID         string `json:"node_id"`
-	Name           string `json:"name"`
-	IP             string `json:"ip"`
-	AgentVersion   string `json:"agent_version"`
-	NginxVersion   string `json:"nginx_version"`
-	CurrentVersion string `json:"current_version"`
-	LastError      string `json:"last_error"`
+	NodeID           string `json:"node_id"`
+	Name             string `json:"name"`
+	IP               string `json:"ip"`
+	AgentVersion     string `json:"agent_version"`
+	NginxVersion     string `json:"nginx_version"`
+	CurrentVersion   string `json:"current_version"`
+	LastError        string `json:"last_error"`
+	OpenrestyStatus  string `json:"openresty_status"`
+	OpenrestyMessage string `json:"openresty_message"`
 }
 
 type RegisterNodeResponse struct {

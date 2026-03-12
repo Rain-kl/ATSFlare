@@ -25,6 +25,8 @@ type Executor interface {
 	Test(ctx context.Context) error
 	Reload(ctx context.Context) error
 	EnsureRuntime(ctx context.Context, recreate bool) error
+	CheckHealth(ctx context.Context) error
+	Restart(ctx context.Context) error
 }
 
 type CommandRunner interface {
@@ -65,6 +67,27 @@ func (e *PathExecutor) Reload(ctx context.Context) error {
 }
 
 func (e *PathExecutor) EnsureRuntime(ctx context.Context, recreate bool) error {
+	return nil
+}
+
+func (e *PathExecutor) CheckHealth(ctx context.Context) error {
+	return e.Test(ctx)
+}
+
+func (e *PathExecutor) Restart(ctx context.Context) error {
+	log.Printf("restarting openresty with binary: %s", e.Path)
+	output, err := e.Runner.Run(ctx, e.Path, "-s", "quit")
+	if err != nil {
+		text := string(output)
+		if !isIgnorableOpenrestyStopError(text) {
+			return fmt.Errorf("openresty stop failed: %w: %s", err, text)
+		}
+	}
+	output, err = e.Runner.Run(ctx, e.Path)
+	if err != nil {
+		return fmt.Errorf("openresty start failed: %w: %s", err, string(output))
+	}
+	log.Printf("openresty restart succeeded with binary: %s", e.Path)
 	return nil
 }
 
@@ -112,6 +135,22 @@ func (e *DockerExecutor) EnsureRuntime(ctx context.Context, recreate bool) error
 		return e.runContainer(ctx)
 	}
 	return e.runContainer(ctx)
+}
+
+func (e *DockerExecutor) CheckHealth(ctx context.Context) error {
+	log.Printf("checking docker openresty runtime health: container=%s", e.ContainerName)
+	output, err := e.Runner.Run(ctx, e.DockerBinary, "inspect", "-f", "{{.State.Running}}", e.ContainerName)
+	if err != nil {
+		return fmt.Errorf("docker inspect openresty failed: %w: %s", err, string(output))
+	}
+	if strings.TrimSpace(string(output)) != "true" {
+		return errors.New("docker openresty container is not running")
+	}
+	return nil
+}
+
+func (e *DockerExecutor) Restart(ctx context.Context) error {
+	return e.EnsureRuntime(ctx, true)
 }
 
 func (e *DockerExecutor) removeContainer(ctx context.Context) error {
@@ -191,6 +230,21 @@ func (m *Manager) EnsureRuntime(ctx context.Context, recreate bool) error {
 	}
 	log.Printf("openresty ensure runtime requested: recreate=%t", recreate)
 	return m.Executor.EnsureRuntime(ctx, recreate)
+}
+
+func (m *Manager) CheckHealth(ctx context.Context) error {
+	if m.Executor == nil {
+		return errors.New("executor 未配置")
+	}
+	return m.Executor.CheckHealth(ctx)
+}
+
+func (m *Manager) Restart(ctx context.Context) error {
+	if m.Executor == nil {
+		return errors.New("executor 未配置")
+	}
+	log.Printf("openresty restart requested")
+	return m.Executor.Restart(ctx)
 }
 
 func (m *Manager) CurrentChecksum() (string, error) {
@@ -299,6 +353,14 @@ func parseNginxVersion(output string) string {
 }
 
 var nginxVersionPattern = regexp.MustCompile(`(?im)(?:nginx|openresty) version:\s*(?:nginx|openresty)/([^\s]+)`)
+
+func isIgnorableOpenrestyStopError(output string) bool {
+	text := strings.ToLower(strings.TrimSpace(output))
+	if text == "" {
+		return false
+	}
+	return strings.Contains(text, "invalid pid") || strings.Contains(text, "no such process")
+}
 
 func (e *DockerExecutor) runEphemeralRuntimeCommand(ctx context.Context, args ...string) ([]byte, error) {
 	return e.runEphemeralRuntimeCommandWithBinary(ctx, dockerRuntimeCommand, args...)
