@@ -371,6 +371,45 @@ func TestManagerApplyAndChecksumIncludeMainConfig(t *testing.T) {
 	}
 }
 
+func TestManagerApplyUsesRuntimeRouteConfigPath(t *testing.T) {
+	tempDir := t.TempDir()
+	mainPath := filepath.Join(tempDir, "nginx.conf")
+	routePath := filepath.Join(tempDir, "conf.d", "atsflare_routes.conf")
+	manager := &Manager{
+		MainConfigPath:         mainPath,
+		RouteConfigPath:        routePath,
+		RuntimeRouteConfigPath: DockerRouteConfigPath,
+		CertDir:                filepath.Join(tempDir, "certs"),
+		NginxCertDir:           "/etc/nginx/atsflare-certs",
+		Executor:               &fakeExecutor{},
+	}
+
+	if err := manager.Apply(context.Background(), "include __ATSF_ROUTE_CONFIG__;\n", "server { listen 80; }\n", nil); err != nil {
+		t.Fatalf("Apply failed: %v", err)
+	}
+
+	mainData, err := os.ReadFile(mainPath)
+	if err != nil {
+		t.Fatalf("failed to read main config: %v", err)
+	}
+	if string(mainData) != "include "+DockerRouteConfigPath+";\n" {
+		t.Fatalf("unexpected main config include path: %s", string(mainData))
+	}
+
+	value, err := manager.CurrentChecksum()
+	if err != nil {
+		t.Fatalf("CurrentChecksum failed: %v", err)
+	}
+	expected := bundleChecksum(
+		"include __ATSF_ROUTE_CONFIG__;\n",
+		"server { listen 80; }\n",
+		nil,
+	)
+	if value != expected {
+		t.Fatalf("unexpected checksum: got %s want %s", value, expected)
+	}
+}
+
 func TestDetectVersionFromDockerImage(t *testing.T) {
 	runner := &fakeRunner{
 		runFn: func(name string, args ...string) ([]byte, error) {

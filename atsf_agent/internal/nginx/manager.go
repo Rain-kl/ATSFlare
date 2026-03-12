@@ -20,6 +20,7 @@ import (
 const CertDirPlaceholder = "__ATSF_CERT_DIR__"
 const RouteConfigPlaceholder = "__ATSF_ROUTE_CONFIG__"
 const DockerMainConfigPath = "/usr/local/openresty/nginx/conf/nginx.conf"
+const DockerRouteConfigPath = "/etc/nginx/conf.d/atsflare_routes.conf"
 
 const dockerRuntimeCommand = "openresty"
 
@@ -191,11 +192,12 @@ func (e *DockerExecutor) runContainer(ctx context.Context) error {
 }
 
 type Manager struct {
-	MainConfigPath  string
-	RouteConfigPath string
-	CertDir         string
-	NginxCertDir    string
-	Executor        Executor
+	MainConfigPath         string
+	RouteConfigPath        string
+	RuntimeRouteConfigPath string
+	CertDir                string
+	NginxCertDir           string
+	Executor               Executor
 }
 
 func (m *Manager) Apply(ctx context.Context, mainConfig string, routeConfig string, supportFiles []protocol.SupportFile) error {
@@ -280,8 +282,8 @@ func (m *Manager) CurrentChecksum() (string, error) {
 		return "", err
 	}
 	normalizedMain := string(mainData)
-	if m.RouteConfigPath != "" {
-		normalizedMain = strings.ReplaceAll(normalizedMain, m.RouteConfigPath, RouteConfigPlaceholder)
+	if includePath := m.routeConfigIncludePath(); includePath != "" {
+		normalizedMain = strings.ReplaceAll(normalizedMain, includePath, RouteConfigPlaceholder)
 	}
 	normalizedRoute := string(data)
 	if m.NginxCertDir != "" {
@@ -579,10 +581,18 @@ func (m *Manager) renderRouteConfig(content string) string {
 }
 
 func (m *Manager) renderMainConfig(content string) string {
-	if m.RouteConfigPath == "" {
+	includePath := m.routeConfigIncludePath()
+	if includePath == "" {
 		return content
 	}
-	return strings.ReplaceAll(content, RouteConfigPlaceholder, m.RouteConfigPath)
+	return strings.ReplaceAll(content, RouteConfigPlaceholder, includePath)
+}
+
+func (m *Manager) routeConfigIncludePath() string {
+	if strings.TrimSpace(m.RuntimeRouteConfigPath) != "" {
+		return strings.TrimSpace(m.RuntimeRouteConfigPath)
+	}
+	return strings.TrimSpace(m.RouteConfigPath)
 }
 
 func checksum(content string) string {

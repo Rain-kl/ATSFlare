@@ -42,11 +42,16 @@ func main() {
 
 	client := httpclient.New(cfg.ServerURL, cfg.InitialAuthToken(), cfg.RequestTimeout.Duration())
 	stateStore := state.NewStore(cfg.StatePath)
+	runtimeRouteConfigPath := cfg.RouteConfigPath
+	if cfg.OpenrestyPath == "" {
+		runtimeRouteConfigPath = nginx.DockerRouteConfigPath
+	}
 	runtimeManager := &nginx.Manager{
-		MainConfigPath:  cfg.MainConfigPath,
-		RouteConfigPath: cfg.RouteConfigPath,
-		CertDir:         cfg.CertDir,
-		NginxCertDir:    cfg.OpenrestyCertDir,
+		MainConfigPath:         cfg.MainConfigPath,
+		RouteConfigPath:        cfg.RouteConfigPath,
+		RuntimeRouteConfigPath: runtimeRouteConfigPath,
+		CertDir:                cfg.CertDir,
+		NginxCertDir:           cfg.OpenrestyCertDir,
 		Executor: nginx.NewExecutor(nginx.ExecutorOptions{
 			NginxPath:       cfg.OpenrestyPath,
 			DockerBinary:    cfg.DockerBinary,
