@@ -22,6 +22,8 @@ import {
   getTlsCertificates,
 } from '@/features/tls-certificates/api/tls-certificates';
 import type { TlsCertificateItem } from '@/features/tls-certificates/types';
+import { CertificateDetailModal } from '@/features/websites/components/certificate-detail-modal';
+import { CertificateEditorModal } from '@/features/websites/components/certificate-editor-modal';
 import { CertificateImportModal } from '@/features/websites/components/certificate-import-modal';
 import { WebsiteEditorModal } from '@/features/websites/components/website-editor-modal';
 import {
@@ -48,6 +50,11 @@ export function WebsitesPage() {
   const [isWebsiteModalOpen, setIsWebsiteModalOpen] = useState(false);
   const [isCertificateImportOpen, setIsCertificateImportOpen] = useState(false);
   const [isCertificateListOpen, setIsCertificateListOpen] = useState(false);
+  const [selectedCertificateId, setSelectedCertificateId] = useState<
+    number | null
+  >(null);
+  const [isCertificateDetailOpen, setIsCertificateDetailOpen] = useState(false);
+  const [isCertificateEditorOpen, setIsCertificateEditorOpen] = useState(false);
   const [preferredCertificateId, setPreferredCertificateId] = useState<
     number | null
   >(null);
@@ -121,6 +128,16 @@ export function WebsitesPage() {
 
     setFeedback(null);
     deleteCertificateMutation.mutate(certificate.id);
+  };
+
+  const handleOpenCertificateDetail = (certificate: TlsCertificateItem) => {
+    setSelectedCertificateId(certificate.id);
+    setIsCertificateDetailOpen(true);
+  };
+
+  const handleOpenCertificateEditor = (certificate: TlsCertificateItem) => {
+    setSelectedCertificateId(certificate.id);
+    setIsCertificateEditorOpen(true);
   };
 
   return (
@@ -342,14 +359,30 @@ export function WebsitesPage() {
                         </div>
                       </div>
 
-                      <DangerButton
-                        type="button"
-                        onClick={() => handleDeleteCertificate(certificate)}
-                        disabled={deleteCertificateMutation.isPending}
-                        className="px-3 py-2 text-xs"
-                      >
-                        删除
-                      </DangerButton>
+                      <div className="flex flex-wrap gap-2">
+                        <SecondaryButton
+                          type="button"
+                          onClick={() => handleOpenCertificateDetail(certificate)}
+                          className="px-3 py-2 text-xs"
+                        >
+                          查看
+                        </SecondaryButton>
+                        <SecondaryButton
+                          type="button"
+                          onClick={() => handleOpenCertificateEditor(certificate)}
+                          className="px-3 py-2 text-xs"
+                        >
+                          编辑
+                        </SecondaryButton>
+                        <DangerButton
+                          type="button"
+                          onClick={() => handleDeleteCertificate(certificate)}
+                          disabled={deleteCertificateMutation.isPending}
+                          className="px-3 py-2 text-xs"
+                        >
+                          删除
+                        </DangerButton>
+                      </div>
                     </div>
                   </div>
                 );
@@ -358,6 +391,38 @@ export function WebsitesPage() {
           )}
         </div>
       </AppModal>
+
+      <CertificateDetailModal
+        certificateId={selectedCertificateId}
+        isOpen={isCertificateDetailOpen}
+        onClose={() => setIsCertificateDetailOpen(false)}
+        onEdit={() => {
+          setIsCertificateDetailOpen(false);
+          setIsCertificateEditorOpen(true);
+        }}
+        onDelete={() => {
+          const certificate = certificates.find(
+            (item) => item.id === selectedCertificateId,
+          );
+          if (certificate) {
+            setIsCertificateDetailOpen(false);
+            handleDeleteCertificate(certificate);
+          }
+        }}
+        deleting={deleteCertificateMutation.isPending}
+      />
+
+      <CertificateEditorModal
+        certificateId={selectedCertificateId}
+        isOpen={isCertificateEditorOpen}
+        onClose={() => setIsCertificateEditorOpen(false)}
+        onSaved={(certificate) => {
+          setFeedback({
+            tone: 'success',
+            message: `证书 ${certificate.name} 已更新。`,
+          });
+        }}
+      />
     </>
   );
 }

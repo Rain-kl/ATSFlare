@@ -184,6 +184,25 @@ func TestPhase1HTTPSAndCertificateImportLifecycle(t *testing.T) {
 		t.Fatal("expected manual certificate import to persist certificate")
 	}
 
+	detailResp := performJSONRequest(t, engine, token, http.MethodGet, "/api/tls-certificates/"+toString(manualCertificate.ID), nil)
+	var certificateDetail model.TLSCertificate
+	decodeResponseData(t, detailResp, &certificateDetail)
+	if certificateDetail.ID != manualCertificate.ID || certificateDetail.CertPEM == "" || certificateDetail.KeyPEM == "" {
+		t.Fatal("expected certificate detail endpoint to return pem payloads")
+	}
+
+	updatedCertPEM, updatedKeyPEM := generateCertificatePairForRouterTest(t, []string{"secure.example.com", "www.secure.example.com"})
+	updateCertificateResp := performJSONRequest(t, engine, token, http.MethodPut, "/api/tls-certificates/"+toString(manualCertificate.ID), map[string]any{
+		"name":     "secure-example-updated",
+		"cert_pem": updatedCertPEM,
+		"key_pem":  updatedKeyPEM,
+		"remark":   "updated manual import",
+	})
+	decodeResponseData(t, updateCertificateResp, &manualCertificate)
+	if manualCertificate.Name != "secure-example-updated" || manualCertificate.Remark != "updated manual import" {
+		t.Fatalf("expected certificate update to persist metadata, got %+v", manualCertificate)
+	}
+
 	fileCertPEM, fileKeyPEM := generateCertificatePairForRouterTest(t, []string{"upload.example.com"})
 	multipartResp := performMultipartRequest(t, engine, token, "/api/tls-certificates/import-file", map[string]string{
 		"name":   "upload-example",

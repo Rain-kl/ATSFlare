@@ -29,6 +29,10 @@ func (certificate *TLSCertificate) Insert() error {
 	return DB.Create(certificate).Error
 }
 
+func (certificate *TLSCertificate) Update() error {
+	return DB.Save(certificate).Error
+}
+
 func (certificate *TLSCertificate) Delete() error {
 	return DB.Delete(certificate).Error
 }

@@ -20,6 +20,10 @@ func ListTLSCertificates() ([]*model.TLSCertificate, error) {
 	return model.ListTLSCertificates()
 }
 
+func GetTLSCertificate(id uint) (*model.TLSCertificate, error) {
+	return model.GetTLSCertificateByID(id)
+}
+
 func CreateTLSCertificate(input TLSCertificateInput) (*model.TLSCertificate, error) {
 	certificate, err := buildTLSCertificate(nil, input)
 	if err != nil {
@@ -52,6 +56,25 @@ func CreateTLSCertificateFromFiles(name string, certFile *multipart.FileHeader, 
 		KeyPEM:  keyContent,
 		Remark:  remark,
 	})
+}
+
+func UpdateTLSCertificate(id uint, input TLSCertificateInput) (*model.TLSCertificate, error) {
+	existing, err := model.GetTLSCertificateByID(id)
+	if err != nil {
+		return nil, err
+	}
+
+	certificate, err := buildTLSCertificate(existing, input)
+	if err != nil {
+		return nil, err
+	}
+	if err = certificate.Update(); err != nil {
+		if isUniqueConstraintError(err) {
+			return nil, errors.New("certificate name already exists")
+		}
+		return nil, err
+	}
+	return certificate, nil
 }
 
 func DeleteTLSCertificate(id uint) error {

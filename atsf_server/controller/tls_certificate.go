@@ -31,6 +31,40 @@ func GetTLSCertificates(c *gin.Context) {
 	})
 }
 
+// GetTLSCertificate godoc
+// @Summary Get TLS certificate detail
+// @Tags TLSCertificates
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "Certificate ID"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Router /api/tls-certificates/{id} [get]
+func GetTLSCertificate(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil || id == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"message": "invalid request",
+		})
+		return
+	}
+
+	certificate, err := service.GetTLSCertificate(uint(id))
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": err.Error(),
+		})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "",
+		"data":    certificate,
+	})
+}
+
 // CreateTLSCertificate godoc
 // @Summary Create TLS certificate from PEM
 // @Tags TLSCertificates
@@ -51,6 +85,51 @@ func CreateTLSCertificate(c *gin.Context) {
 		return
 	}
 	certificate, err := service.CreateTLSCertificate(input)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": err.Error(),
+		})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "",
+		"data":    certificate,
+	})
+}
+
+// UpdateTLSCertificate godoc
+// @Summary Update TLS certificate from PEM
+// @Tags TLSCertificates
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "Certificate ID"
+// @Param payload body service.TLSCertificateInput true "TLS certificate payload"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Router /api/tls-certificates/{id} [put]
+func UpdateTLSCertificate(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil || id == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"message": "invalid request",
+		})
+		return
+	}
+
+	var input service.TLSCertificateInput
+	if err = json.NewDecoder(c.Request.Body).Decode(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"message": "invalid request",
+		})
+		return
+	}
+
+	certificate, err := service.UpdateTLSCertificate(uint(id), input)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,

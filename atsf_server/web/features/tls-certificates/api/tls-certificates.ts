@@ -1,6 +1,7 @@
 import { apiRequest } from '@/lib/api/client';
 
 import type {
+  TlsCertificateDetailItem,
   TlsCertificateFileImportPayload,
   TlsCertificateItem,
   TlsCertificateMutationPayload,
@@ -13,6 +14,20 @@ export function getTlsCertificates() {
 export function createTlsCertificate(payload: TlsCertificateMutationPayload) {
   return apiRequest<TlsCertificateItem>('/tls-certificates/', {
     method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function getTlsCertificate(id: number) {
+  return apiRequest<TlsCertificateDetailItem>(`/tls-certificates/${id}`);
+}
+
+export function updateTlsCertificate(
+  id: number,
+  payload: TlsCertificateMutationPayload,
+) {
+  return apiRequest<TlsCertificateItem>(`/tls-certificates/${id}`, {
+    method: 'PUT',
     body: JSON.stringify(payload),
   });
 }

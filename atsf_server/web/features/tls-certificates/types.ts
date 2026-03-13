@@ -1,11 +1,18 @@
 export interface TlsCertificateItem {
   id: number;
   name: string;
+  cert_pem?: string;
+  key_pem?: string;
   not_before: string;
   not_after: string;
   remark: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface TlsCertificateDetailItem extends TlsCertificateItem {
+  cert_pem: string;
+  key_pem: string;
 }
 
 export interface TlsCertificateMutationPayload {

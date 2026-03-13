@@ -23,6 +23,8 @@ import {
   deleteTlsCertificate,
   getTlsCertificates,
 } from '@/features/tls-certificates/api/tls-certificates';
+import { CertificateDetailModal } from '@/features/websites/components/certificate-detail-modal';
+import { CertificateEditorModal } from '@/features/websites/components/certificate-editor-modal';
 import { CertificateImportModal } from '@/features/websites/components/certificate-import-modal';
 import { WebsiteEditorModal } from '@/features/websites/components/website-editor-modal';
 import {
@@ -50,6 +52,8 @@ export function WebsiteDetailPage({ websiteId }: { websiteId: string }) {
   const [feedback, setFeedback] = useState<FeedbackState | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [isCertificateImportOpen, setIsCertificateImportOpen] = useState(false);
+  const [isCertificateDetailOpen, setIsCertificateDetailOpen] = useState(false);
+  const [isCertificateEditorOpen, setIsCertificateEditorOpen] = useState(false);
   const [preferredCertificateId, setPreferredCertificateId] = useState<
     number | null
   >(null);
@@ -339,6 +343,20 @@ export function WebsiteDetailPage({ websiteId }: { websiteId: string }) {
                   <p>到期时间：{formatDateTime(certificate.not_after)}</p>
                   <p>备注：{certificate.remark || '暂无备注'}</p>
                 </div>
+                <div className="flex flex-wrap gap-2">
+                  <SecondaryButton
+                    type="button"
+                    onClick={() => setIsCertificateDetailOpen(true)}
+                  >
+                    查看证书
+                  </SecondaryButton>
+                  <SecondaryButton
+                    type="button"
+                    onClick={() => setIsCertificateEditorOpen(true)}
+                  >
+                    编辑证书
+                  </SecondaryButton>
+                </div>
                 <DangerButton
                   type="button"
                   onClick={handleDeleteCertificate}
@@ -468,6 +486,33 @@ export function WebsiteDetailPage({ websiteId }: { websiteId: string }) {
             message: `证书 ${importedCertificate.name} 已导入，可在编辑网站时直接应用。`,
           });
           setIsEditorOpen(true);
+        }}
+      />
+
+      <CertificateDetailModal
+        certificateId={certificate?.id ?? null}
+        isOpen={isCertificateDetailOpen}
+        onClose={() => setIsCertificateDetailOpen(false)}
+        onEdit={() => {
+          setIsCertificateDetailOpen(false);
+          setIsCertificateEditorOpen(true);
+        }}
+        onDelete={() => {
+          setIsCertificateDetailOpen(false);
+          handleDeleteCertificate();
+        }}
+        deleting={deleteCertificateMutation.isPending}
+      />
+
+      <CertificateEditorModal
+        certificateId={certificate?.id ?? null}
+        isOpen={isCertificateEditorOpen}
+        onClose={() => setIsCertificateEditorOpen(false)}
+        onSaved={(updatedCertificate) => {
+          setFeedback({
+            tone: 'success',
+            message: `证书 ${updatedCertificate.name} 已更新。`,
+          });
         }}
       />
     </>
