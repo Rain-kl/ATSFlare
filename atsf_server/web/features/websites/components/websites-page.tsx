@@ -10,32 +10,23 @@ import { InlineMessage } from '@/components/feedback/inline-message';
 import { LoadingState } from '@/components/feedback/loading-state';
 import { PageHeader } from '@/components/layout/page-header';
 import { AppCard } from '@/components/ui/app-card';
-import { AppModal } from '@/components/ui/app-modal';
 import { StatusBadge } from '@/components/ui/status-badge';
 import {
   deleteManagedDomain,
   getManagedDomains,
 } from '@/features/managed-domains/api/managed-domains';
 import type { ManagedDomainItem } from '@/features/managed-domains/types';
-import {
-  deleteTlsCertificate,
-  getTlsCertificates,
-} from '@/features/tls-certificates/api/tls-certificates';
-import type { TlsCertificateItem } from '@/features/tls-certificates/types';
-import { CertificateDetailModal } from '@/features/websites/components/certificate-detail-modal';
-import { CertificateEditorModal } from '@/features/websites/components/certificate-editor-modal';
+import { getTlsCertificates } from '@/features/tls-certificates/api/tls-certificates';
 import { CertificateImportModal } from '@/features/websites/components/certificate-import-modal';
 import { WebsiteEditorModal } from '@/features/websites/components/website-editor-modal';
 import {
   buildCertificateLabel,
-  getCertificateStatus,
   getErrorMessage,
   getMatchTypeMeta,
 } from '@/features/websites/utils';
 import {
   DangerButton,
   PrimaryButton,
-  SecondaryButton,
 } from '@/features/shared/components/resource-primitives';
 import { formatDateTime } from '@/lib/utils/date';
 
@@ -49,12 +40,6 @@ export function WebsitesPage() {
   const [feedback, setFeedback] = useState<FeedbackState | null>(null);
   const [isWebsiteModalOpen, setIsWebsiteModalOpen] = useState(false);
   const [isCertificateImportOpen, setIsCertificateImportOpen] = useState(false);
-  const [isCertificateListOpen, setIsCertificateListOpen] = useState(false);
-  const [selectedCertificateId, setSelectedCertificateId] = useState<
-    number | null
-  >(null);
-  const [isCertificateDetailOpen, setIsCertificateDetailOpen] = useState(false);
-  const [isCertificateEditorOpen, setIsCertificateEditorOpen] = useState(false);
   const [preferredCertificateId, setPreferredCertificateId] = useState<
     number | null
   >(null);
@@ -73,20 +58,6 @@ export function WebsitesPage() {
     onSuccess: async () => {
       setFeedback({ tone: 'success', message: '网站已删除。' });
       await queryClient.invalidateQueries({ queryKey: ['managed-domains'] });
-    },
-    onError: (error) => {
-      setFeedback({ tone: 'danger', message: getErrorMessage(error) });
-    },
-  });
-
-  const deleteCertificateMutation = useMutation({
-    mutationFn: deleteTlsCertificate,
-    onSuccess: async () => {
-      setFeedback({ tone: 'success', message: '证书已删除。' });
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['tls-certificates'] }),
-        queryClient.invalidateQueries({ queryKey: ['managed-domains'] }),
-      ]);
     },
     onError: (error) => {
       setFeedback({ tone: 'danger', message: getErrorMessage(error) });
@@ -121,25 +92,6 @@ export function WebsitesPage() {
     deleteDomainMutation.mutate(domain.id);
   };
 
-  const handleDeleteCertificate = (certificate: TlsCertificateItem) => {
-    if (!window.confirm(`确认删除证书 ${certificate.name} 吗？`)) {
-      return;
-    }
-
-    setFeedback(null);
-    deleteCertificateMutation.mutate(certificate.id);
-  };
-
-  const handleOpenCertificateDetail = (certificate: TlsCertificateItem) => {
-    setSelectedCertificateId(certificate.id);
-    setIsCertificateDetailOpen(true);
-  };
-
-  const handleOpenCertificateEditor = (certificate: TlsCertificateItem) => {
-    setSelectedCertificateId(certificate.id);
-    setIsCertificateEditorOpen(true);
-  };
-
   return (
     <>
       <div className="space-y-6">
@@ -147,17 +99,17 @@ export function WebsitesPage() {
           title="网站"
           description="主界面只保留网站列表卡片。新增网站时可直接绑定证书，也可以在弹窗内先添加证书后再应用。"
           action={
-            <>
-              <SecondaryButton
-                type="button"
-                onClick={() => setIsCertificateListOpen(true)}
+            <div className="flex flex-wrap gap-3">
+              <Link
+                href="/website/certificate"
+                className="inline-flex min-h-[46px] items-center justify-center rounded-2xl border border-[var(--border-default)] bg-[var(--control-background)] px-4 py-3 text-sm font-medium text-[var(--foreground-primary)] transition hover:bg-[var(--control-background-hover)]"
               >
                 证书列表
-              </SecondaryButton>
+              </Link>
               <PrimaryButton type="button" onClick={handleOpenWebsiteModal}>
                 新增网站
               </PrimaryButton>
-            </>
+            </div>
           }
         />
 
@@ -288,138 +240,6 @@ export function WebsitesPage() {
           setFeedback({
             tone: 'success',
             message: `证书 ${certificate.name} 已导入，可直接用于当前网站。`,
-          });
-        }}
-      />
-
-      <AppModal
-        isOpen={isCertificateListOpen}
-        onClose={() => setIsCertificateListOpen(false)}
-        title="证书列表"
-        description="回到主界面后可在这里统一查看已添加的证书，并继续新增或删除证书。"
-        size="xl"
-      >
-        <div className="space-y-5">
-          <div className="flex flex-wrap justify-end gap-3">
-            <SecondaryButton
-              type="button"
-              onClick={() =>
-                void queryClient.invalidateQueries({
-                  queryKey: ['tls-certificates'],
-                })
-              }
-            >
-              刷新证书
-            </SecondaryButton>
-            <PrimaryButton
-              type="button"
-              onClick={() => setIsCertificateImportOpen(true)}
-            >
-              添加证书
-            </PrimaryButton>
-          </div>
-
-          {certificatesQuery.isLoading ? (
-            <LoadingState />
-          ) : certificatesQuery.isError ? (
-            <ErrorState
-              title="证书列表加载失败"
-              description={getErrorMessage(certificatesQuery.error)}
-            />
-          ) : certificates.length === 0 ? (
-            <EmptyState
-              title="暂无证书"
-              description="点击上方“添加证书”即可开始录入。"
-            />
-          ) : (
-            <div className="space-y-3">
-              {certificates.map((certificate) => {
-                const status = getCertificateStatus(certificate);
-
-                return (
-                  <div
-                    key={certificate.id}
-                    className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-4"
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="space-y-2">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="text-sm font-semibold text-[var(--foreground-primary)]">
-                            {certificate.name}
-                          </p>
-                          <StatusBadge
-                            label={status.label}
-                            variant={status.variant}
-                          />
-                        </div>
-                        <div className="text-xs leading-5 text-[var(--foreground-secondary)]">
-                          <p>生效：{formatDateTime(certificate.not_before)}</p>
-                          <p>到期：{formatDateTime(certificate.not_after)}</p>
-                          <p>备注：{certificate.remark || '暂无备注'}</p>
-                        </div>
-                      </div>
-
-                      <div className="flex flex-wrap gap-2">
-                        <SecondaryButton
-                          type="button"
-                          onClick={() => handleOpenCertificateDetail(certificate)}
-                          className="px-3 py-2 text-xs"
-                        >
-                          查看
-                        </SecondaryButton>
-                        <SecondaryButton
-                          type="button"
-                          onClick={() => handleOpenCertificateEditor(certificate)}
-                          className="px-3 py-2 text-xs"
-                        >
-                          编辑
-                        </SecondaryButton>
-                        <DangerButton
-                          type="button"
-                          onClick={() => handleDeleteCertificate(certificate)}
-                          disabled={deleteCertificateMutation.isPending}
-                          className="px-3 py-2 text-xs"
-                        >
-                          删除
-                        </DangerButton>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </AppModal>
-
-      <CertificateDetailModal
-        certificateId={selectedCertificateId}
-        isOpen={isCertificateDetailOpen}
-        onClose={() => setIsCertificateDetailOpen(false)}
-        onEdit={() => {
-          setIsCertificateDetailOpen(false);
-          setIsCertificateEditorOpen(true);
-        }}
-        onDelete={() => {
-          const certificate = certificates.find(
-            (item) => item.id === selectedCertificateId,
-          );
-          if (certificate) {
-            setIsCertificateDetailOpen(false);
-            handleDeleteCertificate(certificate);
-          }
-        }}
-        deleting={deleteCertificateMutation.isPending}
-      />
-
-      <CertificateEditorModal
-        certificateId={selectedCertificateId}
-        isOpen={isCertificateEditorOpen}
-        onClose={() => setIsCertificateEditorOpen(false)}
-        onSaved={(certificate) => {
-          setFeedback({
-            tone: 'success',
-            message: `证书 ${certificate.name} 已更新。`,
           });
         }}
       />
