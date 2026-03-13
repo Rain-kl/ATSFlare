@@ -944,7 +944,6 @@ export function PerformancePage() {
                                 </ResourceField>
                                 <ToggleField
                                     label="proxy_request_buffering"
-                                    description="是否先缓冲请求体再转发给上游。"
                                     tooltip={performanceFieldTooltips.proxy_request_buffering}
                                     checked={
                                         performanceFields.OpenRestyProxyRequestBufferingEnabled
@@ -1019,7 +1018,7 @@ export function PerformancePage() {
 
                             <AppCard
                                 title="OpenResty 缓存"
-                                description="缓存能力仍限定在单节点反代优化场景，不扩展为独立缓存产品。"
+                                description="缓存能力限定在单节点反代优化场景。"
                                 action={
                                     <div className="flex flex-wrap gap-2">
                                         <SecondaryButton
@@ -1051,70 +1050,6 @@ export function PerformancePage() {
                                 }
                             >
                                 <div className="space-y-5">
-                                    <div className="grid gap-4 md:grid-cols-2">
-                                        <div
-                                            className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-4">
-                                            <p className="text-xs tracking-[0.2em] text-[var(--foreground-muted)] uppercase">
-                                                缓存状态
-                                            </p>
-                                            <div className="mt-3 flex flex-wrap items-center gap-3">
-                                                <StatusBadge
-                                                    label={
-                                                        performanceFields.OpenRestyCacheEnabled
-                                                            ? '已启用，主配置会渲染缓存指令'
-                                                            : '已关闭，主配置不会渲染缓存指令'
-                                                    }
-                                                    variant={
-                                                        performanceFields.OpenRestyCacheEnabled
-                                                            ? 'success'
-                                                            : 'warning'
-                                                    }
-                                                />
-                                                <button
-                                                    type="button"
-                                                    onClick={() =>
-                                                        setPerformanceFields((previous) => ({
-                                                            ...previous,
-                                                            OpenRestyCacheEnabled:
-                                                                !previous.OpenRestyCacheEnabled,
-                                                        }))
-                                                    }
-                                                    className={[
-                                                        'inline-flex items-center rounded-full px-3 py-1.5 text-xs font-medium transition',
-                                                        performanceFields.OpenRestyCacheEnabled
-                                                            ? 'bg-[var(--status-danger-soft)] text-[var(--status-danger-foreground)]'
-                                                            : 'bg-[var(--brand-primary-soft)] text-[var(--brand-primary)]',
-                                                    ].join(' ')}
-                                                >
-                                                    {performanceFields.OpenRestyCacheEnabled
-                                                        ? '点击关闭'
-                                                        : '点击启用'}
-                                                </button>
-                                            </div>
-                                            <p className="mt-3 text-xs leading-5 text-[var(--foreground-secondary)]">
-                                                `max_size` 会跟随 `proxy_cache_path`
-                                                一起渲染，不会单独占一行。
-                                            </p>
-                                        </div>
-
-                                        <div
-                                            className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-4">
-                                            <p className="text-xs tracking-[0.2em] text-[var(--foreground-muted)] uppercase">
-                                                当前缓存预览
-                                            </p>
-                                            {cachePreviewLines.length > 0 ? (
-                                                <CodeBlock className="mt-3 text-xs leading-6 whitespace-pre-wrap">
-                                                    {cachePreviewLines.join('\n')}
-                                                </CodeBlock>
-                                            ) : (
-                                                <p className="mt-3 text-sm leading-6 text-[var(--foreground-secondary)]">
-                                                    当前主配置预览中没有缓存指令。启用缓存并保存后，会出现
-                                                    `proxy_cache_path ... max_size=...;` 这一行。
-                                                </p>
-                                            )}
-                                        </div>
-                                    </div>
-
                                     <div
                                         className={[
                                             'grid gap-5 transition md:grid-cols-2',
@@ -1209,7 +1144,6 @@ export function PerformancePage() {
                                         </ResourceField>
                                         <ToggleField
                                             label="proxy_cache_lock"
-                                            description="是否启用 proxy_cache_lock。"
                                             tooltip={performanceFieldTooltips.proxy_cache_lock}
                                             checked={performanceFields.OpenRestyCacheLockEnabled}
                                             disabled={!performanceFields.OpenRestyCacheEnabled}
@@ -1258,7 +1192,6 @@ export function PerformancePage() {
                             </AppCard>
                             <AppCard
                                 title="OpenResty 压缩"
-                                description="单独维护 gzip 相关参数，避免与缓存配置混在一起。"
                                 action={
                                     <PrimaryButton
                                         type="button"
@@ -1275,7 +1208,6 @@ export function PerformancePage() {
                                     <div className="grid gap-5 md:grid-cols-2">
                                         <ToggleField
                                             label="gzip"
-                                            description="是否启用 gzip on。"
                                             tooltip={performanceFieldTooltips.gzip}
                                             checked={performanceFields.OpenRestyGzipEnabled}
                                             onChange={(checked) =>
@@ -1285,21 +1217,6 @@ export function PerformancePage() {
                                                 }))
                                             }
                                         />
-                                        <div
-                                            className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-4">
-                                            <p className="text-xs tracking-[0.2em] text-[var(--foreground-muted)] uppercase">
-                                                当前压缩预览
-                                            </p>
-                                            {gzipPreviewLines.length > 0 ? (
-                                                <CodeBlock className="mt-3 text-xs leading-6 whitespace-pre-wrap">
-                                                    {gzipPreviewLines.join('\n')}
-                                                </CodeBlock>
-                                            ) : (
-                                                <p className="mt-3 text-sm leading-6 text-[var(--foreground-secondary)]">
-                                                    当前主配置预览中没有压缩指令。
-                                                </p>
-                                            )}
-                                        </div>
                                         <ResourceField
                                             label="gzip_min_length"
                                             tooltip={performanceFieldTooltips.gzip_min_length}
