@@ -22,6 +22,17 @@ const (
 
 var currentLogLevel = logLevelInfo
 var currentLogLevelName = "info"
+var commonLogWriter io.Writer = os.Stdout
+var errorLogWriter io.Writer = os.Stderr
+
+func configureGinWriters() {
+	if shouldLog(logLevelDebug) {
+		gin.DefaultWriter = commonLogWriter
+	} else {
+		gin.DefaultWriter = io.Discard
+	}
+	gin.DefaultErrorWriter = errorLogWriter
+}
 
 func SetLogLevel(level string) {
 	normalized := strings.TrimSpace(strings.ToLower(level))
@@ -39,6 +50,7 @@ func SetLogLevel(level string) {
 		currentLogLevel = logLevelInfo
 		currentLogLevelName = "info"
 	}
+	configureGinWriters()
 }
 
 func GetLogLevel() string {
@@ -61,9 +73,10 @@ func SetupGinLog() {
 		if err != nil {
 			log.Fatal("failed to open log file")
 		}
-		gin.DefaultWriter = io.MultiWriter(os.Stdout, commonFd)
-		gin.DefaultErrorWriter = io.MultiWriter(os.Stderr, errorFd)
+		commonLogWriter = io.MultiWriter(os.Stdout, commonFd)
+		errorLogWriter = io.MultiWriter(os.Stderr, errorFd)
 	}
+	configureGinWriters()
 }
 
 func SysLog(s string) {
@@ -71,7 +84,7 @@ func SysLog(s string) {
 		return
 	}
 	t := time.Now()
-	_, _ = fmt.Fprintf(gin.DefaultWriter, "[SYS] %v | %s \n", t.Format("2006/01/02 - 15:04:05"), s)
+	_, _ = fmt.Fprintf(commonLogWriter, "[SYS] %v | %s \n", t.Format("2006/01/02 - 15:04:05"), s)
 }
 
 func SysError(s string) {
@@ -79,11 +92,11 @@ func SysError(s string) {
 		return
 	}
 	t := time.Now()
-	_, _ = fmt.Fprintf(gin.DefaultErrorWriter, "[SYS] %v | %s \n", t.Format("2006/01/02 - 15:04:05"), s)
+	_, _ = fmt.Fprintf(errorLogWriter, "[SYS] %v | %s \n", t.Format("2006/01/02 - 15:04:05"), s)
 }
 
 func FatalLog(v ...any) {
 	t := time.Now()
-	_, _ = fmt.Fprintf(gin.DefaultErrorWriter, "[FATAL] %v | %v \n", t.Format("2006/01/02 - 15:04:05"), v)
+	_, _ = fmt.Fprintf(errorLogWriter, "[FATAL] %v | %v \n", t.Format("2006/01/02 - 15:04:05"), v)
 	os.Exit(1)
 }

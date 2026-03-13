@@ -108,7 +108,6 @@ Origin
 services:
   atsflare:
     image: ghcr.io/rain-kl/atsflare:latest
-    container_name: atsflare
     restart: unless-stopped
     ports:
       - "3000:3000"
@@ -116,6 +115,7 @@ services:
       SESSION_SECRET: replace-with-random-string
       SQLITE_PATH: /data/atsflare.db
       GIN_MODE: release
+      LOG_LEVEL: info
       PORT: "3000"
     volumes:
       - atsflare-data:/data
