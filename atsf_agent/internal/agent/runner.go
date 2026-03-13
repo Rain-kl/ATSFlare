@@ -69,13 +69,13 @@ func (r *Runner) Run(ctx context.Context) error {
 			if heartbeatResult == nil {
 				heartbeatResult = &protocol.HeartbeatResult{}
 			}
-			slog.Info("agent startup heartbeat succeeded", "node_id", nodeID)
+			slog.Debug("agent startup heartbeat succeeded", "node_id", nodeID)
 			r.applySettings(heartbeatResult.AgentSettings)
 			if err = r.SyncService.SyncOnStartup(ctx, heartbeatResult.ActiveConfig); err != nil {
 				r.recordSyncError(err)
 				slog.Error("agent startup sync failed", "error", err)
 			} else {
-				slog.Info("agent startup sync completed")
+				slog.Debug("agent startup sync completed")
 			}
 			r.tryRestartOpenresty(ctx)
 			r.tryAutoUpdate(ctx)
@@ -232,7 +232,7 @@ func (r *Runner) tryRegister(ctx context.Context, nodeID *string) error {
 		r.recordSyncError(err)
 		slog.Error("agent post-register startup sync failed", "error", err)
 	} else {
-		slog.Info("agent post-register startup sync completed")
+				slog.Debug("agent post-register startup sync completed")
 	}
 	r.tryRestartOpenresty(ctx)
 	r.tryAutoUpdate(ctx)

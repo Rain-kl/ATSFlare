@@ -73,7 +73,7 @@ func (s *Service) sync(ctx context.Context, startup bool, target *protocol.Activ
 			slog.Debug("skipping sync because heartbeat returned no active config summary", "mode", mode)
 			return nil
 		}
-		slog.Info("sync startup fallback: active config summary unavailable, fetching active config directly")
+		slog.Debug("sync startup fallback: active config summary unavailable, fetching active config directly")
 		config, fetchErr := s.client.GetActiveConfig(ctx)
 		if fetchErr != nil {
 			slog.Error("fetch active config failed", "mode", mode, "error", fetchErr)
@@ -87,23 +87,23 @@ func (s *Service) sync(ctx context.Context, startup bool, target *protocol.Activ
 	}
 
 	if currentChecksum == target.Checksum {
-		slog.Info("local openresty config already up to date", "mode", mode, "version", target.Version)
+		slog.Debug("local openresty config already up to date", "mode", mode, "version", target.Version)
 		if startup {
-			slog.Info("ensuring openresty runtime on startup", "version", target.Version)
+			slog.Debug("ensuring openresty runtime on startup", "version", target.Version)
 			if err = s.nginxManager.EnsureRuntime(ctx, true); err != nil {
 				snapshot.OpenrestyStatus = protocol.OpenrestyStatusUnhealthy
 				snapshot.OpenrestyMessage = err.Error()
 				_ = s.stateStore.Save(snapshot)
 				return err
 			}
-			slog.Info("openresty runtime ensured on startup", "version", target.Version)
+			slog.Debug("openresty runtime ensured on startup", "version", target.Version)
 			snapshot.OpenrestyStatus = protocol.OpenrestyStatusHealthy
 			snapshot.OpenrestyMessage = ""
 		}
 		snapshot.CurrentVersion = target.Version
 		snapshot.CurrentChecksum = target.Checksum
 		snapshot.LastError = ""
-		slog.Info("sync finished without changes", "mode", mode, "version", target.Version)
+		slog.Debug("sync finished without changes", "mode", mode, "version", target.Version)
 		return s.stateStore.Save(snapshot)
 	}
 	if snapshot.CurrentVersion == target.Version && snapshot.CurrentChecksum == target.Checksum && !startup {
@@ -121,23 +121,23 @@ func (s *Service) sync(ctx context.Context, startup bool, target *protocol.Activ
 
 func (s *Service) applyIfNeeded(ctx context.Context, mode string, startup bool, snapshot *state.Snapshot, currentChecksum string, target *protocol.ActiveConfigMeta, config *protocol.ActiveConfigResponse) error {
 	if currentChecksum == config.Checksum {
-		slog.Info("local openresty config already up to date", "mode", mode, "version", config.Version)
+		slog.Debug("local openresty config already up to date", "mode", mode, "version", config.Version)
 		if startup {
-			slog.Info("ensuring openresty runtime on startup", "version", config.Version)
+			slog.Debug("ensuring openresty runtime on startup", "version", config.Version)
 			if err := s.nginxManager.EnsureRuntime(ctx, true); err != nil {
 				snapshot.OpenrestyStatus = protocol.OpenrestyStatusUnhealthy
 				snapshot.OpenrestyMessage = err.Error()
 				_ = s.stateStore.Save(snapshot)
 				return err
 			}
-			slog.Info("openresty runtime ensured on startup", "version", config.Version)
+			slog.Debug("openresty runtime ensured on startup", "version", config.Version)
 			snapshot.OpenrestyStatus = protocol.OpenrestyStatusHealthy
 			snapshot.OpenrestyMessage = ""
 		}
 		snapshot.CurrentVersion = config.Version
 		snapshot.CurrentChecksum = config.Checksum
 		snapshot.LastError = ""
-		slog.Info("sync finished without changes", "mode", mode, "version", config.Version)
+		slog.Debug("sync finished without changes", "mode", mode, "version", config.Version)
 		return s.stateStore.Save(snapshot)
 	}
 	if target != nil && (target.Version != config.Version || target.Checksum != config.Checksum) {
@@ -199,7 +199,7 @@ func (s *Service) applyIfNeeded(ctx context.Context, mode string, startup bool, 
 		slog.Error("report successful apply log failed", "version", config.Version, "error", err)
 		return err
 	}
-	slog.Info("successful apply log reported", "version", config.Version)
+	slog.Debug("successful apply log reported", "version", config.Version)
 	return nil
 }
 

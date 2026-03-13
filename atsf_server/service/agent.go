@@ -179,7 +179,7 @@ func GetActiveConfigForAgent() (*AgentConfigResponse, error) {
 			return nil, err
 		}
 	}
-	slog.Info("agent fetched active config", "version", version.Version, "checksum", version.Checksum)
+	slog.Debug("agent fetched active config", "version", version.Version, "checksum", version.Checksum)
 	return &AgentConfigResponse{
 		Version:        version.Version,
 		Checksum:       version.Checksum,
@@ -209,7 +209,7 @@ func ReportApplyLog(payload ApplyLogPayload) (*model.ApplyLog, error) {
 	if payload.Result != ApplyResultOK && payload.Result != ApplyResultFailed {
 		return nil, errors.New("result 仅支持 success 或 failed")
 	}
-	slog.Info("agent apply log received", "node_id", payload.NodeID, "version", payload.Version, "result", payload.Result)
+	slog.Debug("agent apply log received", "node_id", payload.NodeID, "version", payload.Version, "result", payload.Result)
 
 	log := &model.ApplyLog{
 		NodeID:              payload.NodeID,
@@ -244,7 +244,7 @@ func ReportApplyLog(payload ApplyLogPayload) (*model.ApplyLog, error) {
 		return nil, err
 	}
 	if payload.Result == ApplyResultOK {
-		slog.Info("agent apply reported success", "node_id", payload.NodeID, "version", payload.Version)
+		slog.Debug("agent apply reported success", "node_id", payload.NodeID, "version", payload.Version)
 	} else {
 		slog.Error("agent apply reported failure", "node_id", payload.NodeID, "version", payload.Version, "message", payload.Message)
 	}
@@ -267,15 +267,6 @@ func ListNodeViews() ([]*NodeView, error) {
 	views := make([]*NodeView, 0, len(nodes))
 	for _, node := range nodes {
 		computedStatus := computeNodeStatus(node)
-		if node.Status != computedStatus {
-			if computedStatus == NodeStatusOffline {
-				slog.Error("node offline", "node_id", node.NodeID, "name", node.Name, "ip", node.IP, "last_seen_at", node.LastSeenAt.Format(time.RFC3339))
-			} else if computedStatus == NodeStatusOnline {
-				slog.Info("node online", "node_id", node.NodeID, "name", node.Name, "ip", node.IP)
-			}
-			_ = model.DB.Model(node).Update("status", computedStatus).Error
-			node.Status = computedStatus
-		}
 		view := buildNodeView(node)
 		view.Status = computedStatus
 		if log, ok := latestLogs[node.NodeID]; ok {

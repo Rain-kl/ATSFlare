@@ -30,7 +30,7 @@ func New(baseURL string, token string, timeout time.Duration) *Client {
 }
 
 func (c *Client) RegisterNode(ctx context.Context, payload protocol.NodePayload) (*protocol.RegisterNodeResponse, error) {
-	slog.Info("http register node request", "node_id", payload.NodeID, "current_version", payload.CurrentVersion)
+	slog.Debug("http register node request", "node_id", payload.NodeID, "current_version", payload.CurrentVersion)
 	resp := protocol.APIResponse[protocol.RegisterNodeResponse]{}
 	if err := c.postJSON(ctx, "/api/agent/nodes/register", payload, &resp); err != nil {
 		return nil, err
@@ -38,7 +38,7 @@ func (c *Client) RegisterNode(ctx context.Context, payload protocol.NodePayload)
 	if !resp.Success {
 		return nil, errors.New(resp.Message)
 	}
-	slog.Info("http register node response", "node_id", resp.Data.NodeID)
+	slog.Debug("http register node response", "node_id", resp.Data.NodeID)
 	return &resp.Data, nil
 }
 
@@ -64,18 +64,18 @@ func (c *Client) GetActiveConfig(ctx context.Context) (*protocol.ActiveConfigRes
 	if !resp.Success {
 		return nil, errors.New(resp.Message)
 	}
-	slog.Info("http get active config response", "version", resp.Data.Version, "checksum", resp.Data.Checksum, "support_files", len(resp.Data.SupportFiles))
+	slog.Debug("http get active config response", "version", resp.Data.Version, "checksum", resp.Data.Checksum, "support_files", len(resp.Data.SupportFiles))
 	return &resp.Data, nil
 }
 
 func (c *Client) ReportApplyLog(ctx context.Context, payload protocol.ApplyLogPayload) error {
-	slog.Info("http report apply log request", "node_id", payload.NodeID, "version", payload.Version, "result", payload.Result)
+	slog.Debug("http report apply log request", "node_id", payload.NodeID, "version", payload.Version, "result", payload.Result)
 	return c.postJSON(ctx, "/api/agent/apply-logs", payload, nil)
 }
 
 func (c *Client) SetToken(token string) {
 	c.token = strings.TrimSpace(token)
-	slog.Info("http client token updated")
+	slog.Debug("http client token updated")
 }
 
 func (c *Client) getJSON(ctx context.Context, path string, target any) error {

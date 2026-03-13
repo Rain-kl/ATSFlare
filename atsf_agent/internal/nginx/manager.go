@@ -50,22 +50,22 @@ type PathExecutor struct {
 }
 
 func (e *PathExecutor) Test(ctx context.Context) error {
-	slog.Info("running openresty test with binary", "path", e.Path)
+	slog.Debug("running openresty test with binary", "path", e.Path)
 	output, err := e.Runner.Run(ctx, e.Path, "-t")
 	if err != nil {
 		return fmt.Errorf("openresty -t failed: %w: %s", err, string(output))
 	}
-	slog.Info("openresty test succeeded with binary", "path", e.Path)
+	slog.Debug("openresty test succeeded with binary", "path", e.Path)
 	return nil
 }
 
 func (e *PathExecutor) Reload(ctx context.Context) error {
-	slog.Info("running openresty reload with binary", "path", e.Path)
+	slog.Debug("running openresty reload with binary", "path", e.Path)
 	output, err := e.Runner.Run(ctx, e.Path, "-s", "reload")
 	if err != nil {
 		return fmt.Errorf("openresty reload failed: %w: %s", err, string(output))
 	}
-	slog.Info("openresty reload succeeded with binary", "path", e.Path)
+	slog.Debug("openresty reload succeeded with binary", "path", e.Path)
 	return nil
 }
 
@@ -106,12 +106,12 @@ type DockerExecutor struct {
 }
 
 func (e *DockerExecutor) Test(ctx context.Context) error {
-	slog.Info("running docker openresty test", "container", e.ContainerName, "image", e.Image)
+	slog.Debug("running docker openresty test", "container", e.ContainerName, "image", e.Image)
 	output, err := e.runEphemeralRuntimeCommand(ctx, "-t")
 	if err != nil {
 		return fmt.Errorf("docker %s -t failed: %w: %s", dockerRuntimeCommand, err, string(output))
 	}
-	slog.Info("docker openresty test succeeded", "container", e.ContainerName, "runtime", dockerRuntimeCommand)
+	slog.Debug("docker openresty test succeeded", "container", e.ContainerName, "runtime", dockerRuntimeCommand)
 	return nil
 }
 
@@ -130,7 +130,7 @@ func (e *DockerExecutor) EnsureRuntime(ctx context.Context, recreate bool) error
 			return e.runContainer(ctx)
 		}
 		if strings.TrimSpace(string(output)) == "true" {
-			slog.Info("docker openresty runtime already healthy", "container", e.ContainerName)
+			slog.Debug("docker openresty runtime already healthy", "container", e.ContainerName)
 			return nil
 		}
 		if err := e.removeContainer(ctx); err != nil {
@@ -294,7 +294,7 @@ func (m *Manager) CurrentChecksum() (string, error) {
 		return "", err
 	}
 	result := bundleChecksum(normalizedMain, normalizedRoute, files)
-	slog.Info("openresty current checksum calculated", "main_config", m.MainConfigPath, "route_config", m.RouteConfigPath, "checksum", result, "support_files", len(files))
+	slog.Debug("openresty current checksum calculated", "main_config", m.MainConfigPath, "route_config", m.RouteConfigPath, "checksum", result, "support_files", len(files))
 	return result, nil
 }
 
@@ -466,7 +466,7 @@ func (m *Manager) backup() (*backupState, error) {
 		return nil, err
 	}
 	state.Files = files
-	slog.Info("backup captured", "main_exists", state.MainExisted, "route_exists", state.RouteExisted, "support_files", len(state.Files))
+	slog.Debug("backup captured", "main_exists", state.MainExisted, "route_exists", state.RouteExisted, "support_files", len(state.Files))
 	return state, nil
 }
 

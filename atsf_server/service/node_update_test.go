@@ -288,3 +288,40 @@ func TestCollectNodeHeartbeatChangesOnlyReturnsChangedFields(t *testing.T) {
 		t.Fatal("did not expect unchanged ip to be included")
 	}
 }
+
+func TestListNodeViewsDoesNotPersistComputedStatus(t *testing.T) {
+	setupServiceTestDB(t)
+
+	node := &model.Node{
+		NodeID:       "node-offline-view",
+		Name:         "edge-offline",
+		IP:           "10.0.0.21",
+		AgentToken:   "token-offline",
+		AgentVersion: "v0.5.0",
+		NginxVersion: "1.27.1.2",
+		Status:       NodeStatusOnline,
+		LastSeenAt:   time.Now().Add(-common.NodeOfflineThreshold - time.Minute),
+	}
+	if err := node.Insert(); err != nil {
+		t.Fatalf("failed to insert node: %v", err)
+	}
+
+	views, err := ListNodeViews()
+	if err != nil {
+		t.Fatalf("ListNodeViews failed: %v", err)
+	}
+	if len(views) != 1 {
+		t.Fatalf("expected 1 node view, got %d", len(views))
+	}
+	if views[0].Status != NodeStatusOffline {
+		t.Fatalf("expected computed offline status in view, got %s", views[0].Status)
+	}
+
+	storedNode, err := model.GetNodeByID(node.ID)
+	if err != nil {
+		t.Fatalf("failed to reload node: %v", err)
+	}
+	if storedNode.Status != NodeStatusOnline {
+		t.Fatalf("expected list query to avoid persisting computed status, got %s", storedNode.Status)
+	}
+}
