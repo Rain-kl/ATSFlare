@@ -11,7 +11,7 @@ import { InlineMessage } from '@/components/feedback/inline-message';
 import { LoadingState } from '@/components/feedback/loading-state';
 import { AppModal } from '@/components/ui/app-modal';
 import {
-  getTlsCertificate,
+  getTlsCertificateContent,
   updateTlsCertificate,
 } from '@/features/tls-certificates/api/tls-certificates';
 import type { TlsCertificateItem } from '@/features/tls-certificates/types';
@@ -49,8 +49,8 @@ export function CertificateEditorModal({
   });
 
   const certificateQuery = useQuery({
-    queryKey: ['tls-certificates', 'detail', certificateId],
-    queryFn: () => getTlsCertificate(certificateId as number),
+    queryKey: ['tls-certificates', 'content', certificateId],
+    queryFn: () => getTlsCertificateContent(certificateId as number),
     enabled: isOpen && certificateId !== null,
   });
 
@@ -120,7 +120,7 @@ export function CertificateEditorModal({
         <LoadingState />
       ) : certificateQuery.isError ? (
         <ErrorState
-          title="证书详情加载失败"
+          title="证书内容加载失败"
           description={getErrorMessage(certificateQuery.error)}
         />
       ) : !certificateQuery.data ? (

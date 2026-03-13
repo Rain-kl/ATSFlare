@@ -16,12 +16,35 @@ type TLSCertificateInput struct {
 	Remark  string `json:"remark"`
 }
 
+type TLSCertificateContent struct {
+	ID        uint   `json:"id"`
+	Name      string `json:"name"`
+	CertPEM   string `json:"cert_pem"`
+	KeyPEM    string `json:"key_pem"`
+	Remark    string `json:"remark"`
+}
+
 func ListTLSCertificates() ([]*model.TLSCertificate, error) {
 	return model.ListTLSCertificates()
 }
 
 func GetTLSCertificate(id uint) (*model.TLSCertificate, error) {
 	return model.GetTLSCertificateByID(id)
+}
+
+func GetTLSCertificateContent(id uint) (*TLSCertificateContent, error) {
+	certificate, err := model.GetTLSCertificateByID(id)
+	if err != nil {
+		return nil, err
+	}
+
+	return &TLSCertificateContent{
+		ID:      certificate.ID,
+		Name:    certificate.Name,
+		CertPEM: certificate.CertPEM,
+		KeyPEM:  certificate.KeyPEM,
+		Remark:  certificate.Remark,
+	}, nil
 }
 
 func CreateTLSCertificate(input TLSCertificateInput) (*model.TLSCertificate, error) {

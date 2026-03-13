@@ -185,10 +185,20 @@ func TestPhase1HTTPSAndCertificateImportLifecycle(t *testing.T) {
 	}
 
 	detailResp := performJSONRequest(t, engine, token, http.MethodGet, "/api/tls-certificates/"+toString(manualCertificate.ID), nil)
-	var certificateDetail model.TLSCertificate
+	var certificateDetail map[string]any
 	decodeResponseData(t, detailResp, &certificateDetail)
-	if certificateDetail.ID != manualCertificate.ID || certificateDetail.CertPEM == "" || certificateDetail.KeyPEM == "" {
-		t.Fatal("expected certificate detail endpoint to return pem payloads")
+	if _, exists := certificateDetail["cert_pem"]; exists {
+		t.Fatal("expected certificate detail endpoint to omit cert_pem")
+	}
+	if _, exists := certificateDetail["key_pem"]; exists {
+		t.Fatal("expected certificate detail endpoint to omit key_pem")
+	}
+
+	contentResp := performJSONRequest(t, engine, token, http.MethodGet, "/api/tls-certificates/"+toString(manualCertificate.ID)+"/content", nil)
+	var certificateContent map[string]any
+	decodeResponseData(t, contentResp, &certificateContent)
+	if certificateContent["cert_pem"] == "" || certificateContent["key_pem"] == "" {
+		t.Fatal("expected certificate content endpoint to return pem payloads")
 	}
 
 	updatedCertPEM, updatedKeyPEM := generateCertificatePairForRouterTest(t, []string{"secure.example.com", "www.secure.example.com"})

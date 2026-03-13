@@ -65,6 +65,40 @@ func GetTLSCertificate(c *gin.Context) {
 	})
 }
 
+// GetTLSCertificateContent godoc
+// @Summary Get TLS certificate PEM content
+// @Tags TLSCertificates
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "Certificate ID"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Router /api/tls-certificates/{id}/content [get]
+func GetTLSCertificateContent(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil || id == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"message": "invalid request",
+		})
+		return
+	}
+
+	content, err := service.GetTLSCertificateContent(uint(id))
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": err.Error(),
+		})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "",
+		"data":    content,
+	})
+}
+
 // CreateTLSCertificate godoc
 // @Summary Create TLS certificate from PEM
 // @Tags TLSCertificates

@@ -93,6 +93,7 @@ func SetApiRouter(router *gin.Engine) {
 		{
 			tlsCertificateRoute.GET("/", controller.GetTLSCertificates)
 			tlsCertificateRoute.GET("/:id", controller.GetTLSCertificate)
+			tlsCertificateRoute.GET("/:id/content", controller.GetTLSCertificateContent)
 			tlsCertificateRoute.POST("/", controller.CreateTLSCertificate)
 			tlsCertificateRoute.PUT("/:id", controller.UpdateTLSCertificate)
 			tlsCertificateRoute.POST("/import-file", controller.ImportTLSCertificateFile)

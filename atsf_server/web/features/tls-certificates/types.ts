@@ -11,6 +11,11 @@ export interface TlsCertificateItem {
 }
 
 export interface TlsCertificateDetailItem extends TlsCertificateItem {
+  cert_pem?: never;
+  key_pem?: never;
+}
+
+export interface TlsCertificateContentItem extends TlsCertificateItem {
   cert_pem: string;
   key_pem: string;
 }

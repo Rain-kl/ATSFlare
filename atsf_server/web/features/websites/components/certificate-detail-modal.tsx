@@ -7,7 +7,10 @@ import { ErrorState } from '@/components/feedback/error-state';
 import { LoadingState } from '@/components/feedback/loading-state';
 import { AppModal } from '@/components/ui/app-modal';
 import { StatusBadge } from '@/components/ui/status-badge';
-import { getTlsCertificate } from '@/features/tls-certificates/api/tls-certificates';
+import {
+  getTlsCertificate,
+  getTlsCertificateContent,
+} from '@/features/tls-certificates/api/tls-certificates';
 import { getCertificateStatus, getErrorMessage } from '@/features/websites/utils';
 import {
   CodeBlock,
@@ -40,7 +43,14 @@ export function CertificateDetailModal({
     enabled: isOpen && certificateId !== null,
   });
 
+  const contentQuery = useQuery({
+    queryKey: ['tls-certificates', 'content', certificateId],
+    queryFn: () => getTlsCertificateContent(certificateId as number),
+    enabled: isOpen && certificateId !== null,
+  });
+
   const certificate = certificateQuery.data;
+  const content = contentQuery.data;
   const status = certificate ? getCertificateStatus(certificate) : null;
 
   return (
@@ -72,14 +82,16 @@ export function CertificateDetailModal({
         </div>
       }
     >
-      {certificateQuery.isLoading ? (
+      {certificateQuery.isLoading || contentQuery.isLoading ? (
         <LoadingState />
-      ) : certificateQuery.isError ? (
+      ) : certificateQuery.isError || contentQuery.isError ? (
         <ErrorState
           title="证书详情加载失败"
-          description={getErrorMessage(certificateQuery.error)}
+          description={getErrorMessage(
+            certificateQuery.error ?? contentQuery.error,
+          )}
         />
-      ) : !certificate ? (
+      ) : !certificate || !content ? (
         <EmptyState
           title="证书不存在"
           description="当前证书可能已被删除。"
@@ -138,7 +150,7 @@ export function CertificateDetailModal({
                 证书 PEM
               </p>
               <CodeBlock className="max-h-56 overflow-y-auto whitespace-pre-wrap break-all">
-                {certificate.cert_pem}
+                {content.cert_pem}
               </CodeBlock>
             </div>
             <div>
@@ -146,7 +158,7 @@ export function CertificateDetailModal({
                 私钥 PEM
               </p>
               <CodeBlock className="max-h-56 overflow-y-auto whitespace-pre-wrap break-all">
-                {certificate.key_pem}
+                {content.key_pem}
               </CodeBlock>
             </div>
           </div>
