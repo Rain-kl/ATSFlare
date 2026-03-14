@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -805,7 +806,7 @@ func persistDownloadedServerBinary(ctx context.Context, execPath string, release
 	info := buildUploadedServerBinaryView(fileName, common.Version, detectedVersion, time.Now())
 	if !info.ReadyToUpgrade {
 		_ = os.Remove(tempPath)
-		return nil, fmt.Errorf(info.ComparisonMessage)
+		return nil, errors.New(info.ComparisonMessage)
 	}
 
 	return &manualServerBinaryCandidate{

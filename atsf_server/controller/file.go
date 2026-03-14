@@ -4,7 +4,6 @@ import (
 	"atsflare/common"
 	"atsflare/model"
 	"atsflare/utils"
-	"fmt"
 	"github.com/gin-gonic/gin"
 	"net/http"
 	"path/filepath"
@@ -96,7 +95,7 @@ func UploadFile(c *gin.Context) {
 		}
 		err = fileObj.Insert()
 		if err != nil {
-			_ = fmt.Errorf(err.Error())
+			_ = err
 		}
 	}
 	c.JSON(http.StatusOK, gin.H{
