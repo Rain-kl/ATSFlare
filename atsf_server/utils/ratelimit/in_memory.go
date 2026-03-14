@@ -1,4 +1,4 @@
-package common
+package ratelimit
 
 import (
 	"sync"
@@ -52,19 +52,16 @@ func (l *InMemoryRateLimiter) Request(key string, maxRequestNum int, duration in
 		if len(*queue) < maxRequestNum {
 			*queue = append(*queue, now)
 			return true
-		} else {
-			if now-(*queue)[0] >= duration {
-				*queue = (*queue)[1:]
-				*queue = append(*queue, now)
-				return true
-			} else {
-				return false
-			}
 		}
-	} else {
-		s := make([]int64, 0, maxRequestNum)
-		l.store[key] = &s
-		*(l.store[key]) = append(*(l.store[key]), now)
+		if now-(*queue)[0] >= duration {
+			*queue = (*queue)[1:]
+			*queue = append(*queue, now)
+			return true
+		}
+		return false
 	}
+	s := make([]int64, 0, maxRequestNum)
+	l.store[key] = &s
+	*(l.store[key]) = append(*(l.store[key]), now)
 	return true
 }

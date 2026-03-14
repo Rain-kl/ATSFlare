@@ -1,5 +1,6 @@
 'use client';
 
+import * as echarts from 'echarts';
 import type { EChartsOption } from 'echarts';
 import ReactECharts from 'echarts-for-react';
 import Link from 'next/link';
@@ -272,14 +273,21 @@ export function WorldStage({
   useEffect(() => {
     let disposed = false;
 
-    import('echarts-maps/world.js')
-      .then(() => {
+    import('@/features/dashboard/data/world-geo.json')
+      .then(({ default: worldGeoJson }) => {
+        if (!echarts.getMap('world')) {
+          echarts.registerMap('world', worldGeoJson);
+        }
+        if (!echarts.getMap('world')) {
+          throw new Error('world map registration failed');
+        }
         if (!disposed) {
           setMapReady(true);
           setMapFailed(false);
         }
       })
-      .catch(() => {
+      .catch((error) => {
+        console.error('Failed to register ECharts world map', error);
         if (!disposed) {
           setMapReady(false);
           setMapFailed(true);
@@ -435,6 +443,7 @@ export function WorldStage({
         map: 'world',
         roam: false,
         silent: true,
+        regions: [],
         top: 18,
         bottom: 18,
         left: 10,

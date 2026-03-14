@@ -2,6 +2,7 @@ package model
 
 import (
 	"atsflare/common"
+	"atsflare/utils/security"
 	"errors"
 	"strings"
 )
@@ -63,7 +64,7 @@ func DeleteUserById(id int) (err error) {
 func (user *User) Insert() error {
 	var err error
 	if user.Password != "" {
-		user.Password, err = common.Password2Hash(user.Password)
+		user.Password, err = security.Password2Hash(user.Password)
 		if err != nil {
 			return err
 		}
@@ -75,7 +76,7 @@ func (user *User) Insert() error {
 func (user *User) Update(updatePassword bool) error {
 	var err error
 	if updatePassword {
-		user.Password, err = common.Password2Hash(user.Password)
+		user.Password, err = security.Password2Hash(user.Password)
 		if err != nil {
 			return err
 		}
@@ -102,7 +103,7 @@ func (user *User) ValidateAndFill() (err error) {
 		return errors.New("用户名或密码为空")
 	}
 	DB.Where(User{Username: user.Username}).First(user)
-	okay := common.ValidatePasswordAndHash(password, user.Password)
+	okay := security.ValidatePasswordAndHash(password, user.Password)
 	if !okay || user.Status != common.UserStatusEnabled {
 		return errors.New("用户名或密码错误，或用户已被封禁")
 	}
@@ -181,7 +182,7 @@ func ResetUserPasswordByEmail(email string, password string) error {
 	if email == "" || password == "" {
 		return errors.New("邮箱地址或密码为空！")
 	}
-	hashedPassword, err := common.Password2Hash(password)
+	hashedPassword, err := security.Password2Hash(password)
 	if err != nil {
 		return err
 	}

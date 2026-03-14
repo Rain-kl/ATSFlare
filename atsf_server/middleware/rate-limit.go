@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"atsflare/common"
+	"atsflare/utils/ratelimit"
 	"context"
 	"github.com/gin-gonic/gin"
 	"log/slog"
@@ -11,7 +12,7 @@ import (
 
 var timeFormat = "2006-01-02T15:04:05.000Z"
 
-var inMemoryRateLimiter common.InMemoryRateLimiter
+var inMemoryRateLimiter ratelimit.InMemoryRateLimiter
 
 func redisRateLimiter(c *gin.Context, maxRequestNum int, duration int64, mark string) {
 	ctx := context.Background()

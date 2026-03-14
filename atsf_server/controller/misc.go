@@ -3,6 +3,9 @@ package controller
 import (
 	"atsflare/common"
 	"atsflare/model"
+	"atsflare/utils/mail"
+	"atsflare/utils/security"
+	"atsflare/utils/validation"
 	"encoding/json"
 	"fmt"
 	"github.com/gin-gonic/gin"
@@ -62,7 +65,7 @@ func GetAbout(c *gin.Context) {
 
 func SendEmailVerification(c *gin.Context) {
 	email := c.Query("email")
-	if err := common.Validate.Var(email, "required,email"); err != nil {
+	if err := validation.Validate.Var(email, "required,email"); err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
 			"message": "无效的参数",
@@ -76,13 +79,13 @@ func SendEmailVerification(c *gin.Context) {
 		})
 		return
 	}
-	code := common.GenerateVerificationCode(6)
-	common.RegisterVerificationCodeWithKey(email, code, common.EmailVerificationPurpose)
+	code := security.GenerateVerificationCode(6)
+	security.RegisterVerificationCodeWithKey(email, code, security.EmailVerificationPurpose)
 	subject := fmt.Sprintf("%s邮箱验证邮件", common.SystemName)
 	content := fmt.Sprintf("<p>您好，你正在进行%s邮箱验证。</p>"+
 		"<p>您的验证码为: <strong>%s</strong></p>"+
-		"<p>验证码 %d 分钟内有效，如果不是本人操作，请忽略。</p>", common.SystemName, code, common.VerificationValidMinutes)
-	err := common.SendEmail(subject, email, content)
+		"<p>验证码 %d 分钟内有效，如果不是本人操作，请忽略。</p>", common.SystemName, code, security.VerificationValidMinutes)
+	err := mail.SendEmail(subject, email, content)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
@@ -99,7 +102,7 @@ func SendEmailVerification(c *gin.Context) {
 
 func SendPasswordResetEmail(c *gin.Context) {
 	email := c.Query("email")
-	if err := common.Validate.Var(email, "required,email"); err != nil {
+	if err := validation.Validate.Var(email, "required,email"); err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
 			"message": "无效的参数",
@@ -113,14 +116,14 @@ func SendPasswordResetEmail(c *gin.Context) {
 		})
 		return
 	}
-	code := common.GenerateVerificationCode(0)
-	common.RegisterVerificationCodeWithKey(email, code, common.PasswordResetPurpose)
+	code := security.GenerateVerificationCode(0)
+	security.RegisterVerificationCodeWithKey(email, code, security.PasswordResetPurpose)
 	link := fmt.Sprintf("%s/user/reset?email=%s&token=%s", common.ServerAddress, email, code)
 	subject := fmt.Sprintf("%s密码重置", common.SystemName)
 	content := fmt.Sprintf("<p>您好，你正在进行%s密码重置。</p>"+
 		"<p>点击<a href='%s'>此处</a>进行密码重置。</p>"+
-		"<p>重置链接 %d 分钟内有效，如果不是本人操作，请忽略。</p>", common.SystemName, link, common.VerificationValidMinutes)
-	err := common.SendEmail(subject, email, content)
+		"<p>重置链接 %d 分钟内有效，如果不是本人操作，请忽略。</p>", common.SystemName, link, security.VerificationValidMinutes)
+	err := mail.SendEmail(subject, email, content)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
@@ -150,14 +153,14 @@ func ResetPassword(c *gin.Context) {
 		})
 		return
 	}
-	if !common.VerifyCodeWithKey(req.Email, req.Token, common.PasswordResetPurpose) {
+	if !security.VerifyCodeWithKey(req.Email, req.Token, security.PasswordResetPurpose) {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
 			"message": "重置链接非法或已过期",
 		})
 		return
 	}
-	password := common.GenerateVerificationCode(12)
+	password := security.GenerateVerificationCode(12)
 	err = model.ResetUserPasswordByEmail(req.Email, password)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
@@ -166,7 +169,7 @@ func ResetPassword(c *gin.Context) {
 		})
 		return
 	}
-	common.DeleteKey(req.Email, common.PasswordResetPurpose)
+	security.DeleteKey(req.Email, security.PasswordResetPurpose)
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "",

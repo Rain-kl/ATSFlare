@@ -1,9 +1,9 @@
 package router
 
 import (
-	"atsflare/common"
 	"atsflare/controller"
 	"atsflare/middleware"
+	"atsflare/utils/embedfs"
 	"embed"
 	"github.com/gin-contrib/static"
 	"github.com/gin-gonic/gin"
@@ -24,7 +24,7 @@ func setWebRouter(router *gin.Engine, buildFS embed.FS, indexPage []byte) {
 	fileDownloadRoute.GET("/upload/:file", middleware.DownloadRateLimit(), controller.DownloadFile)
 	router.Use(normalizeStaticExportDataNavigation())
 	router.Use(middleware.Cache())
-	router.Use(static.Serve("/", common.EmbedFolder(buildFS, "web/build")))
+	router.Use(static.Serve("/", embedfs.EmbedFolder(buildFS, "web/build")))
 	router.NoRoute(func(c *gin.Context) {
 		if serveExportedPage(c, exportedBuildFS) {
 			return

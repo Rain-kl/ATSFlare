@@ -2,6 +2,7 @@ package model
 
 import (
 	"atsflare/common"
+	"atsflare/utils/security"
 	"github.com/glebarez/sqlite"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
@@ -26,7 +27,7 @@ func createRootAccountIfNeed() error {
 	//if user.Status != common.UserStatusEnabled {
 	if err := DB.First(&user).Error; err != nil {
 		slog.Info("no user exists, create a root user", "username", "root")
-		hashedPassword, err := common.Password2Hash("123456")
+		hashedPassword, err := security.Password2Hash("123456")
 		if err != nil {
 			return err
 		}

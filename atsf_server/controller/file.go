@@ -3,6 +3,7 @@ package controller
 import (
 	"atsflare/common"
 	"atsflare/model"
+	"atsflare/utils"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"net/http"
@@ -75,7 +76,7 @@ func UploadFile(c *gin.Context) {
 	for _, file := range files {
 		filename := filepath.Base(file.Filename)
 		ext := filepath.Ext(filename)
-		link := common.GetUUID() + ext
+		link := utils.GetUUID() + ext
 		savePath := filepath.Join(uploadPath, link) // both parts are checked, so this path should be safe to use
 		if err := c.SaveUploadedFile(file, savePath); err != nil {
 			c.JSON(http.StatusOK, gin.H{

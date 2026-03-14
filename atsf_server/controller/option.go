@@ -4,6 +4,7 @@ import (
 	"atsflare/common"
 	"atsflare/model"
 	"atsflare/service"
+	"atsflare/utils"
 	"encoding/json"
 	"fmt"
 	"github.com/gin-gonic/gin"
@@ -178,7 +179,7 @@ func GetOptions(c *gin.Context) {
 		}
 		options = append(options, &model.Option{
 			Key:   k,
-			Value: common.Interface2String(v),
+			Value: utils.Interface2String(v),
 		})
 	}
 	common.OptionMapRWMutex.Unlock()

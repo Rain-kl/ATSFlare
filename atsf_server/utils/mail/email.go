@@ -1,6 +1,7 @@
-package common
+package mail
 
 import (
+	"atsflare/common"
 	"crypto/tls"
 	"encoding/base64"
 	"fmt"
@@ -14,21 +15,21 @@ func SendEmail(subject string, receiver string, content string) error {
 		"From: %s<%s>\r\n"+
 		"Subject: %s\r\n"+
 		"Content-Type: text/html; charset=UTF-8\r\n\r\n%s\r\n",
-		receiver, SystemName, SMTPAccount, encodedSubject, content))
-	auth := smtp.PlainAuth("", SMTPAccount, SMTPToken, SMTPServer)
-	addr := fmt.Sprintf("%s:%d", SMTPServer, SMTPPort)
+		receiver, common.SystemName, common.SMTPAccount, encodedSubject, content))
+	auth := smtp.PlainAuth("", common.SMTPAccount, common.SMTPToken, common.SMTPServer)
+	addr := fmt.Sprintf("%s:%d", common.SMTPServer, common.SMTPPort)
 	to := strings.Split(receiver, ";")
 	var err error
-	if SMTPPort == 465 {
+	if common.SMTPPort == 465 {
 		tlsConfig := &tls.Config{
 			InsecureSkipVerify: true,
-			ServerName:         SMTPServer,
+			ServerName:         common.SMTPServer,
 		}
-		conn, err := tls.Dial("tcp", fmt.Sprintf("%s:%d", SMTPServer, SMTPPort), tlsConfig)
+		conn, err := tls.Dial("tcp", fmt.Sprintf("%s:%d", common.SMTPServer, common.SMTPPort), tlsConfig)
 		if err != nil {
 			return err
 		}
-		client, err := smtp.NewClient(conn, SMTPServer)
+		client, err := smtp.NewClient(conn, common.SMTPServer)
 		if err != nil {
 			return err
 		}
@@ -36,7 +37,7 @@ func SendEmail(subject string, receiver string, content string) error {
 		if err = client.Auth(auth); err != nil {
 			return err
 		}
-		if err = client.Mail(SMTPAccount); err != nil {
+		if err = client.Mail(common.SMTPAccount); err != nil {
 			return err
 		}
 		receiverEmails := strings.Split(receiver, ";")
@@ -58,7 +59,7 @@ func SendEmail(subject string, receiver string, content string) error {
 			return err
 		}
 	} else {
-		err = smtp.SendMail(addr, auth, SMTPAccount, to, mail)
+		err = smtp.SendMail(addr, auth, common.SMTPAccount, to, mail)
 	}
 	return err
 }

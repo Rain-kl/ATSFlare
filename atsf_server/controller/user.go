@@ -3,6 +3,8 @@ package controller
 import (
 	"atsflare/common"
 	"atsflare/model"
+	"atsflare/utils/security"
+	"atsflare/utils/validation"
 	"encoding/json"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
@@ -128,7 +130,7 @@ func Register(c *gin.Context) {
 		})
 		return
 	}
-	if err := common.Validate.Struct(&user); err != nil {
+	if err := validation.Validate.Struct(&user); err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
 			"message": "输入不合法 " + err.Error(),
@@ -143,7 +145,7 @@ func Register(c *gin.Context) {
 			})
 			return
 		}
-		if !common.VerifyCodeWithKey(user.Email, user.VerificationCode, common.EmailVerificationPurpose) {
+		if !security.VerifyCodeWithKey(user.Email, user.VerificationCode, security.EmailVerificationPurpose) {
 			c.JSON(http.StatusOK, gin.H{
 				"success": false,
 				"message": "验证码错误或已过期",
@@ -313,7 +315,7 @@ func UpdateUser(c *gin.Context) {
 	if updatedUser.Password == "" {
 		updatedUser.Password = "$I_LOVE_U" // make Validator happy :)
 	}
-	if err := common.Validate.Struct(&updatedUser); err != nil {
+	if err := validation.Validate.Struct(&updatedUser); err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
 			"message": "输入不合法 " + err.Error(),
@@ -374,7 +376,7 @@ func UpdateSelf(c *gin.Context) {
 	if user.Password == "" {
 		user.Password = "$I_LOVE_U" // make Validator happy :)
 	}
-	if err := common.Validate.Struct(&user); err != nil {
+	if err := validation.Validate.Struct(&user); err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
 			"message": "输入不合法 " + err.Error(),
@@ -622,7 +624,7 @@ func ManageUser(c *gin.Context) {
 func EmailBind(c *gin.Context) {
 	email := c.Query("email")
 	code := c.Query("code")
-	if !common.VerifyCodeWithKey(email, code, common.EmailVerificationPurpose) {
+	if !security.VerifyCodeWithKey(email, code, security.EmailVerificationPurpose) {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
 			"message": "验证码错误或已过期",
