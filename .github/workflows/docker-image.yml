@@ -3,6 +3,8 @@ name: Docker image builds
 on:
   workflow_dispatch:
   push:
+    branches:
+      - "dev"
     tags: ["v*"]
 
 permissions:
