@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"sync"
 
 	"atsflare-agent/internal/protocol"
@@ -16,6 +17,7 @@ type ObservabilityBufferRecord struct {
 	WindowStartedAtUnix int64                        `json:"window_started_at_unix"`
 	Snapshot            *protocol.NodeMetricSnapshot `json:"snapshot,omitempty"`
 	TrafficReport       *protocol.NodeTrafficReport  `json:"traffic_report,omitempty"`
+	AccessLogs          []protocol.NodeAccessLog     `json:"access_logs,omitempty"`
 	QueuedAtUnix        int64                        `json:"queued_at_unix"`
 }
 
@@ -29,7 +31,7 @@ func NewObservabilityBufferStore(path string) *ObservabilityBufferStore {
 }
 
 func (s *ObservabilityBufferStore) Upsert(record ObservabilityBufferRecord, retainAfterUnix int64) error {
-	if s == nil || record.WindowStartedAtUnix <= 0 || (record.Snapshot == nil && record.TrafficReport == nil) {
+	if s == nil || record.WindowStartedAtUnix <= 0 || (record.Snapshot == nil && record.TrafficReport == nil && len(record.AccessLogs) == 0) {
 		return nil
 	}
 	s.mu.Lock()
@@ -45,7 +47,7 @@ func (s *ObservabilityBufferStore) Upsert(record ObservabilityBufferRecord, reta
 		if records[index].WindowStartedAtUnix != record.WindowStartedAtUnix {
 			continue
 		}
-		records[index] = record
+		records[index] = mergeObservabilityBufferRecord(records[index], record)
 		replaced = true
 		break
 	}
@@ -56,6 +58,55 @@ func (s *ObservabilityBufferStore) Upsert(record ObservabilityBufferRecord, reta
 		return records[i].WindowStartedAtUnix < records[j].WindowStartedAtUnix
 	})
 	return s.saveUnlocked(records)
+}
+
+func mergeObservabilityBufferRecord(existing ObservabilityBufferRecord, incoming ObservabilityBufferRecord) ObservabilityBufferRecord {
+	merged := existing
+	if incoming.Snapshot != nil {
+		merged.Snapshot = incoming.Snapshot
+	}
+	if incoming.TrafficReport != nil {
+		merged.TrafficReport = incoming.TrafficReport
+	}
+	merged.AccessLogs = mergeAccessLogs(existing.AccessLogs, incoming.AccessLogs)
+	if incoming.QueuedAtUnix > 0 {
+		merged.QueuedAtUnix = incoming.QueuedAtUnix
+	}
+	return merged
+}
+
+func mergeAccessLogs(existing []protocol.NodeAccessLog, incoming []protocol.NodeAccessLog) []protocol.NodeAccessLog {
+	if len(existing) == 0 && len(incoming) == 0 {
+		return nil
+	}
+	merged := make([]protocol.NodeAccessLog, 0, len(existing)+len(incoming))
+	seen := make(map[string]struct{}, len(existing)+len(incoming))
+	appendIfNeeded := func(items []protocol.NodeAccessLog) {
+		for _, item := range items {
+			key := accessLogKey(item)
+			if key == "" {
+				continue
+			}
+			if _, ok := seen[key]; ok {
+				continue
+			}
+			seen[key] = struct{}{}
+			merged = append(merged, item)
+		}
+	}
+	appendIfNeeded(existing)
+	appendIfNeeded(incoming)
+	sort.Slice(merged, func(i int, j int) bool {
+		if merged[i].LoggedAtUnix == merged[j].LoggedAtUnix {
+			return accessLogKey(merged[i]) < accessLogKey(merged[j])
+		}
+		return merged[i].LoggedAtUnix < merged[j].LoggedAtUnix
+	})
+	return merged
+}
+
+func accessLogKey(item protocol.NodeAccessLog) string {
+	return strconv.FormatInt(item.LoggedAtUnix, 10) + "|" + item.RemoteAddr + "|" + item.Host + "|" + item.Path + "|" + strconv.Itoa(item.StatusCode)
 }
 
 func (s *ObservabilityBufferStore) Replayable(currentWindowStartedAtUnix int64, retainAfterUnix int64) ([]ObservabilityBufferRecord, error) {

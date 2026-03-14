@@ -311,7 +311,7 @@ func TestRunnerHeartbeatPayloadIncludesObservabilityExtensions(t *testing.T) {
 	}
 	if err := os.WriteFile(
 		filepath.Join(filepath.Dir(runner.Config.RouteConfigPath), "atsflare_access.log"),
-		[]byte("{\"ts\":\""+time.Now().UTC().Format(time.RFC3339)+"\",\"host\":\"edge.example.com\",\"remote_addr\":\"10.0.0.8\",\"status\":200}\n"),
+		[]byte("{\"ts\":\""+time.Now().UTC().Format(time.RFC3339)+"\",\"host\":\"edge.example.com\",\"path\":\"/\",\"remote_addr\":\"10.0.0.8\",\"status\":200}\n"),
 		0o644,
 	); err != nil {
 		t.Fatalf("failed to prepare access log: %v", err)
@@ -327,6 +327,9 @@ func TestRunnerHeartbeatPayloadIncludesObservabilityExtensions(t *testing.T) {
 	if firstPayload.TrafficReport == nil || firstPayload.TrafficReport.RequestCount != 1 {
 		t.Fatalf("expected first heartbeat payload to include traffic report, got %+v", firstPayload.TrafficReport)
 	}
+	if len(firstPayload.AccessLogs) != 1 || firstPayload.AccessLogs[0].Path != "/" {
+		t.Fatalf("expected first heartbeat payload to include access logs, got %+v", firstPayload.AccessLogs)
+	}
 	if len(firstPayload.HealthEvents) != 2 {
 		t.Fatalf("expected health events for openresty and sync error, got %+v", firstPayload.HealthEvents)
 	}
@@ -340,6 +343,9 @@ func TestRunnerHeartbeatPayloadIncludesObservabilityExtensions(t *testing.T) {
 	}
 	if secondPayload.TrafficReport != nil {
 		t.Fatalf("expected unchanged traffic window to be omitted on subsequent heartbeat, got %+v", secondPayload.TrafficReport)
+	}
+	if len(secondPayload.AccessLogs) != 0 {
+		t.Fatalf("expected unchanged access log delta to be omitted on subsequent heartbeat, got %+v", secondPayload.AccessLogs)
 	}
 }
 
@@ -391,7 +397,7 @@ func TestRunnerReplaysBufferedObservabilityAfterHeartbeatRecovery(t *testing.T) 
 	}
 	if err := os.WriteFile(
 		filepath.Join(filepath.Dir(runner.Config.RouteConfigPath), "atsflare_access.log"),
-		[]byte("{\"ts\":\""+time.Now().UTC().Format(time.RFC3339)+"\",\"host\":\"edge.example.com\",\"remote_addr\":\"10.0.0.8\",\"status\":200}\n"),
+		[]byte("{\"ts\":\""+time.Now().UTC().Format(time.RFC3339)+"\",\"host\":\"edge.example.com\",\"path\":\"/\",\"remote_addr\":\"10.0.0.8\",\"status\":200}\n"),
 		0o644,
 	); err != nil {
 		t.Fatalf("failed to prepare access log: %v", err)
@@ -407,6 +413,9 @@ func TestRunnerReplaysBufferedObservabilityAfterHeartbeatRecovery(t *testing.T) 
 	secondPayload := heartbeatService.heartbeatPayloads[1]
 	if len(secondPayload.BufferedObservability) != 1 {
 		t.Fatalf("expected second heartbeat to replay one buffered observation, got %+v", secondPayload.BufferedObservability)
+	}
+	if len(secondPayload.BufferedObservability[0].AccessLogs) != 0 {
+		t.Fatalf("expected seeded buffered observation to keep empty access logs, got %+v", secondPayload.BufferedObservability[0].AccessLogs)
 	}
 
 	replayable, err := bufferStore.Replayable(0, 0)

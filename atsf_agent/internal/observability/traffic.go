@@ -21,10 +21,11 @@ type accessLogRecord struct {
 	Timestamp  string `json:"ts"`
 	Host       string `json:"host"`
 	RemoteAddr string `json:"remote_addr"`
+	Path       string `json:"path"`
 	Status     int    `json:"status"`
 }
 
-var combinedAccessLogPattern = regexp.MustCompile(`^(\S+)\s+\S+\s+\S+\s+\[([^\]]+)\]\s+"[^"]*"\s+(\d{3})\s+\S+`)
+var combinedAccessLogPattern = regexp.MustCompile(`^(\S+)\s+\S+\s+\S+\s+\[([^\]]+)\]\s+"(?:\S+)\s+(\S+)(?:\s+[^"]*)?"\s+(\d{3})\s+\S+`)
 
 type trafficAggregate struct {
 	windowStartedAt time.Time
@@ -34,16 +35,37 @@ type trafficAggregate struct {
 	statusCodes     map[string]int64
 	topDomains      map[string]int64
 	visitors        map[string]struct{}
+	logs            []protocol.NodeAccessLog
 }
 
 func BuildTrafficReport(cfg *config.Config, stateStore *state.Store, managed *managedOpenRestyMetrics) *protocol.NodeTrafficReport {
-	if managed != nil && managed.TrafficReport != nil {
-		return managed.TrafficReport
-	}
+	report, _ := BuildTrafficObservability(cfg, stateStore, managed)
+	return report
+}
+
+func BuildTrafficObservability(cfg *config.Config, stateStore *state.Store, managed *managedOpenRestyMetrics) (*protocol.NodeTrafficReport, []protocol.NodeAccessLog) {
 	if cfg == nil || stateStore == nil {
-		return nil
+		if managed != nil && managed.TrafficReport != nil {
+			return managed.TrafficReport, nil
+		}
+		return nil, nil
 	}
 
+	aggregate := readAccessLogDelta(cfg, stateStore)
+	accessLogs := []protocol.NodeAccessLog{}
+	if aggregate != nil {
+		accessLogs = aggregate.accessLogs()
+	}
+	if managed != nil && managed.TrafficReport != nil {
+		return managed.TrafficReport, accessLogs
+	}
+	if aggregate == nil {
+		return nil, accessLogs
+	}
+	return aggregate.report(), accessLogs
+}
+
+func readAccessLogDelta(cfg *config.Config, stateStore *state.Store) *trafficAggregate {
 	snapshot, err := stateStore.Load()
 	if err != nil {
 		return nil
@@ -97,7 +119,7 @@ func BuildTrafficReport(cfg *config.Config, stateStore *state.Store, managed *ma
 	snapshot.AccessLogOffset = currentOffset
 	_ = stateStore.Save(snapshot)
 
-	return aggregate.report()
+	return aggregate
 }
 
 func managedAccessLogPath(cfg *config.Config) string {
@@ -146,12 +168,20 @@ func (aggregate *trafficAggregate) consume(line []byte) {
 	if remoteAddr := strings.TrimSpace(record.RemoteAddr); remoteAddr != "" {
 		aggregate.visitors[remoteAddr] = struct{}{}
 	}
+	aggregate.logs = append(aggregate.logs, protocol.NodeAccessLog{
+		LoggedAtUnix: record.Timestamp.Unix(),
+		RemoteAddr:   strings.TrimSpace(record.RemoteAddr),
+		Host:         strings.TrimSpace(record.Host),
+		Path:         normalizeAccessLogPath(record.Path),
+		StatusCode:   record.Status,
+	})
 }
 
 type parsedAccessLogRecord struct {
 	Timestamp  time.Time
 	Host       string
 	RemoteAddr string
+	Path       string
 	Status     int
 }
 
@@ -176,26 +206,28 @@ func parseJSONAccessLogRecord(raw string) (parsedAccessLogRecord, bool) {
 		Timestamp:  timestamp,
 		Host:       strings.TrimSpace(record.Host),
 		RemoteAddr: strings.TrimSpace(record.RemoteAddr),
+		Path:       normalizeAccessLogPath(record.Path),
 		Status:     record.Status,
 	}, true
 }
 
 func parseCombinedAccessLogRecord(raw string) (parsedAccessLogRecord, bool) {
 	matches := combinedAccessLogPattern.FindStringSubmatch(raw)
-	if len(matches) != 4 {
+	if len(matches) != 5 {
 		return parsedAccessLogRecord{}, false
 	}
 	timestamp, err := parseAccessLogTime(matches[2])
 	if err != nil {
 		return parsedAccessLogRecord{}, false
 	}
-	status, err := strconv.Atoi(matches[3])
+	status, err := strconv.Atoi(matches[4])
 	if err != nil {
 		return parsedAccessLogRecord{}, false
 	}
 	return parsedAccessLogRecord{
 		Timestamp:  timestamp,
 		RemoteAddr: strings.TrimSpace(matches[1]),
+		Path:       normalizeAccessLogPath(matches[3]),
 		Status:     status,
 	}, true
 }
@@ -215,6 +247,13 @@ func (aggregate *trafficAggregate) report() *protocol.NodeTrafficReport {
 		TopDomains:          topCounts(aggregate.topDomains, 8),
 		SourceCountries:     map[string]int64{},
 	}
+}
+
+func (aggregate *trafficAggregate) accessLogs() []protocol.NodeAccessLog {
+	if aggregate == nil || len(aggregate.logs) == 0 {
+		return []protocol.NodeAccessLog{}
+	}
+	return append([]protocol.NodeAccessLog(nil), aggregate.logs...)
 }
 
 func parseAccessLogTime(value string) (time.Time, error) {
@@ -256,6 +295,20 @@ func cloneTrafficCounts(values map[string]int64, limit int) map[string]int64 {
 type trafficCountItem struct {
 	key   string
 	value int64
+}
+
+func normalizeAccessLogPath(value string) string {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return ""
+	}
+	if strings.HasPrefix(trimmed, "http://") || strings.HasPrefix(trimmed, "https://") {
+		return trimmed
+	}
+	if strings.HasPrefix(trimmed, "/") {
+		return trimmed
+	}
+	return "/" + trimmed
 }
 
 func topCounts(values map[string]int64, limit int) map[string]int64 {

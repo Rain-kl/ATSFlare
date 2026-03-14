@@ -17,6 +17,7 @@ const (
 	NodeHealthSeverityInfo        = "info"
 	NodeHealthSeverityWarning     = "warning"
 	NodeHealthSeverityCritical    = "critical"
+	nodeAccessLogRetentionWindow  = 24 * time.Hour
 )
 
 type AgentNodeSystemProfile struct {
@@ -60,10 +61,19 @@ type AgentNodeTrafficReport struct {
 	SourceCountries     map[string]int64 `json:"source_countries"`
 }
 
+type AgentNodeAccessLog struct {
+	LoggedAtUnix int64  `json:"logged_at_unix"`
+	RemoteAddr   string `json:"remote_addr"`
+	Host         string `json:"host"`
+	Path         string `json:"path"`
+	StatusCode   int    `json:"status_code"`
+}
+
 type AgentBufferedObservabilityRecord struct {
 	WindowStartedAtUnix int64                    `json:"window_started_at_unix"`
 	Snapshot            *AgentNodeMetricSnapshot `json:"snapshot,omitempty"`
 	TrafficReport       *AgentNodeTrafficReport  `json:"traffic_report,omitempty"`
+	AccessLogs          []AgentNodeAccessLog     `json:"access_logs,omitempty"`
 }
 
 type AgentNodeHealthEvent struct {
@@ -78,7 +88,7 @@ func persistHeartbeatObservability(nodeID string, payload AgentNodePayload, repo
 	if strings.TrimSpace(nodeID) == "" {
 		return
 	}
-	if payload.Profile == nil && payload.Snapshot == nil && payload.TrafficReport == nil && len(payload.BufferedObservability) == 0 && payload.HealthEvents == nil {
+	if payload.Profile == nil && payload.Snapshot == nil && payload.TrafficReport == nil && len(payload.AccessLogs) == 0 && len(payload.BufferedObservability) == 0 && payload.HealthEvents == nil {
 		return
 	}
 
@@ -93,6 +103,9 @@ func persistHeartbeatObservability(nodeID string, payload AgentNodePayload, repo
 			return err
 		}
 		if err := persistNodeTrafficReport(tx, nodeID, payload.TrafficReport, reportedAt); err != nil {
+			return err
+		}
+		if err := persistNodeAccessLogs(tx, nodeID, payload.AccessLogs, reportedAt); err != nil {
 			return err
 		}
 		if payload.HealthEvents != nil {
@@ -112,6 +125,9 @@ func persistBufferedObservability(tx *gorm.DB, nodeID string, records []AgentBuf
 			return err
 		}
 		if err := persistNodeTrafficReport(tx, nodeID, record.TrafficReport, reportedAt); err != nil {
+			return err
+		}
+		if err := persistNodeAccessLogs(tx, nodeID, record.AccessLogs, reportedAt); err != nil {
 			return err
 		}
 	}
@@ -184,6 +200,35 @@ func persistNodeTrafficReport(tx *gorm.DB, nodeID string, report *AgentNodeTraff
 		RawJSON:             marshalJSON(report),
 	}
 	return tx.Where("node_id = ? AND window_started_at = ? AND window_ended_at = ?", nodeID, record.WindowStartedAt, record.WindowEndedAt).Assign(record).FirstOrCreate(record).Error
+}
+
+func persistNodeAccessLogs(tx *gorm.DB, nodeID string, logs []AgentNodeAccessLog, reportedAt time.Time) error {
+	if len(logs) == 0 {
+		return nil
+	}
+	for _, item := range logs {
+		record := &model.NodeAccessLog{
+			NodeID:     nodeID,
+			LoggedAt:   timeFromUnix(item.LoggedAtUnix, reportedAt),
+			RemoteAddr: strings.TrimSpace(item.RemoteAddr),
+			Host:       strings.TrimSpace(item.Host),
+			Path:       strings.TrimSpace(item.Path),
+			StatusCode: item.StatusCode,
+			RawJSON:    marshalJSON(item),
+		}
+		if err := tx.Where(
+			"node_id = ? AND logged_at = ? AND remote_addr = ? AND host = ? AND path = ? AND status_code = ?",
+			nodeID,
+			record.LoggedAt,
+			record.RemoteAddr,
+			record.Host,
+			record.Path,
+			record.StatusCode,
+		).Assign(record).FirstOrCreate(record).Error; err != nil {
+			return err
+		}
+	}
+	return tx.Where("node_id = ? AND logged_at < ?", nodeID, reportedAt.Add(-nodeAccessLogRetentionWindow)).Delete(&model.NodeAccessLog{}).Error
 }
 
 func reconcileNodeHealthEvents(tx *gorm.DB, nodeID string, events []AgentNodeHealthEvent, reportedAt time.Time) error {

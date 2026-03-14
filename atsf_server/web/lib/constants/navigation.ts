@@ -26,6 +26,11 @@ export const dashboardNavigation: NavigationItem[] = [
         label: '发布',
         icon: 'release',
     },
+    {
+        href: '/access-log',
+        label: '日志',
+        icon: 'log',
+    },
 
     {
         href: '/performance',

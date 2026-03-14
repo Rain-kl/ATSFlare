@@ -80,6 +80,15 @@ function SidebarIcon({ icon }: { icon: NavigationIconKey }) {
           <path d="M5 19.5h14" />
         </svg>
       );
+    case 'log':
+      return (
+        <svg {...commonProps}>
+          <rect x="5" y="4" width="14" height="16" rx="2.5" />
+          <path d="M8 8h8" />
+          <path d="M8 12h8" />
+          <path d="M8 16h5" />
+        </svg>
+      );
     case 'performance':
       return (
         <svg {...commonProps}>

@@ -133,6 +133,11 @@ func SetApiRouter(router *gin.Engine) {
 		{
 			applyLogRoute.GET("/", controller.GetApplyLogs)
 		}
+		accessLogRoute := apiRouter.Group("/access-logs")
+		accessLogRoute.Use(middleware.AdminAuth())
+		{
+			accessLogRoute.GET("/", controller.GetAccessLogs)
+		}
 		agentRoute := apiRouter.Group("/agent")
 		{
 			discoveryRoute := agentRoute.Group("/")

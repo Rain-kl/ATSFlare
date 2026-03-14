@@ -48,6 +48,7 @@ type NodePayload struct {
 	Profile               *NodeSystemProfile            `json:"profile,omitempty"`
 	Snapshot              *NodeMetricSnapshot           `json:"snapshot,omitempty"`
 	TrafficReport         *NodeTrafficReport            `json:"traffic_report,omitempty"`
+	AccessLogs            []NodeAccessLog               `json:"access_logs,omitempty"`
 	BufferedObservability []BufferedObservabilityRecord `json:"buffered_observability,omitempty"`
 	HealthEvents          []NodeHealthEvent             `json:"health_events"`
 }
@@ -93,10 +94,19 @@ type NodeTrafficReport struct {
 	SourceCountries     map[string]int64 `json:"source_countries"`
 }
 
+type NodeAccessLog struct {
+	LoggedAtUnix int64  `json:"logged_at_unix"`
+	RemoteAddr   string `json:"remote_addr"`
+	Host         string `json:"host"`
+	Path         string `json:"path"`
+	StatusCode   int    `json:"status_code"`
+}
+
 type BufferedObservabilityRecord struct {
 	WindowStartedAtUnix int64               `json:"window_started_at_unix"`
 	Snapshot            *NodeMetricSnapshot `json:"snapshot,omitempty"`
 	TrafficReport       *NodeTrafficReport  `json:"traffic_report,omitempty"`
+	AccessLogs          []NodeAccessLog     `json:"access_logs,omitempty"`
 }
 
 type NodeHealthEvent struct {

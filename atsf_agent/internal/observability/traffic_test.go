@@ -18,9 +18,9 @@ func TestBuildTrafficReportAggregatesManagedAccessLog(t *testing.T) {
 	}
 	logPath := filepath.Join(filepath.Dir(routeConfigPath), "atsflare_access.log")
 	content := []byte(
-		"{\"ts\":\"2026-03-14T08:00:00Z\",\"host\":\"app.example.com\",\"remote_addr\":\"10.0.0.1\",\"status\":200}\n" +
-			"{\"ts\":\"2026-03-14T08:00:05Z\",\"host\":\"app.example.com\",\"remote_addr\":\"10.0.0.2\",\"status\":503}\n" +
-			"{\"ts\":\"2026-03-14T08:00:08Z\",\"host\":\"api.example.com\",\"remote_addr\":\"10.0.0.1\",\"status\":200}\n",
+		"{\"ts\":\"2026-03-14T08:00:00Z\",\"host\":\"app.example.com\",\"path\":\"/\",\"remote_addr\":\"10.0.0.1\",\"status\":200}\n" +
+			"{\"ts\":\"2026-03-14T08:00:05Z\",\"host\":\"app.example.com\",\"path\":\"/healthz\",\"remote_addr\":\"10.0.0.2\",\"status\":503}\n" +
+			"{\"ts\":\"2026-03-14T08:00:08Z\",\"host\":\"api.example.com\",\"path\":\"/api\",\"remote_addr\":\"10.0.0.1\",\"status\":200}\n",
 	)
 	if err := os.WriteFile(logPath, content, 0o644); err != nil {
 		t.Fatalf("WriteFile failed: %v", err)
@@ -62,7 +62,7 @@ func TestBuildTrafficReportResetsOffsetAfterTruncate(t *testing.T) {
 		t.Fatalf("MkdirAll failed: %v", err)
 	}
 	logPath := filepath.Join(filepath.Dir(routeConfigPath), "atsflare_access.log")
-	if err := os.WriteFile(logPath, []byte("{\"ts\":\"2026-03-14T09:00:00Z\",\"host\":\"app.example.com\",\"remote_addr\":\"10.0.0.3\",\"status\":200}\n"), 0o644); err != nil {
+	if err := os.WriteFile(logPath, []byte("{\"ts\":\"2026-03-14T09:00:00Z\",\"host\":\"app.example.com\",\"path\":\"/\",\"remote_addr\":\"10.0.0.3\",\"status\":200}\n"), 0o644); err != nil {
 		t.Fatalf("WriteFile failed: %v", err)
 	}
 
@@ -74,6 +74,34 @@ func TestBuildTrafficReportResetsOffsetAfterTruncate(t *testing.T) {
 	report := BuildTrafficReport(&config.Config{RouteConfigPath: routeConfigPath}, stateStore, nil)
 	if report == nil || report.RequestCount != 1 {
 		t.Fatalf("expected one request after truncate reset, got %+v", report)
+	}
+}
+
+func TestBuildTrafficObservabilityReturnsAccessLogs(t *testing.T) {
+	tempDir := t.TempDir()
+	routeConfigPath := filepath.Join(tempDir, "conf.d", "atsflare_routes.conf")
+	if err := os.MkdirAll(filepath.Dir(routeConfigPath), 0o755); err != nil {
+		t.Fatalf("MkdirAll failed: %v", err)
+	}
+	logPath := filepath.Join(filepath.Dir(routeConfigPath), "atsflare_access.log")
+	content := []byte(
+		"{\"ts\":\"2026-03-14T08:00:00Z\",\"host\":\"app.example.com\",\"path\":\"/login\",\"remote_addr\":\"10.0.0.1\",\"status\":200}\n" +
+			"{\"ts\":\"2026-03-14T08:00:05Z\",\"host\":\"api.example.com\",\"path\":\"/v1/ping\",\"remote_addr\":\"10.0.0.2\",\"status\":502}\n",
+	)
+	if err := os.WriteFile(logPath, content, 0o644); err != nil {
+		t.Fatalf("WriteFile failed: %v", err)
+	}
+
+	stateStore := state.NewStore(filepath.Join(tempDir, "state.json"))
+	report, accessLogs := BuildTrafficObservability(&config.Config{RouteConfigPath: routeConfigPath}, stateStore, nil)
+	if report == nil || report.RequestCount != 2 {
+		t.Fatalf("expected traffic report, got %+v", report)
+	}
+	if len(accessLogs) != 2 {
+		t.Fatalf("expected access logs, got %+v", accessLogs)
+	}
+	if accessLogs[0].Path != "/login" || accessLogs[1].Path != "/v1/ping" {
+		t.Fatalf("unexpected access log paths: %+v", accessLogs)
 	}
 }
 

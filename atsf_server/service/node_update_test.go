@@ -620,6 +620,22 @@ func TestHeartbeatNodePersistsObservabilityPayload(t *testing.T) {
 			TopDomains:          map[string]int64{"example.com": 900},
 			SourceCountries:     map[string]int64{"CN": 700, "US": 200},
 		},
+		AccessLogs: []AgentNodeAccessLog{
+			{
+				LoggedAtUnix: time.Now().Add(-45 * time.Second).Unix(),
+				RemoteAddr:   "203.0.113.10",
+				Host:         "example.com",
+				Path:         "/login",
+				StatusCode:   200,
+			},
+			{
+				LoggedAtUnix: time.Now().Add(-40 * time.Second).Unix(),
+				RemoteAddr:   "198.51.100.20",
+				Host:         "api.example.com",
+				Path:         "/v1/ping",
+				StatusCode:   502,
+			},
+		},
 		HealthEvents: []AgentNodeHealthEvent{
 			{
 				EventType:       "openresty_unhealthy",
@@ -655,6 +671,14 @@ func TestHeartbeatNodePersistsObservabilityPayload(t *testing.T) {
 	}
 	if len(reports) != 1 || reports[0].RequestCount != 1200 {
 		t.Fatalf("unexpected request reports: %+v", reports)
+	}
+
+	accessLogs, err := model.ListNodeAccessLogs(node.NodeID, time.Time{}, 10)
+	if err != nil {
+		t.Fatalf("expected node access logs query to succeed: %v", err)
+	}
+	if len(accessLogs) != 2 || accessLogs[0].Path == "" {
+		t.Fatalf("unexpected access logs: %+v", accessLogs)
 	}
 
 	events, err := model.ListNodeHealthEvents(node.NodeID, true, 10)
@@ -724,6 +748,15 @@ func TestHeartbeatNodePersistsBufferedObservabilityPayload(t *testing.T) {
 					TopDomains:          map[string]int64{"edge.example.com": 40},
 					SourceCountries:     map[string]int64{"CN": 20},
 				},
+				AccessLogs: []AgentNodeAccessLog{
+					{
+						LoggedAtUnix: now.Add(-110 * time.Second).Unix(),
+						RemoteAddr:   "203.0.113.21",
+						Host:         "edge.example.com",
+						Path:         "/buffered",
+						StatusCode:   200,
+					},
+				},
 			},
 		},
 	})
@@ -745,6 +778,14 @@ func TestHeartbeatNodePersistsBufferedObservabilityPayload(t *testing.T) {
 	}
 	if len(reports) != 2 {
 		t.Fatalf("expected current and buffered reports, got %+v", reports)
+	}
+
+	accessLogs, err := model.ListNodeAccessLogs(node.NodeID, time.Time{}, 10)
+	if err != nil {
+		t.Fatalf("expected node access logs query to succeed: %v", err)
+	}
+	if len(accessLogs) != 1 || accessLogs[0].Path != "/buffered" {
+		t.Fatalf("expected buffered access logs to persist, got %+v", accessLogs)
 	}
 
 	_, err = HeartbeatNode(node, AgentNodePayload{

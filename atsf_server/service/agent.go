@@ -36,6 +36,7 @@ type AgentNodePayload struct {
 	Profile               *AgentNodeSystemProfile            `json:"profile,omitempty"`
 	Snapshot              *AgentNodeMetricSnapshot           `json:"snapshot,omitempty"`
 	TrafficReport         *AgentNodeTrafficReport            `json:"traffic_report,omitempty"`
+	AccessLogs            []AgentNodeAccessLog               `json:"access_logs,omitempty"`
 	BufferedObservability []AgentBufferedObservabilityRecord `json:"buffered_observability,omitempty"`
 	HealthEvents          []AgentNodeHealthEvent             `json:"health_events"`
 }

@@ -107,6 +107,10 @@ func InitDB() (err error) {
 		if err != nil {
 			return err
 		}
+		err = db.AutoMigrate(&NodeAccessLog{})
+		if err != nil {
+			return err
+		}
 		err = db.AutoMigrate(&NodeHealthEvent{})
 		if err != nil {
 			return err

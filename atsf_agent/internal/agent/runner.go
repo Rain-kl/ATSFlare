@@ -321,7 +321,7 @@ func (r *Runner) nodePayload(nodeID string) protocol.NodePayload {
 	profile := observability.BuildProfile(r.Config, r.StateStore)
 	managedOpenRestyMetrics := observability.CollectManagedOpenRestyMetrics(r.Config)
 	metricSnapshot := observability.BuildSnapshot(r.Config, r.StateStore, managedOpenRestyMetrics)
-	trafficReport := observability.BuildTrafficReport(r.Config, r.StateStore, managedOpenRestyMetrics)
+	trafficReport, accessLogs := observability.BuildTrafficObservability(r.Config, r.StateStore, managedOpenRestyMetrics)
 	healthEvents := observability.BuildHealthEvents(snapshot)
 	return protocol.NodePayload{
 		NodeID:           nodeID,
@@ -336,13 +336,14 @@ func (r *Runner) nodePayload(nodeID string) protocol.NodePayload {
 		Profile:          profile,
 		Snapshot:         metricSnapshot,
 		TrafficReport:    trafficReport,
+		AccessLogs:       accessLogs,
 		HealthEvents:     healthEvents,
 	}
 }
 
 func (r *Runner) prepareHeartbeatPayload(nodeID string) (protocol.NodePayload, []int64) {
 	payload := r.nodePayload(nodeID)
-	if r.ObservabilityBuffer == nil || payload.Snapshot == nil {
+	if r.ObservabilityBuffer == nil || (payload.Snapshot == nil && payload.TrafficReport == nil && len(payload.AccessLogs) == 0) {
 		return payload, nil
 	}
 	now := time.Now().UTC()
@@ -356,6 +357,7 @@ func (r *Runner) prepareHeartbeatPayload(nodeID string) (protocol.NodePayload, [
 		WindowStartedAtUnix: windowStartedAtUnix,
 		Snapshot:            payload.Snapshot,
 		TrafficReport:       payload.TrafficReport,
+		AccessLogs:          payload.AccessLogs,
 		QueuedAtUnix:        now.Unix(),
 	}
 	if err := r.ObservabilityBuffer.Upsert(record, retainAfterUnix); err != nil {
@@ -379,6 +381,7 @@ func (r *Runner) prepareHeartbeatPayload(nodeID string) (protocol.NodePayload, [
 			WindowStartedAtUnix: item.WindowStartedAtUnix,
 			Snapshot:            item.Snapshot,
 			TrafficReport:       item.TrafficReport,
+			AccessLogs:          item.AccessLogs,
 		})
 		ackWindows = append(ackWindows, item.WindowStartedAtUnix)
 	}

@@ -133,6 +133,7 @@
 * `tls_certificates`
 * `managed_domains`
 * `node_request_reports`
+* `node_access_logs`
 * `node_metric_snapshots`
 * `traffic_analytics_rollups`
 * `node_health_events`
@@ -154,6 +155,7 @@
 * 第六版新增的请求明细、资源快照和聚合统计必须按节点与时间窗口关联
 * `node_metric_snapshots` 必须是追加式时间序列快照，不通过覆盖 `nodes` 当前值替代历史
 * `traffic_analytics_rollups` 必须区分时间粒度与统计范围，优先存储窗口聚合而不是无限制保留原始逐请求明细
+* `node_access_logs` 仅保留管理端排查所需的受控访问字段与短期保留窗口，不承担全文检索或长期归档职责
 * `node_health_events` 必须具备事件类型、严重级别、首次触发时间、最近触发时间和恢复时间，便于首页总览做异常归并
 * 访问分析优先复用现有 Server/SQLite 基线，不为第六版引入新的时序数据库或消息队列
 * 聚合统计与原始明细的保留策略必须明确，避免无限制累积

@@ -6,6 +6,7 @@ export type NavigationIconKey =
   | 'certificate'
   | 'proxy'
   | 'release'
+  | 'log'
   | 'performance'
   | 'user'
   | 'setting';

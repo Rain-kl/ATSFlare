@@ -58,6 +58,36 @@ func TestObservabilityBufferStoreUpsertReplayAndAck(t *testing.T) {
 	}
 }
 
+func TestObservabilityBufferStoreMergesAccessLogsWithinWindow(t *testing.T) {
+	store := NewObservabilityBufferStore(filepath.Join(t.TempDir(), "observability-buffer.json"))
+
+	if err := store.Upsert(ObservabilityBufferRecord{
+		WindowStartedAtUnix: 1710403200,
+		AccessLogs: []protocol.NodeAccessLog{
+			{LoggedAtUnix: 1710403201, RemoteAddr: "10.0.0.1", Host: "app.example.com", Path: "/a", StatusCode: 200},
+		},
+	}, 1710403000); err != nil {
+		t.Fatalf("first upsert failed: %v", err)
+	}
+	if err := store.Upsert(ObservabilityBufferRecord{
+		WindowStartedAtUnix: 1710403200,
+		AccessLogs: []protocol.NodeAccessLog{
+			{LoggedAtUnix: 1710403201, RemoteAddr: "10.0.0.1", Host: "app.example.com", Path: "/a", StatusCode: 200},
+			{LoggedAtUnix: 1710403205, RemoteAddr: "10.0.0.2", Host: "app.example.com", Path: "/b", StatusCode: 502},
+		},
+	}, 1710403000); err != nil {
+		t.Fatalf("second upsert failed: %v", err)
+	}
+
+	records, err := store.Replayable(0, 1710403000)
+	if err != nil {
+		t.Fatalf("Replayable failed: %v", err)
+	}
+	if len(records) != 1 || len(records[0].AccessLogs) != 2 {
+		t.Fatalf("expected merged access logs, got %+v", records)
+	}
+}
+
 func TestObservabilityWindowStartedAt(t *testing.T) {
 	if value := ObservabilityWindowStartedAt(nil, &protocol.NodeTrafficReport{WindowStartedAtUnix: 1710403200}); value != 1710403200 {
 		t.Fatalf("unexpected traffic window start: %d", value)
