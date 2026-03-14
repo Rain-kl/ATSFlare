@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 
+import { EmptyState } from '@/components/feedback/empty-state';
 import { StatusBadge } from '@/components/ui/status-badge';
 import type {
   DashboardConfig,
@@ -117,6 +118,22 @@ function HeroMetric({
   );
 }
 
+function SignalLegend() {
+  return (
+    <div className="absolute right-4 top-4 flex flex-wrap gap-2">
+      <div className="rounded-full border border-emerald-300/20 bg-emerald-400/10 px-3 py-1 text-[11px] text-emerald-100">
+        绿色: 运行健康
+      </div>
+      <div className="rounded-full border border-amber-300/20 bg-amber-400/10 px-3 py-1 text-[11px] text-amber-100">
+        黄色: 容量压力
+      </div>
+      <div className="rounded-full border border-rose-300/20 bg-rose-400/10 px-3 py-1 text-[11px] text-rose-100">
+        红色: 异常或离线
+      </div>
+    </div>
+  );
+}
+
 function CountrySignal({
   item,
   index,
@@ -210,6 +227,7 @@ export function WorldStage({
             <div className="absolute left-8 top-8 rounded-full bg-sky-400/20 px-3 py-1 text-[11px] tracking-[0.22em] text-sky-100 uppercase backdrop-blur">
               {geoConfiguredNodes > 0 ? '真实节点点位' : '节点信号覆盖'}
             </div>
+            <SignalLegend />
 
             <svg
               viewBox="0 0 1000 420"
@@ -230,44 +248,53 @@ export function WorldStage({
               </g>
             </svg>
 
-            {signalNodes.map((node, index) => {
-              const anchor = projectNodeCoordinates(node, index);
-              const tone = getNodeSignalTone(node);
-              return (
-                <Link
-                  key={node.node_id}
-                  href={buildNodeDetailHref(node.id)}
-                  className={`absolute w-[184px] -translate-x-1/2 -translate-y-1/2 rounded-2xl border px-4 py-3 backdrop-blur transition hover:scale-[1.02] ${tone.ring}`}
-                  style={anchor}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="relative">
-                      <span
-                        className={`absolute inset-0 rounded-full blur-md ${tone.halo}`}
-                      />
-                      <span
-                        className={`relative block h-3.5 w-3.5 rounded-full ${tone.dot}`}
-                      />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-white">
-                        {node.name}
-                      </p>
-                      <p className="mt-1 text-xs text-slate-300">
-                        {(node.geo_name || node.name) + ' · '}
-                        请求 {node.request_count.toLocaleString('zh-CN')} · 异常{' '}
-                        {node.active_event_count}
-                      </p>
-                      {!anchor.derivedFromGeo ? (
-                        <p className="mt-1 text-[11px] text-slate-400">
-                          未配置经纬度，当前使用备用落点
+            {signalNodes.length === 0 ? (
+              <div className="absolute inset-x-4 bottom-20 top-20 flex items-center justify-center">
+                <EmptyState
+                  title="暂无节点地图数据"
+                  description="节点接入后，首页会在这里展示真实落点、健康颜色和容量风险。"
+                />
+              </div>
+            ) : (
+              signalNodes.map((node, index) => {
+                const anchor = projectNodeCoordinates(node, index);
+                const tone = getNodeSignalTone(node);
+                return (
+                  <Link
+                    key={node.node_id}
+                    href={buildNodeDetailHref(node.id)}
+                    className={`absolute w-[184px] -translate-x-1/2 -translate-y-1/2 rounded-2xl border px-4 py-3 backdrop-blur transition hover:scale-[1.02] ${tone.ring}`}
+                    style={anchor}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="relative">
+                        <span
+                          className={`absolute inset-0 rounded-full blur-md ${tone.halo}`}
+                        />
+                        <span
+                          className={`relative block h-3.5 w-3.5 rounded-full ${tone.dot}`}
+                        />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-white">
+                          {node.name}
                         </p>
-                      ) : null}
+                        <p className="mt-1 text-xs text-slate-300">
+                          {(node.geo_name || node.name) + ' · '}
+                          请求 {node.request_count.toLocaleString('zh-CN')} · 异常{' '}
+                          {node.active_event_count}
+                        </p>
+                        {!anchor.derivedFromGeo ? (
+                          <p className="mt-1 text-[11px] text-slate-400">
+                            未配置经纬度，当前使用备用落点
+                          </p>
+                        ) : null}
+                      </div>
                     </div>
-                  </div>
-                </Link>
-              );
-            })}
+                  </Link>
+                );
+              })
+            )}
 
             <div className="absolute bottom-4 left-4 right-4 grid gap-3 md:grid-cols-3">
               {sourceCountries.length > 0 ? (

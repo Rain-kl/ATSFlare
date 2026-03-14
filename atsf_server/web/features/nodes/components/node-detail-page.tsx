@@ -266,6 +266,28 @@ function MetricBar({
   );
 }
 
+function SummaryStat({
+  label,
+  value,
+  hint,
+}: {
+  label: string;
+  value: string;
+  hint: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-4">
+      <p className="text-xs tracking-[0.2em] text-[var(--foreground-muted)] uppercase">
+        {label}
+      </p>
+      <p className="mt-3 text-2xl font-semibold text-[var(--foreground-primary)]">
+        {value}
+      </p>
+      <p className="mt-2 text-sm text-[var(--foreground-secondary)]">{hint}</p>
+    </div>
+  );
+}
+
 export function NodeDetailPage({ nodeId }: { nodeId: string }) {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -542,6 +564,11 @@ export function NodeDetailPage({ nodeId }: { nodeId: string }) {
   );
   const dominantStatusCode = statusCodeDistribution[0] ?? null;
   const dominantDomain = topDomains[0] ?? null;
+  const topSourceCountry =
+    observability?.analytics.distributions.source_countries[0] ?? null;
+  const trafficSummary = observability?.analytics.traffic ?? null;
+  const healthSummary = observability?.analytics.health ?? null;
+  const latestHealthEvent = activeHealthEvents[0] ?? null;
   const resolvedHealthEvents = useMemo(
     () =>
       observability?.health_events.filter(
@@ -668,6 +695,55 @@ export function NodeDetailPage({ nodeId }: { nodeId: string }) {
         {feedback ? (
           <InlineMessage tone={feedback.tone} message={feedback.message} />
         ) : null}
+
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <SummaryStat
+            label="运行诊断"
+            value={
+              activeHealthEvents.length
+                ? `${activeHealthEvents.length} 个活动异常`
+                : '运行稳定'
+            }
+            hint={
+              latestHealthEvent
+                ? `${getHealthEventLabel(latestHealthEvent)} · ${latestHealthEvent.message || '等待处理'}`
+                : '当前没有活动中的健康事件'
+            }
+          />
+          <SummaryStat
+            label="当前窗口请求"
+            value={
+              trafficSummary
+                ? trafficSummary.request_count.toLocaleString('zh-CN')
+                : '—'
+            }
+            hint={
+              trafficSummary
+                ? `QPS ${trafficSummary.estimated_qps.toFixed(1)} · 错误率 ${trafficSummary.error_rate_percent.toFixed(1)}%`
+                : '当前没有可展示的请求窗口摘要'
+            }
+          />
+          <SummaryStat
+            label="容量压力"
+            value={
+              healthSummary?.has_capacity_risk ? '需要关注' : '正常范围'
+            }
+            hint={
+              latestMetricSnapshot
+                ? `CPU ${formatPercent(latestMetricSnapshot.cpu_usage_percent)} · 存储 ${formatPercent(storageUsageRatio)}`
+                : '当前没有资源快照'
+            }
+          />
+          <SummaryStat
+            label="来源信号"
+            value={topSourceCountry?.key ?? '—'}
+            hint={
+              topSourceCountry
+                ? `${topSourceCountry.value.toLocaleString('zh-CN')} 次请求`
+                : '当前没有来源分布数据'
+            }
+          />
+        </div>
 
         <div className="grid gap-6 xl:grid-cols-[1.1fr_1.1fr_0.8fr]">
           <AppCard
@@ -823,11 +899,66 @@ export function NodeDetailPage({ nodeId }: { nodeId: string }) {
                     hint="OpenResty 当前连接"
                   />
                 </div>
+              </div>
+            ) : (
+              <EmptyState
+                title="暂无资源快照"
+                description="节点已经接入，但还没有上报资源快照。"
+              />
+            )}
+          </AppCard>
+
+          <AppCard
+            title="网络流量"
+            description="首屏优先看 OpenResty 吞吐、节点网络与最近窗口流量，快速判断是否存在网络或流量异常。"
+          >
+            {observabilityQuery.isLoading ? (
+              <LoadingState />
+            ) : observabilityQuery.isError ? (
+              <InlineMessage
+                tone="danger"
+                message={getErrorMessage(observabilityQuery.error)}
+              />
+            ) : latestMetricSnapshot ? (
+              <div className="space-y-4">
+                <div className="flex flex-wrap gap-3">
+                  <StatusBadge
+                    label={getNodeStatusLabel(node.status)}
+                    variant={getNodeStatusVariant(node.status)}
+                  />
+                  <StatusBadge
+                    label={getOpenrestyStatusLabel(node.openresty_status)}
+                    variant={getOpenrestyStatusVariant(node.openresty_status)}
+                  />
+                  <StatusBadge
+                    label={
+                      activeHealthEvents.length
+                        ? `${activeHealthEvents.length} 个活动异常`
+                        : '无活动异常'
+                    }
+                    variant={activeHealthEvents.length ? 'warning' : 'success'}
+                  />
+                </div>
 
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-4">
                     <p className="text-xs tracking-[0.2em] text-[var(--foreground-muted)] uppercase">
-                      网络流量
+                      OpenResty 吞吐
+                    </p>
+                    <div className="mt-3 space-y-2 text-sm text-[var(--foreground-secondary)]">
+                      <p>
+                        入站：
+                        {formatBytes(latestMetricSnapshot.openresty_rx_bytes)}
+                      </p>
+                      <p>
+                        出站：
+                        {formatBytes(latestMetricSnapshot.openresty_tx_bytes)}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-4">
+                    <p className="text-xs tracking-[0.2em] text-[var(--foreground-muted)] uppercase">
+                      节点网络
                     </p>
                     <div className="mt-3 space-y-2 text-sm text-[var(--foreground-secondary)]">
                       <p>
@@ -840,98 +971,47 @@ export function NodeDetailPage({ nodeId }: { nodeId: string }) {
                       </p>
                     </div>
                   </div>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
                   <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-4">
                     <p className="text-xs tracking-[0.2em] text-[var(--foreground-muted)] uppercase">
-                      磁盘 IO
+                      最近窗口请求
                     </p>
-                    <div className="mt-3 space-y-2 text-sm text-[var(--foreground-secondary)]">
-                      <p>
-                        读取：
-                        {formatBytes(latestMetricSnapshot.disk_read_bytes)}
-                      </p>
-                      <p>
-                        写入：
-                        {formatBytes(latestMetricSnapshot.disk_write_bytes)}
-                      </p>
-                    </div>
+                    <p className="mt-3 text-2xl font-semibold text-[var(--foreground-primary)]">
+                      {trafficSummary
+                        ? trafficSummary.request_count.toLocaleString('zh-CN')
+                        : '—'}
+                    </p>
+                    <p className="mt-2 text-sm text-[var(--foreground-secondary)]">
+                      {trafficSummary
+                        ? `QPS ${trafficSummary.estimated_qps.toFixed(1)} · UV ${trafficSummary.unique_visitor_count}`
+                        : '暂无窗口流量摘要'}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-4">
+                    <p className="text-xs tracking-[0.2em] text-[var(--foreground-muted)] uppercase">
+                      最近窗口错误
+                    </p>
+                    <p className="mt-3 text-2xl font-semibold text-[var(--foreground-primary)]">
+                      {trafficSummary
+                        ? trafficSummary.error_count.toLocaleString('zh-CN')
+                        : '—'}
+                    </p>
+                    <p className="mt-2 text-sm text-[var(--foreground-secondary)]">
+                      {trafficSummary
+                        ? `错误率 ${trafficSummary.error_rate_percent.toFixed(1)}%`
+                        : '暂无错误率摘要'}
+                    </p>
                   </div>
                 </div>
               </div>
             ) : (
               <EmptyState
-                title="暂无资源快照"
-                description="节点已经接入，但还没有上报资源快照。"
+                title="暂无网络流量快照"
+                description="节点已经接入，但还没有上报网络流量相关快照。"
               />
             )}
-          </AppCard>
-
-          <AppCard
-            title="运行状态"
-            description="汇总节点在线状态、OpenResty 健康与当前异常。"
-          >
-            <div className="space-y-4">
-              <div className="flex flex-wrap gap-3">
-                <StatusBadge
-                  label={getNodeStatusLabel(node.status)}
-                  variant={getNodeStatusVariant(node.status)}
-                />
-                <StatusBadge
-                  label={getOpenrestyStatusLabel(node.openresty_status)}
-                  variant={getOpenrestyStatusVariant(node.openresty_status)}
-                />
-                <StatusBadge
-                  label={
-                    activeHealthEvents.length
-                      ? `${activeHealthEvents.length} 个活动异常`
-                      : '无活动异常'
-                  }
-                  variant={activeHealthEvents.length ? 'warning' : 'success'}
-                />
-              </div>
-
-              <div className="space-y-2 text-sm text-[var(--foreground-secondary)]">
-                <p>
-                  最近心跳：
-                  {isMeaningfulTime(node.last_seen_at)
-                    ? ` ${formatRelativeTime(node.last_seen_at)} · ${formatDateTime(node.last_seen_at)}`
-                    : ' 暂无'}
-                </p>
-                <p>IP：{node.ip || '暂无'}</p>
-                <p>当前配置：{node.current_version || '未应用'}</p>
-                {latestTrafficReport ? (
-                  <p>
-                    最近窗口请求：{latestTrafficReport.request_count} · UV{' '}
-                    {latestTrafficReport.unique_visitor_count} · 错误{' '}
-                    {latestTrafficReport.error_count}
-                  </p>
-                ) : null}
-              </div>
-
-              <div className="space-y-2">
-                {activeHealthEvents.slice(0, 3).map((event) => (
-                  <div
-                    key={`${event.event_type}-${event.last_triggered_at}`}
-                    className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-3"
-                  >
-                    <div className="flex flex-wrap items-center gap-2">
-                      <StatusBadge
-                        label={getHealthEventLabel(event)}
-                        variant={getHealthEventVariant(event)}
-                      />
-                    </div>
-                    <p className="mt-2 text-sm text-[var(--foreground-secondary)]">
-                      {event.message || '暂无详细消息'}
-                    </p>
-                  </div>
-                ))}
-
-                {activeHealthEvents.length === 0 ? (
-                  <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-4 text-sm text-[var(--foreground-secondary)]">
-                    当前没有活动中的健康事件。
-                  </div>
-                ) : null}
-              </div>
-            </div>
           </AppCard>
         </div>
 
@@ -999,6 +1079,78 @@ export function NodeDetailPage({ nodeId }: { nodeId: string }) {
                       (point) => point.average_memory_usage_percent,
                     ) ?? [],
                   valueFormatter: formatPercent,
+                },
+              ]}
+            />
+          </AppCard>
+        </div>
+
+        <div className="grid gap-6 xl:grid-cols-2">
+          <AppCard
+            title="24 小时网络趋势"
+            description="观察 OpenResty 入站/出站吞吐的变化，辅助识别回源压力、突发流量或出口异常。"
+          >
+            <TrendChart
+              labels={
+                observability?.trends.network_24h.map((point) =>
+                  formatTrendHour(point.bucket_started_at),
+                ) ?? []
+              }
+              series={[
+                {
+                  label: 'OpenResty 入站',
+                  color: '#22c55e',
+                  fillColor: 'rgba(34, 197, 94, 0.14)',
+                  variant: 'area',
+                  values:
+                    observability?.trends.network_24h.map(
+                      (point) => point.openresty_rx_bytes,
+                    ) ?? [],
+                  valueFormatter: formatBytes,
+                },
+                {
+                  label: 'OpenResty 出站',
+                  color: '#38bdf8',
+                  values:
+                    observability?.trends.network_24h.map(
+                      (point) => point.openresty_tx_bytes,
+                    ) ?? [],
+                  valueFormatter: formatBytes,
+                },
+              ]}
+            />
+          </AppCard>
+
+          <AppCard
+            title="24 小时磁盘 IO 趋势"
+            description="观察磁盘读写变化，辅助判断日志放大、缓存抖动或磁盘压力。"
+          >
+            <TrendChart
+              labels={
+                observability?.trends.disk_io_24h.map((point) =>
+                  formatTrendHour(point.bucket_started_at),
+                ) ?? []
+              }
+              series={[
+                {
+                  label: '磁盘读',
+                  color: '#a78bfa',
+                  fillColor: 'rgba(167, 139, 250, 0.14)',
+                  variant: 'area',
+                  values:
+                    observability?.trends.disk_io_24h.map(
+                      (point) => point.disk_read_bytes,
+                    ) ?? [],
+                  valueFormatter: formatBytes,
+                },
+                {
+                  label: '磁盘写',
+                  color: '#fb7185',
+                  values:
+                    observability?.trends.disk_io_24h.map(
+                      (point) => point.disk_write_bytes,
+                    ) ?? [],
+                  valueFormatter: formatBytes,
                 },
               ]}
             />
