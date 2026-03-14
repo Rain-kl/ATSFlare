@@ -15,6 +15,7 @@ type DashboardOverviewView struct {
 	Traffic      DashboardTraffic      `json:"traffic"`
 	Capacity     DashboardCapacity     `json:"capacity"`
 	Config       DashboardConfig       `json:"config"`
+	Trends       DashboardTrends       `json:"trends"`
 	Nodes        []DashboardNodeHealth `json:"nodes"`
 	ActiveAlerts []DashboardAlert      `json:"active_alerts"`
 }
@@ -49,6 +50,11 @@ type DashboardConfig struct {
 	ActiveVersion string `json:"active_version"`
 	LaggingNodes  int    `json:"lagging_nodes"`
 	PendingNodes  int    `json:"pending_nodes"`
+}
+
+type DashboardTrends struct {
+	Traffic24h  []TrafficTrendPoint  `json:"traffic_24h"`
+	Capacity24h []CapacityTrendPoint `json:"capacity_24h"`
 }
 
 type DashboardNodeHealth struct {
@@ -94,13 +100,33 @@ func GetDashboardOverview() (*DashboardOverviewView, error) {
 		return nil, versionErr
 	}
 
+	snapshots, err := model.ListMetricSnapshotsSince(since)
+	if err != nil {
+		return nil, err
+	}
+	reports, err := model.ListRequestReportsSince(since)
+	if err != nil {
+		return nil, err
+	}
+	activeEvents, err := model.ListActiveNodeHealthEvents()
+	if err != nil {
+		return nil, err
+	}
+
 	view := &DashboardOverviewView{
 		GeneratedAt: now,
 		Nodes:       make([]DashboardNodeHealth, 0, len(nodes)),
+		Trends: DashboardTrends{
+			Traffic24h:  buildTrafficTrendPoints(now, reports),
+			Capacity24h: buildCapacityTrendPoints(now, snapshots),
+		},
 	}
 
 	var cpuNodeCount int
 	var memoryNodeCount int
+	latestSnapshots := latestMetricSnapshotsByNode(snapshots)
+	latestTrafficReports := latestTrafficReportsByNode(reports)
+	activeEventsByNode := activeHealthEventsByNode(activeEvents)
 
 	for _, node := range nodes {
 		computedStatus := computeNodeStatus(node)
@@ -122,12 +148,9 @@ func GetDashboardOverview() (*DashboardOverviewView, error) {
 			view.Summary.LaggingNodes++
 		}
 
-		latestSnapshot := latestMetricSnapshotForNode(node.NodeID, since)
-		latestTraffic := latestTrafficReportForNode(node.NodeID, since)
-		activeEvents, eventErr := model.ListNodeHealthEvents(node.NodeID, true, 20)
-		if eventErr != nil {
-			return nil, eventErr
-		}
+		latestSnapshot := latestSnapshots[node.NodeID]
+		latestTraffic := latestTrafficReports[node.NodeID]
+		nodeActiveEvents := activeEventsByNode[node.NodeID]
 
 		nodeHealth := DashboardNodeHealth{
 			ID:               node.ID,
@@ -137,10 +160,10 @@ func GetDashboardOverview() (*DashboardOverviewView, error) {
 			OpenrestyStatus:  node.OpenrestyStatus,
 			CurrentVersion:   node.CurrentVersion,
 			LastSeenAt:       node.LastSeenAt,
-			ActiveEventCount: len(activeEvents),
+			ActiveEventCount: len(nodeActiveEvents),
 		}
 
-		for _, event := range activeEvents {
+		for _, event := range nodeActiveEvents {
 			view.ActiveAlerts = append(view.ActiveAlerts, DashboardAlert{
 				NodeID:          node.NodeID,
 				NodeName:        node.Name,
@@ -188,7 +211,7 @@ func GetDashboardOverview() (*DashboardOverviewView, error) {
 			view.Traffic.ReportedNodes++
 		}
 
-		view.Summary.ActiveAlerts += len(activeEvents)
+		view.Summary.ActiveAlerts += len(nodeActiveEvents)
 		view.Nodes = append(view.Nodes, nodeHealth)
 	}
 
@@ -225,27 +248,50 @@ func GetDashboardOverview() (*DashboardOverviewView, error) {
 	return view, nil
 }
 
-func latestMetricSnapshotForNode(nodeID string, since time.Time) *model.NodeMetricSnapshot {
-	snapshots, err := model.ListNodeMetricSnapshots(nodeID, since, 1)
-	if err != nil || len(snapshots) == 0 {
-		return nil
-	}
-	return snapshots[0]
-}
-
-func latestTrafficReportForNode(nodeID string, since time.Time) *model.NodeRequestReport {
-	reports, err := model.ListNodeRequestReports(nodeID, since, 1)
-	if err != nil || len(reports) == 0 {
-		return nil
-	}
-	return reports[0]
-}
-
 func percentage(used int64, total int64) float64 {
 	if used <= 0 || total <= 0 {
 		return 0
 	}
 	return (float64(used) / float64(total)) * 100
+}
+
+func latestMetricSnapshotsByNode(snapshots []*model.NodeMetricSnapshot) map[string]*model.NodeMetricSnapshot {
+	result := make(map[string]*model.NodeMetricSnapshot, len(snapshots))
+	for _, snapshot := range snapshots {
+		if snapshot == nil || snapshot.NodeID == "" {
+			continue
+		}
+		if existing, ok := result[snapshot.NodeID]; ok && !snapshot.CapturedAt.After(existing.CapturedAt) {
+			continue
+		}
+		result[snapshot.NodeID] = snapshot
+	}
+	return result
+}
+
+func latestTrafficReportsByNode(reports []*model.NodeRequestReport) map[string]*model.NodeRequestReport {
+	result := make(map[string]*model.NodeRequestReport, len(reports))
+	for _, report := range reports {
+		if report == nil || report.NodeID == "" {
+			continue
+		}
+		if existing, ok := result[report.NodeID]; ok && !report.WindowEndedAt.After(existing.WindowEndedAt) {
+			continue
+		}
+		result[report.NodeID] = report
+	}
+	return result
+}
+
+func activeHealthEventsByNode(events []*model.NodeHealthEvent) map[string][]*model.NodeHealthEvent {
+	result := make(map[string][]*model.NodeHealthEvent)
+	for _, event := range events {
+		if event == nil || event.NodeID == "" {
+			continue
+		}
+		result[event.NodeID] = append(result[event.NodeID], event)
+	}
+	return result
 }
 
 func severityWeight(severity string) int {

@@ -313,6 +313,7 @@ func (r *Runner) nodePayload(nodeID string) protocol.NodePayload {
 	}
 	profile := observability.BuildProfile(r.Config, r.StateStore)
 	metricSnapshot := observability.BuildSnapshot(r.Config, r.StateStore)
+	trafficReport := observability.BuildTrafficReport(r.Config, r.StateStore)
 	healthEvents := observability.BuildHealthEvents(snapshot)
 	return protocol.NodePayload{
 		NodeID:           nodeID,
@@ -326,6 +327,7 @@ func (r *Runner) nodePayload(nodeID string) protocol.NodePayload {
 		OpenrestyMessage: snapshot.OpenrestyMessage,
 		Profile:          profile,
 		Snapshot:         metricSnapshot,
+		TrafficReport:    trafficReport,
 		HealthEvents:     healthEvents,
 	}
 }

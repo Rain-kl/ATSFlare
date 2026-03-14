@@ -19,8 +19,10 @@ import (
 
 const CertDirPlaceholder = "__ATSF_CERT_DIR__"
 const RouteConfigPlaceholder = "__ATSF_ROUTE_CONFIG__"
+const AccessLogPlaceholder = "__ATSF_ACCESS_LOG__"
 const DockerMainConfigPath = "/usr/local/openresty/nginx/conf/nginx.conf"
 const DockerRouteConfigPath = "/etc/nginx/conf.d/atsflare_routes.conf"
+const DockerAccessLogPath = "/etc/nginx/conf.d/atsflare_access.log"
 
 const dockerRuntimeCommand = "openresty"
 
@@ -284,6 +286,9 @@ func (m *Manager) CurrentChecksum() (string, error) {
 	normalizedMain := string(mainData)
 	if includePath := m.routeConfigIncludePath(); includePath != "" {
 		normalizedMain = strings.ReplaceAll(normalizedMain, includePath, RouteConfigPlaceholder)
+	}
+	if accessLogPath := m.accessLogRuntimePath(); accessLogPath != "" {
+		normalizedMain = strings.ReplaceAll(normalizedMain, accessLogPath, AccessLogPlaceholder)
 	}
 	normalizedRoute := string(data)
 	if m.NginxCertDir != "" {
@@ -609,11 +614,14 @@ func (m *Manager) renderRouteConfig(content string) string {
 }
 
 func (m *Manager) renderMainConfig(content string) string {
-	includePath := m.routeConfigIncludePath()
-	if includePath == "" {
-		return content
+	rendered := content
+	if includePath := m.routeConfigIncludePath(); includePath != "" {
+		rendered = strings.ReplaceAll(rendered, RouteConfigPlaceholder, includePath)
 	}
-	return strings.ReplaceAll(content, RouteConfigPlaceholder, includePath)
+	if accessLogPath := m.accessLogRuntimePath(); accessLogPath != "" {
+		rendered = strings.ReplaceAll(rendered, AccessLogPlaceholder, accessLogPath)
+	}
+	return rendered
 }
 
 func (m *Manager) routeConfigIncludePath() string {
@@ -621,6 +629,14 @@ func (m *Manager) routeConfigIncludePath() string {
 		return strings.TrimSpace(m.RuntimeRouteConfigPath)
 	}
 	return strings.TrimSpace(m.RouteConfigPath)
+}
+
+func (m *Manager) accessLogRuntimePath() string {
+	includePath := m.routeConfigIncludePath()
+	if strings.TrimSpace(includePath) == "" {
+		return ""
+	}
+	return filepath.ToSlash(filepath.Join(filepath.Dir(includePath), "atsflare_access.log"))
 }
 
 func checksum(content string) string {

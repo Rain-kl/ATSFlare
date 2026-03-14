@@ -35,3 +35,8 @@ func ListNodeHealthEvents(nodeID string, activeOnly bool, limit int) (events []*
 	err = query.Find(&events).Error
 	return events, err
 }
+
+func ListActiveNodeHealthEvents() (events []*NodeHealthEvent, err error) {
+	err = DB.Where("status = ?", "active").Order("last_triggered_at desc").Find(&events).Error
+	return events, err
+}

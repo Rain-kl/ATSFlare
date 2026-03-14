@@ -337,7 +337,7 @@ func TestManagerApplyAndChecksumIncludeMainConfig(t *testing.T) {
 
 	err := manager.Apply(
 		context.Background(),
-		"include __ATSF_ROUTE_CONFIG__;\n",
+		"include __ATSF_ROUTE_CONFIG__;\naccess_log __ATSF_ACCESS_LOG__ atsflare_json;\n",
 		"ssl_certificate __ATSF_CERT_DIR__/1.crt;\n",
 		[]protocol.SupportFile{{Path: "1.crt", Content: "cert"}},
 	)
@@ -349,7 +349,8 @@ func TestManagerApplyAndChecksumIncludeMainConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to read main config: %v", err)
 	}
-	if string(mainData) != "include "+routePath+";\n" {
+	expectedMain := "include " + routePath + ";\naccess_log " + filepath.Join(filepath.Dir(routePath), "atsflare_access.log") + " atsflare_json;\n"
+	if string(mainData) != expectedMain {
 		t.Fatalf("unexpected main config: %s", string(mainData))
 	}
 
@@ -366,7 +367,7 @@ func TestManagerApplyAndChecksumIncludeMainConfig(t *testing.T) {
 		t.Fatalf("CurrentChecksum failed: %v", err)
 	}
 	expected := bundleChecksum(
-		"include __ATSF_ROUTE_CONFIG__;\n",
+		"include __ATSF_ROUTE_CONFIG__;\naccess_log __ATSF_ACCESS_LOG__ atsflare_json;\n",
 		"ssl_certificate __ATSF_CERT_DIR__/1.crt;\n",
 		[]protocol.SupportFile{{Path: "1.crt", Content: "cert"}},
 	)
@@ -388,7 +389,7 @@ func TestManagerApplyUsesRuntimeRouteConfigPath(t *testing.T) {
 		Executor:               &fakeExecutor{},
 	}
 
-	if err := manager.Apply(context.Background(), "include __ATSF_ROUTE_CONFIG__;\n", "server { listen 80; }\n", nil); err != nil {
+	if err := manager.Apply(context.Background(), "include __ATSF_ROUTE_CONFIG__;\naccess_log __ATSF_ACCESS_LOG__ atsflare_json;\n", "server { listen 80; }\n", nil); err != nil {
 		t.Fatalf("Apply failed: %v", err)
 	}
 
@@ -396,7 +397,8 @@ func TestManagerApplyUsesRuntimeRouteConfigPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to read main config: %v", err)
 	}
-	if string(mainData) != "include "+DockerRouteConfigPath+";\n" {
+	expectedMain := "include " + DockerRouteConfigPath + ";\naccess_log " + DockerAccessLogPath + " atsflare_json;\n"
+	if string(mainData) != expectedMain {
 		t.Fatalf("unexpected main config include path: %s", string(mainData))
 	}
 
@@ -405,7 +407,7 @@ func TestManagerApplyUsesRuntimeRouteConfigPath(t *testing.T) {
 		t.Fatalf("CurrentChecksum failed: %v", err)
 	}
 	expected := bundleChecksum(
-		"include __ATSF_ROUTE_CONFIG__;\n",
+		"include __ATSF_ROUTE_CONFIG__;\naccess_log __ATSF_ACCESS_LOG__ atsflare_json;\n",
 		"server { listen 80; }\n",
 		nil,
 	)

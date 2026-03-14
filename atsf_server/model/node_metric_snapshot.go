@@ -37,3 +37,12 @@ func ListNodeMetricSnapshots(nodeID string, since time.Time, limit int) (snapsho
 	err = query.Find(&snapshots).Error
 	return snapshots, err
 }
+
+func ListMetricSnapshotsSince(since time.Time) (snapshots []*NodeMetricSnapshot, err error) {
+	query := DB.Order("captured_at desc")
+	if !since.IsZero() {
+		query = query.Where("captured_at >= ?", since)
+	}
+	err = query.Find(&snapshots).Error
+	return snapshots, err
+}

@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 
+import { TrendChart } from '@/components/data/trend-chart';
 import { EmptyState } from '@/components/feedback/empty-state';
 import { ErrorState } from '@/components/feedback/error-state';
 import { LoadingState } from '@/components/feedback/loading-state';
@@ -30,6 +31,14 @@ function formatPercent(value?: number | null) {
 
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : '请求失败，请稍后重试。';
+}
+
+function formatTrendHour(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return '—';
+  }
+  return `${date.getHours().toString().padStart(2, '0')}:00`;
 }
 
 function getAlertVariant(
@@ -214,6 +223,68 @@ export function DashboardOverview() {
           />
         </div>
       </AppCard>
+
+      <div className="grid gap-6 xl:grid-cols-2">
+        <AppCard
+          title="24 小时请求趋势"
+          description="观察整体请求量和错误量是否出现异常抬升。"
+        >
+          <TrendChart
+            labels={overview.trends.traffic_24h.map((point) =>
+              formatTrendHour(point.bucket_started_at),
+            )}
+            series={[
+              {
+                label: '请求量',
+                color: '#f59e0b',
+                fillColor: 'rgba(245, 158, 11, 0.18)',
+                variant: 'area',
+                values: overview.trends.traffic_24h.map(
+                  (point) => point.request_count,
+                ),
+              },
+              {
+                label: '错误量',
+                color: '#ef4444',
+                values: overview.trends.traffic_24h.map(
+                  (point) => point.error_count,
+                ),
+              },
+            ]}
+          />
+        </AppCard>
+
+        <AppCard
+          title="24 小时容量趋势"
+          description="按小时聚合 CPU 与内存使用率，判断整体容量是否持续紧张。"
+        >
+          <TrendChart
+            labels={overview.trends.capacity_24h.map((point) =>
+              formatTrendHour(point.bucket_started_at),
+            )}
+            series={[
+              {
+                label: '平均 CPU',
+                color: '#0f766e',
+                fillColor: 'rgba(15, 118, 110, 0.15)',
+                variant: 'area',
+                values: overview.trends.capacity_24h.map(
+                  (point) => point.average_cpu_usage_percent,
+                ),
+                valueFormatter: formatPercent,
+              },
+              {
+                label: '平均内存',
+                color: '#2563eb',
+                values: overview.trends.capacity_24h.map(
+                  (point) => point.average_memory_usage_percent,
+                ),
+                valueFormatter: formatPercent,
+              },
+            ]}
+          />
+        </AppCard>
+      </div>
 
       <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
         <AppCard

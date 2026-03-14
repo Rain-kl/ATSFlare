@@ -99,6 +99,25 @@ export interface NodeTrafficReport {
   source_countries_json: string;
 }
 
+export interface NodeTrafficTrendPoint {
+  bucket_started_at: string;
+  request_count: number;
+  error_count: number;
+  unique_visitor_count: number;
+}
+
+export interface NodeCapacityTrendPoint {
+  bucket_started_at: string;
+  average_cpu_usage_percent: number;
+  average_memory_usage_percent: number;
+  reported_nodes: number;
+}
+
+export interface NodeObservabilityTrends {
+  traffic_24h: NodeTrafficTrendPoint[];
+  capacity_24h: NodeCapacityTrendPoint[];
+}
+
 export interface NodeHealthEvent {
   event_type: string;
   severity: string;
@@ -116,4 +135,5 @@ export interface NodeObservability {
   metric_snapshots: NodeMetricSnapshot[];
   traffic_reports: NodeTrafficReport[];
   health_events: NodeHealthEvent[];
+  trends: NodeObservabilityTrends;
 }

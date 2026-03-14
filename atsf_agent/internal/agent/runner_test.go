@@ -282,7 +282,8 @@ func TestRunnerReportsOpenrestyHealthAndExecutesRestart(t *testing.T) {
 }
 
 func TestRunnerHeartbeatPayloadIncludesObservabilityExtensions(t *testing.T) {
-	stateStore := state.NewStore(filepath.Join(t.TempDir(), "state.json"))
+	tempDir := t.TempDir()
+	stateStore := state.NewStore(filepath.Join(tempDir, "state.json"))
 	if err := stateStore.Save(&state.Snapshot{
 		NodeID:           "node-observe",
 		CurrentVersion:   "20260314-001",
@@ -299,10 +300,21 @@ func TestRunnerHeartbeatPayloadIncludesObservabilityExtensions(t *testing.T) {
 			NodeIP:            "10.0.0.51",
 			AgentVersion:      config.AgentVersion,
 			NginxVersion:      "1.27.1.2",
-			DataDir:           t.TempDir(),
+			DataDir:           tempDir,
+			RouteConfigPath:   filepath.Join(tempDir, "conf.d", "atsflare_routes.conf"),
 			HeartbeatInterval: config.MillisecondDuration(10 * time.Millisecond),
 		},
 		StateStore: stateStore,
+	}
+	if err := os.MkdirAll(filepath.Dir(runner.Config.RouteConfigPath), 0o755); err != nil {
+		t.Fatalf("failed to prepare route config dir: %v", err)
+	}
+	if err := os.WriteFile(
+		filepath.Join(filepath.Dir(runner.Config.RouteConfigPath), "atsflare_access.log"),
+		[]byte("{\"ts\":\"2026-03-14T10:00:00Z\",\"host\":\"edge.example.com\",\"remote_addr\":\"10.0.0.8\",\"status\":200}\n"),
+		0o644,
+	); err != nil {
+		t.Fatalf("failed to prepare access log: %v", err)
 	}
 
 	firstPayload := runner.nodePayload("node-observe")
@@ -311,6 +323,9 @@ func TestRunnerHeartbeatPayloadIncludesObservabilityExtensions(t *testing.T) {
 	}
 	if firstPayload.Snapshot == nil {
 		t.Fatal("expected first heartbeat payload to include metric snapshot")
+	}
+	if firstPayload.TrafficReport == nil || firstPayload.TrafficReport.RequestCount != 1 {
+		t.Fatalf("expected first heartbeat payload to include traffic report, got %+v", firstPayload.TrafficReport)
 	}
 	if len(firstPayload.HealthEvents) != 2 {
 		t.Fatalf("expected health events for openresty and sync error, got %+v", firstPayload.HealthEvents)
@@ -322,6 +337,9 @@ func TestRunnerHeartbeatPayloadIncludesObservabilityExtensions(t *testing.T) {
 	}
 	if secondPayload.Snapshot == nil {
 		t.Fatal("expected metric snapshot to continue reporting on subsequent heartbeat")
+	}
+	if secondPayload.TrafficReport != nil {
+		t.Fatalf("expected unchanged traffic window to be omitted on subsequent heartbeat, got %+v", secondPayload.TrafficReport)
 	}
 }
 

@@ -54,6 +54,9 @@ func TestCreateTLSCertificateAndRenderHTTPSConfig(t *testing.T) {
 	if !strings.Contains(result.Version.MainConfig, "include __ATSF_ROUTE_CONFIG__;") {
 		t.Fatal("expected main config to include managed route config placeholder")
 	}
+	if !strings.Contains(result.Version.MainConfig, "access_log __ATSF_ACCESS_LOG__ atsflare_json;") {
+		t.Fatal("expected main config to include managed access log placeholder")
+	}
 	if !strings.Contains(result.Version.RenderedConfig, "listen 443 ssl;") {
 		t.Fatal("expected rendered config to include https server block")
 	}
@@ -279,6 +282,9 @@ func TestOpenRestyMainConfigTemplateRenderAndValidate(t *testing.T) {
 	if !strings.Contains(preview.MainConfig, "include __ATSF_ROUTE_CONFIG__;") {
 		t.Fatal("expected preview main config to preserve managed route include")
 	}
+	if !strings.Contains(preview.MainConfig, "access_log __ATSF_ACCESS_LOG__ atsflare_json;") {
+		t.Fatal("expected preview main config to preserve managed access log placeholder")
+	}
 
 	invalidTemplate := strings.ReplaceAll(
 		common.OpenRestyMainConfigTemplate,
@@ -287,6 +293,15 @@ func TestOpenRestyMainConfigTemplateRenderAndValidate(t *testing.T) {
 	)
 	if err := ValidateOpenRestyMainConfigTemplate(invalidTemplate); err == nil {
 		t.Fatal("expected template without managed route placeholder to fail validation")
+	}
+
+	invalidTemplate = strings.ReplaceAll(
+		common.OpenRestyMainConfigTemplate,
+		"{{OpenRestyAccessLogPath}}",
+		"",
+	)
+	if err := ValidateOpenRestyMainConfigTemplate(invalidTemplate); err == nil {
+		t.Fatal("expected template without managed access log placeholder to fail validation")
 	}
 }
 

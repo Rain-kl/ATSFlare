@@ -99,6 +99,8 @@ events {
 http {
     include       mime.types;
     default_type  application/octet-stream;
+    log_format atsflare_json escape=json '{"ts":"$time_iso8601","host":"$host","remote_addr":"$remote_addr","status":$status,"request_time":$request_time,"bytes_sent":$body_bytes_sent,"request_length":$request_length}';
+    access_log {{OpenRestyAccessLogPath}} atsflare_json;
     sendfile on;
     tcp_nopush on;
     tcp_nodelay on;

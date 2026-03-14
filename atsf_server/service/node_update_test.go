@@ -564,6 +564,12 @@ func TestGetNodeObservability(t *testing.T) {
 	if len(view.HealthEvents) != 1 || view.HealthEvents[0].EventType != "sync_error" {
 		t.Fatalf("unexpected health events: %+v", view.HealthEvents)
 	}
+	if len(view.Trends.Traffic24h) != 24 || len(view.Trends.Capacity24h) != 24 {
+		t.Fatalf("expected 24-point trends, got %+v", view.Trends)
+	}
+	if view.Trends.Traffic24h[len(view.Trends.Traffic24h)-1].RequestCount != 123 {
+		t.Fatalf("unexpected traffic trend tail: %+v", view.Trends.Traffic24h[len(view.Trends.Traffic24h)-1])
+	}
 }
 
 func TestGetNodeObservabilityAllowsMissingProfile(t *testing.T) {
@@ -588,6 +594,9 @@ func TestGetNodeObservabilityAllowsMissingProfile(t *testing.T) {
 	}
 	if view.Profile != nil {
 		t.Fatalf("expected nil profile when profile not reported, got %+v", view.Profile)
+	}
+	if len(view.Trends.Traffic24h) != 24 || len(view.Trends.Capacity24h) != 24 {
+		t.Fatalf("expected empty 24-point trends, got %+v", view.Trends)
 	}
 }
 
@@ -714,5 +723,11 @@ func TestGetDashboardOverview(t *testing.T) {
 	}
 	if len(view.Nodes) != 2 || len(view.ActiveAlerts) != 1 {
 		t.Fatalf("unexpected dashboard nodes/alerts: %+v %+v", view.Nodes, view.ActiveAlerts)
+	}
+	if len(view.Trends.Traffic24h) != 24 || len(view.Trends.Capacity24h) != 24 {
+		t.Fatalf("expected 24-point dashboard trends, got %+v", view.Trends)
+	}
+	if view.Trends.Traffic24h[len(view.Trends.Traffic24h)-1].RequestCount != 900 {
+		t.Fatalf("unexpected dashboard traffic trend tail: %+v", view.Trends.Traffic24h[len(view.Trends.Traffic24h)-1])
 	}
 }

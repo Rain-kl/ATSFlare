@@ -117,12 +117,14 @@ type configBundle struct {
 const (
 	nginxCertDirPlaceholder     = "__ATSF_CERT_DIR__"
 	nginxRouteConfigPlaceholder = "__ATSF_ROUTE_CONFIG__"
+	nginxAccessLogPlaceholder   = "__ATSF_ACCESS_LOG__"
 )
 
 var requiredMainConfigTemplatePlaceholders = []string{
 	"{{OpenRestyWorkerProcesses}}",
 	"{{OpenRestyWorkerConnections}}",
 	"{{OpenRestyWorkerRlimitNofile}}",
+	"{{OpenRestyAccessLogPath}}",
 	"{{OpenRestyEventsUseDirective}}",
 	"{{OpenRestyEventsMultiAcceptDirective}}",
 	"{{OpenRestyKeepaliveTimeout}}",
@@ -638,6 +640,7 @@ func renderMainConfigTemplate(templateText string, cfg openRestyConfigSnapshot) 
 		"{{OpenRestyWorkerProcesses}}", cfg.WorkerProcesses,
 		"{{OpenRestyWorkerConnections}}", fmt.Sprintf("%d", cfg.WorkerConnections),
 		"{{OpenRestyWorkerRlimitNofile}}", fmt.Sprintf("%d", cfg.WorkerRlimitNofile),
+		"{{OpenRestyAccessLogPath}}", nginxAccessLogPlaceholder,
 		"{{OpenRestyEventsUseDirective}}", renderTemplateDirective(cfg.EventsUse != "", fmt.Sprintf("use %s;", cfg.EventsUse)),
 		"{{OpenRestyEventsMultiAcceptDirective}}", renderTemplateDirective(cfg.EventsMultiAcceptEnabled, "multi_accept on;"),
 		"{{OpenRestyKeepaliveTimeout}}", fmt.Sprintf("%d", cfg.KeepaliveTimeout),

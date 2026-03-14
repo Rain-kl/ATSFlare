@@ -8,6 +8,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { z } from 'zod';
 
+import { TrendChart } from '@/components/data/trend-chart';
 import { EmptyState } from '@/components/feedback/empty-state';
 import { ErrorState } from '@/components/feedback/error-state';
 import { InlineMessage } from '@/components/feedback/inline-message';
@@ -141,6 +142,14 @@ function formatUptime(seconds?: number | null) {
     return `${hours} 小时 ${minutes} 分钟`;
   }
   return `${minutes} 分钟`;
+}
+
+function formatTrendHour(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return '—';
+  }
+  return `${date.getHours().toString().padStart(2, '0')}:00`;
 }
 
 function getHealthEventVariant(
@@ -826,6 +835,76 @@ export function NodeDetailPage({ nodeId }: { nodeId: string }) {
                 ) : null}
               </div>
             </div>
+          </AppCard>
+        </div>
+
+        <div className="grid gap-6 xl:grid-cols-2">
+          <AppCard
+            title="24 小时请求趋势"
+            description="按小时聚合该节点的请求量和错误量，判断是否存在突发流量或持续异常。"
+          >
+            <TrendChart
+              labels={
+                observability?.trends.traffic_24h.map((point) =>
+                  formatTrendHour(point.bucket_started_at),
+                ) ?? []
+              }
+              series={[
+                {
+                  label: '请求量',
+                  color: '#f59e0b',
+                  fillColor: 'rgba(245, 158, 11, 0.18)',
+                  variant: 'area',
+                  values:
+                    observability?.trends.traffic_24h.map(
+                      (point) => point.request_count,
+                    ) ?? [],
+                },
+                {
+                  label: '错误量',
+                  color: '#ef4444',
+                  values:
+                    observability?.trends.traffic_24h.map(
+                      (point) => point.error_count,
+                    ) ?? [],
+                },
+              ]}
+            />
+          </AppCard>
+
+          <AppCard
+            title="24 小时容量趋势"
+            description="观察该节点 CPU 与内存使用率在 24 小时内的变化，辅助扩容和排障。"
+          >
+            <TrendChart
+              labels={
+                observability?.trends.capacity_24h.map((point) =>
+                  formatTrendHour(point.bucket_started_at),
+                ) ?? []
+              }
+              series={[
+                {
+                  label: '平均 CPU',
+                  color: '#0f766e',
+                  fillColor: 'rgba(15, 118, 110, 0.15)',
+                  variant: 'area',
+                  values:
+                    observability?.trends.capacity_24h.map(
+                      (point) => point.average_cpu_usage_percent,
+                    ) ?? [],
+                  valueFormatter: formatPercent,
+                },
+                {
+                  label: '平均内存',
+                  color: '#2563eb',
+                  values:
+                    observability?.trends.capacity_24h.map(
+                      (point) => point.average_memory_usage_percent,
+                    ) ?? [],
+                  valueFormatter: formatPercent,
+                },
+              ]}
+            />
           </AppCard>
         </div>
 

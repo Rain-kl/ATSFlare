@@ -20,6 +20,7 @@ type Snapshot struct {
 	LastCPUStatTotal       uint64 `json:"last_cpu_stat_total"`
 	LastCPUStatIdle        uint64 `json:"last_cpu_stat_idle"`
 	LastMetricAtUnix       int64  `json:"last_metric_at_unix"`
+	AccessLogOffset        int64  `json:"access_log_offset"`
 }
 
 type Store struct {

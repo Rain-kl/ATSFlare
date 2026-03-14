@@ -30,6 +30,25 @@ export interface DashboardConfig {
   pending_nodes: number;
 }
 
+export interface TrafficTrendPoint {
+  bucket_started_at: string;
+  request_count: number;
+  error_count: number;
+  unique_visitor_count: number;
+}
+
+export interface CapacityTrendPoint {
+  bucket_started_at: string;
+  average_cpu_usage_percent: number;
+  average_memory_usage_percent: number;
+  reported_nodes: number;
+}
+
+export interface DashboardTrends {
+  traffic_24h: TrafficTrendPoint[];
+  capacity_24h: CapacityTrendPoint[];
+}
+
 export interface DashboardNodeHealth {
   id: number;
   node_id: string;
@@ -63,6 +82,7 @@ export interface DashboardOverview {
   traffic: DashboardTraffic;
   capacity: DashboardCapacity;
   config: DashboardConfig;
+  trends: DashboardTrends;
   nodes: DashboardNodeHealth[];
   active_alerts: DashboardAlert[];
 }

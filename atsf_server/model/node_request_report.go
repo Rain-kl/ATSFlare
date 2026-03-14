@@ -32,3 +32,12 @@ func ListNodeRequestReports(nodeID string, since time.Time, limit int) (reports 
 	err = query.Find(&reports).Error
 	return reports, err
 }
+
+func ListRequestReportsSince(since time.Time) (reports []*NodeRequestReport, err error) {
+	query := DB.Order("window_ended_at desc")
+	if !since.IsZero() {
+		query = query.Where("window_ended_at >= ?", since)
+	}
+	err = query.Find(&reports).Error
+	return reports, err
+}
