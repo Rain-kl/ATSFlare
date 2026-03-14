@@ -161,13 +161,6 @@ function isCacheLevelsValue(value: string) {
     return /^\d{1,2}(?::\d{1,2}){0,2}$/.test(value.trim());
 }
 
-function extractMainConfigLines(content: string, matcher: RegExp) {
-    return content
-        .split('\n')
-        .map((line) => line.trim())
-        .filter((line) => line && matcher.test(line));
-}
-
 export function PerformancePage() {
     const queryClient = useQueryClient();
     const {user} = useAuth();
@@ -594,15 +587,6 @@ export function PerformancePage() {
             />
         );
     }
-
-    const cachePreviewLines = extractMainConfigLines(
-        preview.main_config,
-        /proxy_cache_path|proxy_cache_key|proxy_cache_lock(?:_timeout)?|proxy_cache_use_stale/,
-    );
-    const gzipPreviewLines = extractMainConfigLines(
-        preview.main_config,
-        /gzip(?:_| )/,
-    );
 
     return (
         <div className="space-y-6">

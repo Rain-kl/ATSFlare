@@ -235,7 +235,6 @@ export function DashboardOverview() {
   return (
     <div className="space-y-6">
       <WorldStage
-        generatedAt={overview.generated_at}
         summary={overview.summary}
         traffic={overview.traffic}
         capacity={overview.capacity}

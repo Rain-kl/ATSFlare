@@ -320,7 +320,7 @@ export function NodeDetailPage({ nodeId }: { nodeId: string }) {
   const saveMutation = useMutation({
     mutationFn: async (payload: Parameters<typeof updateNode>[1]) =>
       updateNode(Number(nodeId), payload),
-    onSuccess: async (updatedNode) => {
+    onSuccess: async () => {
       setFeedback({ tone: 'success', message: '节点已更新。' });
       setIsEditorOpen(false);
       await queryClient.invalidateQueries({ queryKey: nodesQueryKey });

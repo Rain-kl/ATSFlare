@@ -28,7 +28,6 @@ import {
   DangerButton,
   PrimaryButton,
 } from '@/features/shared/components/resource-primitives';
-import { formatDateTime } from '@/lib/utils/date';
 
 type FeedbackState = {
   tone: 'info' | 'success' | 'danger';
@@ -205,36 +204,40 @@ export function WebsitesPage() {
         </AppCard>
       </div>
 
-      <WebsiteEditorModal
-        isOpen={isWebsiteModalOpen}
-        onClose={() => {
-          setIsWebsiteModalOpen(false);
-          setPreferredCertificateId(null);
-        }}
-        certificates={certificates}
-        certificatesLoading={certificatesQuery.isLoading}
-        preferredCertificateId={preferredCertificateId}
-        onRequestImportCertificate={() => setIsCertificateImportOpen(true)}
-        onSaved={(_, mode) => {
-          setPreferredCertificateId(null);
-          setFeedback({
-            tone: 'success',
-            message: mode === 'create' ? '网站已创建。' : '网站已更新。',
-          });
-        }}
-      />
+      {isWebsiteModalOpen ? (
+        <WebsiteEditorModal
+          isOpen={isWebsiteModalOpen}
+          onClose={() => {
+            setIsWebsiteModalOpen(false);
+            setPreferredCertificateId(null);
+          }}
+          certificates={certificates}
+          certificatesLoading={certificatesQuery.isLoading}
+          preferredCertificateId={preferredCertificateId}
+          onRequestImportCertificate={() => setIsCertificateImportOpen(true)}
+          onSaved={(_, mode) => {
+            setPreferredCertificateId(null);
+            setFeedback({
+              tone: 'success',
+              message: mode === 'create' ? '网站已创建。' : '网站已更新。',
+            });
+          }}
+        />
+      ) : null}
 
-      <CertificateImportModal
-        isOpen={isCertificateImportOpen}
-        onClose={() => setIsCertificateImportOpen(false)}
-        onImported={(certificate) => {
-          setPreferredCertificateId(certificate.id);
-          setFeedback({
-            tone: 'success',
-            message: `证书 ${certificate.name} 已导入，可直接用于当前网站。`,
-          });
-        }}
-      />
+      {isCertificateImportOpen ? (
+        <CertificateImportModal
+          isOpen={isCertificateImportOpen}
+          onClose={() => setIsCertificateImportOpen(false)}
+          onImported={(certificate) => {
+            setPreferredCertificateId(certificate.id);
+            setFeedback({
+              tone: 'success',
+              message: `证书 ${certificate.name} 已导入，可直接用于当前网站。`,
+            });
+          }}
+        />
+      ) : null}
     </>
   );
 }

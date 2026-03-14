@@ -114,7 +114,7 @@ export function WebsiteEditorModal({
         ? toManagedDomainFormValues(initialDomain)
         : defaultManagedDomainValues,
     );
-  }, [form, initialDomain, isOpen]);
+  }, [form, initialDomain, isOpen, saveMutation]);
 
   useEffect(() => {
     if (!isOpen || !preferredCertificateId) {

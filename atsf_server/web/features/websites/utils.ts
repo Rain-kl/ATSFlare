@@ -2,7 +2,6 @@ import type {
   ManagedDomainItem,
   ManagedDomainMutationPayload,
 } from '@/features/managed-domains/types';
-import type { ProxyRouteItem } from '@/features/proxy-routes/types';
 import type {
   TlsCertificateFileImportPayload,
   TlsCertificateItem,

@@ -196,48 +196,54 @@ export function TlsCertificatesPage() {
         </AppCard>
       </div>
 
-      <CertificateImportModal
-        isOpen={isImportOpen}
-        onClose={() => setIsImportOpen(false)}
-        onImported={(certificate) => {
-          setFeedback({
-            tone: 'success',
-            message: `证书 ${certificate.name} 已导入。`,
-          });
-        }}
-      />
+      {isImportOpen ? (
+        <CertificateImportModal
+          isOpen={isImportOpen}
+          onClose={() => setIsImportOpen(false)}
+          onImported={(certificate) => {
+            setFeedback({
+              tone: 'success',
+              message: `证书 ${certificate.name} 已导入。`,
+            });
+          }}
+        />
+      ) : null}
 
-      <CertificateDetailModal
-        certificateId={selectedCertificateId}
-        isOpen={isDetailOpen}
-        onClose={() => setIsDetailOpen(false)}
-        onEdit={() => {
-          setIsDetailOpen(false);
-          setIsEditorOpen(true);
-        }}
-        onDelete={() => {
-          const certificate = certificates.find(
-            (item) => item.id === selectedCertificateId,
-          );
-          if (certificate) {
+      {isDetailOpen ? (
+        <CertificateDetailModal
+          certificateId={selectedCertificateId}
+          isOpen={isDetailOpen}
+          onClose={() => setIsDetailOpen(false)}
+          onEdit={() => {
             setIsDetailOpen(false);
-            handleDeleteCertificate(certificate);
-          }
-        }}
-        deleting={deleteCertificateMutation.isPending}
-      />
+            setIsEditorOpen(true);
+          }}
+          onDelete={() => {
+            const certificate = certificates.find(
+              (item) => item.id === selectedCertificateId,
+            );
+            if (certificate) {
+              setIsDetailOpen(false);
+              handleDeleteCertificate(certificate);
+            }
+          }}
+          deleting={deleteCertificateMutation.isPending}
+        />
+      ) : null}
 
-      <CertificateEditorModal
-        certificateId={selectedCertificateId}
-        isOpen={isEditorOpen}
-        onClose={() => setIsEditorOpen(false)}
-        onSaved={(certificate) => {
-          setFeedback({
-            tone: 'success',
-            message: `证书 ${certificate.name} 已更新。`,
-          });
-        }}
-      />
+      {isEditorOpen ? (
+        <CertificateEditorModal
+          certificateId={selectedCertificateId}
+          isOpen={isEditorOpen}
+          onClose={() => setIsEditorOpen(false)}
+          onSaved={(certificate) => {
+            setFeedback({
+              tone: 'success',
+              message: `证书 ${certificate.name} 已更新。`,
+            });
+          }}
+        />
+      ) : null}
     </>
   );
 }

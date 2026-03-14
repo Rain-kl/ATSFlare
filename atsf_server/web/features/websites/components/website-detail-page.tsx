@@ -434,62 +434,70 @@ export function WebsiteDetailPage({websiteId}: { websiteId: string }) {
                 </AppCard>
             </div>
 
-            <WebsiteEditorModal
-                isOpen={isEditorOpen}
-                onClose={() => {
-                    setIsEditorOpen(false);
-                    setPreferredCertificateId(null);
-                }}
-                initialDomain={website}
-                certificates={certificates}
-                certificatesLoading={certificatesQuery.isLoading}
-                preferredCertificateId={preferredCertificateId}
-                onRequestImportCertificate={() => setIsCertificateImportOpen(true)}
-                onSaved={() => {
-                    setPreferredCertificateId(null);
-                    setFeedback({tone: 'success', message: '网站已更新。'});
-                }}
-            />
+            {isEditorOpen ? (
+                <WebsiteEditorModal
+                    isOpen={isEditorOpen}
+                    onClose={() => {
+                        setIsEditorOpen(false);
+                        setPreferredCertificateId(null);
+                    }}
+                    initialDomain={website}
+                    certificates={certificates}
+                    certificatesLoading={certificatesQuery.isLoading}
+                    preferredCertificateId={preferredCertificateId}
+                    onRequestImportCertificate={() => setIsCertificateImportOpen(true)}
+                    onSaved={() => {
+                        setPreferredCertificateId(null);
+                        setFeedback({tone: 'success', message: '网站已更新。'});
+                    }}
+                />
+            ) : null}
 
-            <CertificateImportModal
-                isOpen={isCertificateImportOpen}
-                onClose={() => setIsCertificateImportOpen(false)}
-                onImported={(importedCertificate) => {
-                    setPreferredCertificateId(importedCertificate.id);
-                    setFeedback({
-                        tone: 'success',
-                        message: `证书 ${importedCertificate.name} 已导入，可在编辑网站时直接应用。`,
-                    });
-                    setIsEditorOpen(true);
-                }}
-            />
+            {isCertificateImportOpen ? (
+                <CertificateImportModal
+                    isOpen={isCertificateImportOpen}
+                    onClose={() => setIsCertificateImportOpen(false)}
+                    onImported={(importedCertificate) => {
+                        setPreferredCertificateId(importedCertificate.id);
+                        setFeedback({
+                            tone: 'success',
+                            message: `证书 ${importedCertificate.name} 已导入，可在编辑网站时直接应用。`,
+                        });
+                        setIsEditorOpen(true);
+                    }}
+                />
+            ) : null}
 
-            <CertificateDetailModal
-                certificateId={certificate?.id ?? null}
-                isOpen={isCertificateDetailOpen}
-                onClose={() => setIsCertificateDetailOpen(false)}
-                onEdit={() => {
-                    setIsCertificateDetailOpen(false);
-                    setIsCertificateEditorOpen(true);
-                }}
-                onDelete={() => {
-                    setIsCertificateDetailOpen(false);
-                    handleDeleteCertificate();
-                }}
-                deleting={deleteCertificateMutation.isPending}
-            />
+            {isCertificateDetailOpen ? (
+                <CertificateDetailModal
+                    certificateId={certificate?.id ?? null}
+                    isOpen={isCertificateDetailOpen}
+                    onClose={() => setIsCertificateDetailOpen(false)}
+                    onEdit={() => {
+                        setIsCertificateDetailOpen(false);
+                        setIsCertificateEditorOpen(true);
+                    }}
+                    onDelete={() => {
+                        setIsCertificateDetailOpen(false);
+                        handleDeleteCertificate();
+                    }}
+                    deleting={deleteCertificateMutation.isPending}
+                />
+            ) : null}
 
-            <CertificateEditorModal
-                certificateId={certificate?.id ?? null}
-                isOpen={isCertificateEditorOpen}
-                onClose={() => setIsCertificateEditorOpen(false)}
-                onSaved={(updatedCertificate) => {
-                    setFeedback({
-                        tone: 'success',
-                        message: `证书 ${updatedCertificate.name} 已更新。`,
-                    });
-                }}
-            />
+            {isCertificateEditorOpen ? (
+                <CertificateEditorModal
+                    certificateId={certificate?.id ?? null}
+                    isOpen={isCertificateEditorOpen}
+                    onClose={() => setIsCertificateEditorOpen(false)}
+                    onSaved={(updatedCertificate) => {
+                        setFeedback({
+                            tone: 'success',
+                            message: `证书 ${updatedCertificate.name} 已更新。`,
+                        });
+                    }}
+                />
+            ) : null}
         </>
     );
 }

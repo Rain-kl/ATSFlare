@@ -13,7 +13,6 @@ import type {
   DistributionItem,
 } from '@/features/dashboard/types';
 import { cn } from '@/lib/utils/cn';
-import { formatDateTime } from '@/lib/utils/date';
 
 type Tone = 'healthy' | 'warning' | 'danger';
 
@@ -157,14 +156,12 @@ function CountrySignal({
 }
 
 export function WorldStage({
-  generatedAt,
   summary,
   traffic,
   capacity,
   nodes,
   sourceCountries,
 }: {
-  generatedAt: string;
   summary: DashboardSummary;
   traffic: DashboardTraffic;
   capacity: DashboardCapacity;
@@ -236,43 +233,14 @@ export function WorldStage({
         )}
       >
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-          <div className="space-y-2">
-            <p
+          <p
               className={cn(
-                'text-[11px] tracking-[0.34em] uppercase',
-                isDark ? 'text-sky-200/80' : 'text-sky-700/80',
+                  'text-[11px] tracking-[0.34em] uppercase',
+                  isDark ? 'text-sky-200/80' : 'text-sky-700/80',
               )}
-            >
-              Global Stage
-            </p>
-            <h2
-              className={cn(
-                'text-2xl font-semibold',
-                isDark ? 'text-white' : 'text-slate-950',
-              )}
-            >
-              全球态势板
-            </h2>
-            <p
-              className={cn(
-                'max-w-3xl text-sm leading-6',
-                isDark ? 'text-slate-300' : 'text-slate-600',
-              )}
-            >
-              在同一视图汇总节点在线率、运行状态、资源负载与全球流量来源，
-              让首屏可以直接承担值守与研判入口。
-            </p>
-          </div>
-          <div
-            className={cn(
-              'rounded-full border px-4 py-2 text-sm backdrop-blur',
-              isDark
-                ? 'border-white/10 bg-white/6 text-slate-200'
-                : 'border-slate-200/80 bg-white/80 text-slate-700',
-            )}
           >
-            数据生成于 {formatDateTime(generatedAt)}
-          </div>
+            Global Stage
+          </p>
         </div>
       </div>
 
