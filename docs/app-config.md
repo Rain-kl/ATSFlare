@@ -176,11 +176,14 @@ volumes:
 | --- | --- | --- | --- |
 | `NEXT_PUBLIC_API_BASE_URL` | 前端请求后端 API 的基础路径；默认走同源 `/api` | `/api` | `NEXT_PUBLIC_API_BASE_URL=https://demo.example.com/api` |
 | `NEXT_PUBLIC_APP_VERSION` | 构建时注入前端展示版本号 | `dev` | `NEXT_PUBLIC_APP_VERSION=v0.4.0` |
+| `NEXT_DEV_BACKEND_URL` | 前端开发服务器通过反向代理转发 `/api/*` 时使用的后端地址；仅开发模式使用 | `http://127.0.0.1:3000` | `NEXT_DEV_BACKEND_URL=http://127.0.0.1:3300` |
 
 说明：
 
-* 以上变量在前端构建阶段读取，并会被打包进静态资源
+* `NEXT_PUBLIC_*` 变量会在前端构建阶段读取，并打包进静态资源
+* `NEXT_DEV_BACKEND_URL` 仅在本地开发服务器模式下使用，不会进入静态导出产物
 * 推荐生产环境继续使用同源部署，优先保持 `NEXT_PUBLIC_API_BASE_URL=/api`
+* `pnpm start` 会以开发模式启动前端，默认监听 `3001`，并通过 `NEXT_DEV_BACKEND_URL` 将 `/api/*` 代理到后端
 
 ---
 

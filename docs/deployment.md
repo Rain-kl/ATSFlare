@@ -39,6 +39,24 @@ pnpm build
 * `pnpm build` 会生成供 Go Server 托管的 `atsf_server/web/build` 目录
 * 如需覆盖默认接口地址，可在构建前设置 `NEXT_PUBLIC_API_BASE_URL`
 
+### 2.1.1 本地前端热更新开发
+
+在本地联调时，可单独启动前端开发服务器：
+
+```bash
+cd atsf_server/web
+corepack enable
+pnpm install
+pnpm start
+```
+
+说明：
+
+* `pnpm start` 默认以 Next.js 开发模式启动，监听 `http://127.0.0.1:3001`
+* 开发服务器会把 `/api/*` 请求反向代理到 `http://127.0.0.1:3000`
+* 如需改后端地址，可在启动前设置 `NEXT_DEV_BACKEND_URL`
+* 这种模式用于本地热更新开发；正式运行和交付仍以 `pnpm build` 后由 Go Server 托管为准
+
 ### 2.2 启动服务
 
 ```bash

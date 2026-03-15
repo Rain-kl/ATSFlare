@@ -26,6 +26,13 @@
 * Vitest + Testing Library + Playwright
 * pnpm
 
+本地开发模式：
+
+* `pnpm start`：启动独立前端开发服务器，默认监听 `3001`，支持热更新
+* 开发服务器默认把 `/api/*` 反向代理到 `http://127.0.0.1:3000`
+* 如需改后端地址，可设置 `NEXT_DEV_BACKEND_URL`
+* `pnpm build`：继续用于静态导出，产物交给 Go Server 托管
+
 要求：
 
 * 默认使用 TypeScript，不新增 JS 页面模块
