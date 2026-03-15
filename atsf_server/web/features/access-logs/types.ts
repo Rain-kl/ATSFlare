@@ -4,6 +4,7 @@ export interface AccessLogItem {
   node_name: string;
   logged_at: string;
   remote_addr: string;
+  region: string;
   host: string;
   path: string;
   status_code: number;

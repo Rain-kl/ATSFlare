@@ -206,15 +206,26 @@ func persistNodeAccessLogs(tx *gorm.DB, nodeID string, logs []AgentNodeAccessLog
 	if len(logs) == 0 {
 		return nil
 	}
+	resolver, err := newAccessLogRegionResolver()
+	if err != nil {
+		slog.Warn("initialize access log geo resolver failed", "node_id", nodeID, "error", err)
+	}
+	if resolver != nil {
+		defer resolver.Close()
+	}
 	for _, item := range logs {
 		record := &model.NodeAccessLog{
 			NodeID:     nodeID,
 			LoggedAt:   timeFromUnix(item.LoggedAtUnix, reportedAt),
 			RemoteAddr: strings.TrimSpace(item.RemoteAddr),
+			Region:     "",
 			Host:       strings.TrimSpace(item.Host),
 			Path:       strings.TrimSpace(item.Path),
 			StatusCode: item.StatusCode,
 			RawJSON:    marshalJSON(item),
+		}
+		if resolver != nil {
+			record.Region = resolver.Resolve(record.RemoteAddr)
 		}
 		if err := tx.Where(
 			"node_id = ? AND logged_at = ? AND remote_addr = ? AND host = ? AND path = ? AND status_code = ?",

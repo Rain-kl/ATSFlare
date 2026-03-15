@@ -1054,14 +1054,15 @@ export function SettingsPage() {
                       IP 归属方式
                     </p>
                     <p className="text-sm text-[var(--foreground-muted)]">
-                      控制世界地图等场景使用的 IP 归属解析来源。选择 MaxMind
-                      时会按需下载本地 mmdb 数据库。
+                      控制节点地图等场景使用的 IP
+                      归属解析来源。访客访问记录归属地入库固定使用 MaxMind
+                      mmdb。
                     </p>
                   </div>
                   <div className="mt-4">
                     <ResourceField
                       label="归属方式"
-                      hint="disabled 关闭解析；mmdb 使用本地数据库；其余选项调用外部 GeoIP 服务。"
+                      hint="disabled 关闭节点归属解析；mmdb 使用本地数据库；其余选项调用外部 GeoIP 服务。"
                     >
                       <ResourceSelect
                         value={operationFields.GeoIPProvider}
@@ -1082,9 +1083,7 @@ export function SettingsPage() {
                   </div>
                   <div className="mt-5 rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] p-5">
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
-                      <ResourceField
-                        label="测试 IP"
-                      >
+                      <ResourceField label="测试 IP">
                         <ResourceInput
                           value={geoIPTestIP}
                           onChange={(event) =>

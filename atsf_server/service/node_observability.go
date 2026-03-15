@@ -68,6 +68,10 @@ func GetNodeObservability(id uint, query NodeObservabilityQuery) (*NodeObservabi
 	if err != nil {
 		return nil, err
 	}
+	accessLogRegions, err := model.ListNodeAccessLogRegionCounts(node.NodeID, since, 8)
+	if err != nil {
+		return nil, err
+	}
 	trendSnapshots, err := model.ListNodeMetricSnapshots(node.NodeID, now.Add(-24*time.Hour), 0)
 	if err != nil {
 		return nil, err
@@ -89,7 +93,7 @@ func GetNodeObservability(id uint, query NodeObservabilityQuery) (*NodeObservabi
 		HealthEvents:    events,
 		Analytics: NodeObservabilityAnalytics{
 			Traffic:       buildTrafficWindowSummary(latestTrafficReport(reports)),
-			Distributions: buildTrafficDistributions(reports, 8),
+			Distributions: buildTrafficDistributions(reports, accessLogRegions, 8),
 			Health:        buildObservabilityHealthSummary(latestMetricSnapshot(snapshots), latestTrafficReport(reports), events),
 		},
 		Trends: NodeObservabilityTrends{

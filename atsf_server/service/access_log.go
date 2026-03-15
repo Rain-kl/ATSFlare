@@ -17,6 +17,7 @@ type AccessLogView struct {
 	NodeName   string    `json:"node_name"`
 	LoggedAt   time.Time `json:"logged_at"`
 	RemoteAddr string    `json:"remote_addr"`
+	Region     string    `json:"region"`
 	Host       string    `json:"host"`
 	Path       string    `json:"path"`
 	StatusCode int       `json:"status_code"`
@@ -76,6 +77,7 @@ func ListAccessLogs(nodeID string, page int, pageSize int) (*AccessLogList, erro
 			NodeName:   nodeNames[item.NodeID],
 			LoggedAt:   item.LoggedAt,
 			RemoteAddr: item.RemoteAddr,
+			Region:     item.Region,
 			Host:       item.Host,
 			Path:       item.Path,
 			StatusCode: item.StatusCode,

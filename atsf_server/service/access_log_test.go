@@ -28,6 +28,7 @@ func TestListAccessLogsIncludesSummaryTotals(t *testing.T) {
 			NodeID:     "node-a",
 			LoggedAt:   now.Add(-5 * time.Minute),
 			RemoteAddr: "1.1.1.1",
+			Region:     "United States",
 			Host:       "a.example.com",
 			Path:       "/alpha",
 			StatusCode: 200,
@@ -36,6 +37,7 @@ func TestListAccessLogsIncludesSummaryTotals(t *testing.T) {
 			NodeID:     "node-a",
 			LoggedAt:   now.Add(-4 * time.Minute),
 			RemoteAddr: "2.2.2.2",
+			Region:     "China",
 			Host:       "a.example.com",
 			Path:       "/beta",
 			StatusCode: 404,
@@ -44,6 +46,7 @@ func TestListAccessLogsIncludesSummaryTotals(t *testing.T) {
 			NodeID:     "node-b",
 			LoggedAt:   now.Add(-3 * time.Minute),
 			RemoteAddr: "1.1.1.1",
+			Region:     "United States",
 			Host:       "b.example.com",
 			Path:       "/gamma",
 			StatusCode: 502,
@@ -73,6 +76,9 @@ func TestListAccessLogsIncludesSummaryTotals(t *testing.T) {
 	}
 	if len(result.Items) != 2 {
 		t.Fatalf("expected current page items=2, got %d", len(result.Items))
+	}
+	if result.Items[1].Region == "" {
+		t.Fatalf("expected region to be returned, got %+v", result.Items[1])
 	}
 	if !result.HasMore {
 		t.Fatal("expected has_more to be true")

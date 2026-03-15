@@ -62,14 +62,28 @@ func buildTrafficWindowSummary(report *model.NodeRequestReport) TrafficWindowSum
 	return summary
 }
 
-func buildTrafficDistributions(reports []*model.NodeRequestReport, limit int) TrafficDistributions {
+func buildTrafficDistributions(
+	reports []*model.NodeRequestReport,
+	accessLogRegions []*model.NodeAccessLogRegionCount,
+	limit int,
+) TrafficDistributions {
 	statusCodes := make(distributionAccumulator)
 	topDomains := make(distributionAccumulator)
-	sourceCountries := make(distributionAccumulator)
+	reportSourceCountries := make(distributionAccumulator)
 	for _, report := range reports {
 		mergeJSONCounts(statusCodes, report.StatusCodesJSON)
 		mergeJSONCounts(topDomains, report.TopDomainsJSON)
-		mergeJSONCounts(sourceCountries, report.SourceCountriesJSON)
+		mergeJSONCounts(reportSourceCountries, report.SourceCountriesJSON)
+	}
+	sourceCountries := reportSourceCountries
+	if len(accessLogRegions) > 0 {
+		sourceCountries = make(distributionAccumulator, len(accessLogRegions))
+		for _, item := range accessLogRegions {
+			if item == nil || strings.TrimSpace(item.Region) == "" || item.Count <= 0 {
+				continue
+			}
+			sourceCountries[item.Region] = item.Count
+		}
 	}
 	return TrafficDistributions{
 		StatusCodes:     toDistributionItems(statusCodes, limit),

@@ -69,7 +69,7 @@ export function AccessLogsPage() {
     <div className="space-y-6">
       <PageHeader
         title="日志"
-        description="查看最近时间窗口内的访问记录，包含来源 IP、访问域名、路径、命中节点与响应状态码。"
+        description="查看最近时间窗口内的访问记录，包含来源 IP、归属地、访问域名、路径、命中节点与响应状态码。"
         action={
           <Link
             href="/node"
@@ -185,7 +185,14 @@ export function AccessLogsPage() {
                           </div>
                         </td>
                         <td className="px-3 py-4 font-medium text-[var(--foreground-primary)]">
-                          {item.remote_addr || '—'}
+                          <div>{item.remote_addr || '—'}</div>
+                          {item.region ? (
+                            <div className="mt-2">
+                              <span className="inline-flex rounded-full border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2.5 py-1 text-[11px] font-medium text-[var(--foreground-secondary)]">
+                                {item.region}
+                              </span>
+                            </div>
+                          ) : null}
                         </td>
                         <td className="px-3 py-4 text-[var(--foreground-secondary)]">
                           {item.host || '—'}

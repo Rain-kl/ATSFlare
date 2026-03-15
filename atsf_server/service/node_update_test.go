@@ -19,6 +19,10 @@ type fakeGeoIPProvider struct {
 	info *geoip.GeoInfo
 }
 
+type fakeAccessLogGeoProvider struct {
+	info *geoip.GeoInfo
+}
+
 func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
 	return f(req)
 }
@@ -39,12 +43,39 @@ func (f *fakeGeoIPProvider) Close() error {
 	return nil
 }
 
+func (f *fakeAccessLogGeoProvider) Name() string {
+	return "fake-access-log-geoip"
+}
+
+func (f *fakeAccessLogGeoProvider) GetGeoInfo(ip net.IP) (*geoip.GeoInfo, error) {
+	return f.info, nil
+}
+
+func (f *fakeAccessLogGeoProvider) UpdateDatabase() error {
+	return nil
+}
+
+func (f *fakeAccessLogGeoProvider) Close() error {
+	return nil
+}
+
 func withFakeGeoIPProvider(t *testing.T, info *geoip.GeoInfo) {
 	t.Helper()
 	previous := geoip.CurrentProvider
 	geoip.CurrentProvider = &fakeGeoIPProvider{info: info}
 	t.Cleanup(func() {
 		geoip.CurrentProvider = previous
+	})
+}
+
+func withFakeAccessLogGeoProvider(t *testing.T, info *geoip.GeoInfo) {
+	t.Helper()
+	previous := accessLogGeoProviderFactory
+	accessLogGeoProviderFactory = func() (geoip.GeoIPService, error) {
+		return &fakeAccessLogGeoProvider{info: info}, nil
+	}
+	t.Cleanup(func() {
+		accessLogGeoProviderFactory = previous
 	})
 }
 
@@ -564,6 +595,10 @@ func TestListNodeViewsDoesNotPersistComputedStatus(t *testing.T) {
 
 func TestHeartbeatNodePersistsObservabilityPayload(t *testing.T) {
 	setupServiceTestDB(t)
+	withFakeAccessLogGeoProvider(t, &geoip.GeoInfo{
+		ISOCode: "US",
+		Name:    "United States",
+	})
 
 	node := &model.Node{
 		NodeID:       "node-observe-1",
@@ -680,6 +715,9 @@ func TestHeartbeatNodePersistsObservabilityPayload(t *testing.T) {
 	if len(accessLogs) != 2 || accessLogs[0].Path == "" {
 		t.Fatalf("unexpected access logs: %+v", accessLogs)
 	}
+	if accessLogs[0].Region == "" || accessLogs[1].Region == "" {
+		t.Fatalf("expected access log region to persist: %+v", accessLogs)
+	}
 
 	events, err := model.ListNodeHealthEvents(node.NodeID, true, 10)
 	if err != nil {
@@ -692,6 +730,10 @@ func TestHeartbeatNodePersistsObservabilityPayload(t *testing.T) {
 
 func TestHeartbeatNodePersistsBufferedObservabilityPayload(t *testing.T) {
 	setupServiceTestDB(t)
+	withFakeAccessLogGeoProvider(t, &geoip.GeoInfo{
+		ISOCode: "CN",
+		Name:    "China",
+	})
 
 	node := &model.Node{
 		NodeID:       "node-observe-buffered",
@@ -787,6 +829,9 @@ func TestHeartbeatNodePersistsBufferedObservabilityPayload(t *testing.T) {
 	if len(accessLogs) != 1 || accessLogs[0].Path != "/buffered" {
 		t.Fatalf("expected buffered access logs to persist, got %+v", accessLogs)
 	}
+	if accessLogs[0].Region != "China" {
+		t.Fatalf("expected buffered access log region to persist, got %+v", accessLogs[0])
+	}
 
 	_, err = HeartbeatNode(node, AgentNodePayload{
 		NodeID:       node.NodeID,
@@ -858,6 +903,7 @@ func TestListAccessLogsUsesPagination(t *testing.T) {
 			NodeID:     node.NodeID,
 			LoggedAt:   now.Add(-10 * time.Second),
 			RemoteAddr: "203.0.113.1",
+			Region:     "United States",
 			Host:       "example.com",
 			Path:       "/one",
 			StatusCode: 200,
@@ -866,6 +912,7 @@ func TestListAccessLogsUsesPagination(t *testing.T) {
 			NodeID:     node.NodeID,
 			LoggedAt:   now.Add(-9 * time.Second),
 			RemoteAddr: "203.0.113.2",
+			Region:     "China",
 			Host:       "example.com",
 			Path:       "/two",
 			StatusCode: 200,
@@ -874,6 +921,7 @@ func TestListAccessLogsUsesPagination(t *testing.T) {
 			NodeID:     node.NodeID,
 			LoggedAt:   now.Add(-8 * time.Second),
 			RemoteAddr: "203.0.113.3",
+			Region:     "Japan",
 			Host:       "example.com",
 			Path:       "/three",
 			StatusCode: 502,
@@ -891,6 +939,9 @@ func TestListAccessLogsUsesPagination(t *testing.T) {
 	}
 	if pageOne.Items[0].Path != "/three" || pageOne.Items[1].Path != "/two" {
 		t.Fatalf("unexpected first page ordering: %+v", pageOne.Items)
+	}
+	if pageOne.Items[0].Region != "Japan" {
+		t.Fatalf("expected paged access log region to be returned, got %+v", pageOne.Items[0])
 	}
 
 	pageTwo, err := ListAccessLogs(node.NodeID, 1, 2)
@@ -1252,30 +1303,59 @@ func TestGetDashboardOverview(t *testing.T) {
 	}
 
 	if err := (&model.NodeRequestReport{
-		NodeID:              "node-dashboard-a",
-		WindowStartedAt:     now.Add(-time.Minute),
-		WindowEndedAt:       now,
-		RequestCount:        600,
-		ErrorCount:          6,
-		UniqueVisitorCount:  120,
-		StatusCodesJSON:     `{"200":570,"502":6,"304":24}`,
-		TopDomainsJSON:      `{"app.example.com":420,"api.example.com":180}`,
-		SourceCountriesJSON: `{"CN":320,"SG":280}`,
+		NodeID:             "node-dashboard-a",
+		WindowStartedAt:    now.Add(-time.Minute),
+		WindowEndedAt:      now,
+		RequestCount:       600,
+		ErrorCount:         6,
+		UniqueVisitorCount: 120,
+		StatusCodesJSON:    `{"200":570,"502":6,"304":24}`,
+		TopDomainsJSON:     `{"app.example.com":420,"api.example.com":180}`,
 	}).Insert(); err != nil {
 		t.Fatalf("failed to insert node a traffic report: %v", err)
 	}
 	if err := (&model.NodeRequestReport{
-		NodeID:              "node-dashboard-b",
-		WindowStartedAt:     now.Add(-time.Minute),
-		WindowEndedAt:       now,
-		RequestCount:        300,
-		ErrorCount:          30,
-		UniqueVisitorCount:  80,
-		StatusCodesJSON:     `{"200":240,"500":18,"502":12,"404":30}`,
-		TopDomainsJSON:      `{"app.example.com":140,"edge.example.com":160}`,
-		SourceCountriesJSON: `{"US":180,"CN":120}`,
+		NodeID:             "node-dashboard-b",
+		WindowStartedAt:    now.Add(-time.Minute),
+		WindowEndedAt:      now,
+		RequestCount:       300,
+		ErrorCount:         30,
+		UniqueVisitorCount: 80,
+		StatusCodesJSON:    `{"200":240,"500":18,"502":12,"404":30}`,
+		TopDomainsJSON:     `{"app.example.com":140,"edge.example.com":160}`,
 	}).Insert(); err != nil {
 		t.Fatalf("failed to insert node b traffic report: %v", err)
+	}
+	if err := model.DB.Create([]*model.NodeAccessLog{
+		{
+			NodeID:     "node-dashboard-a",
+			LoggedAt:   now.Add(-30 * time.Minute),
+			RemoteAddr: "203.0.113.11",
+			Region:     "China",
+			Host:       "app.example.com",
+			Path:       "/",
+			StatusCode: 200,
+		},
+		{
+			NodeID:     "node-dashboard-a",
+			LoggedAt:   now.Add(-20 * time.Minute),
+			RemoteAddr: "203.0.113.12",
+			Region:     "China",
+			Host:       "app.example.com",
+			Path:       "/login",
+			StatusCode: 200,
+		},
+		{
+			NodeID:     "node-dashboard-b",
+			LoggedAt:   now.Add(-10 * time.Minute),
+			RemoteAddr: "198.51.100.8",
+			Region:     "United States",
+			Host:       "edge.example.com",
+			Path:       "/edge",
+			StatusCode: 502,
+		},
+	}).Error; err != nil {
+		t.Fatalf("failed to seed dashboard access logs: %v", err)
 	}
 
 	if err := model.DB.Create(&model.NodeHealthEvent{
@@ -1331,7 +1411,7 @@ func TestGetDashboardOverview(t *testing.T) {
 	if len(view.Distributions.StatusCodes) == 0 || view.Distributions.StatusCodes[0].Key != "200" {
 		t.Fatalf("unexpected dashboard status distributions: %+v", view.Distributions.StatusCodes)
 	}
-	if len(view.Distributions.SourceCountries) == 0 || view.Distributions.SourceCountries[0].Key != "CN" {
+	if len(view.Distributions.SourceCountries) == 0 || view.Distributions.SourceCountries[0].Key != "China" {
 		t.Fatalf("unexpected dashboard source distributions: %+v", view.Distributions.SourceCountries)
 	}
 	if len(view.Distributions.TopDomains) == 0 || view.Distributions.TopDomains[0].Key != "app.example.com" {

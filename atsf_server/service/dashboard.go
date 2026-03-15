@@ -84,6 +84,10 @@ func GetDashboardOverview() (*DashboardOverviewView, error) {
 	if err != nil {
 		return nil, err
 	}
+	accessLogRegions, err := model.ListNodeAccessLogRegionCounts("", since, 8)
+	if err != nil {
+		return nil, err
+	}
 	activeEvents, err := model.ListActiveNodeHealthEvents()
 	if err != nil {
 		return nil, err
@@ -92,7 +96,7 @@ func GetDashboardOverview() (*DashboardOverviewView, error) {
 	view := &DashboardOverviewView{
 		GeneratedAt:   now,
 		Nodes:         make([]DashboardNodeHealth, 0, len(nodes)),
-		Distributions: buildTrafficDistributions(reports, 8),
+		Distributions: buildTrafficDistributions(reports, accessLogRegions, 8),
 		Trends: DashboardTrends{
 			Traffic24h:  buildTrafficTrendPoints(now, reports),
 			Capacity24h: buildCapacityTrendPoints(now, snapshots),
