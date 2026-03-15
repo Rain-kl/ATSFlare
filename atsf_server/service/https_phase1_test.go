@@ -57,7 +57,7 @@ func TestCreateTLSCertificateAndRenderHTTPSConfig(t *testing.T) {
 	if !strings.Contains(result.Version.MainConfig, "access_log __ATSF_ACCESS_LOG__ atsflare_json;") {
 		t.Fatal("expected main config to include managed access log placeholder")
 	}
-	if !strings.Contains(result.Version.MainConfig, "log_by_lua_file __ATSF_LUA_DIR__/observability/log.lua;") {
+	if !strings.Contains(result.Version.MainConfig, "log_by_lua_file __ATSF_LUA_DIR__/log.lua;") {
 		t.Fatal("expected main config to include managed openresty lua log hook")
 	}
 	if !strings.Contains(result.Version.MainConfig, "listen __ATSF_OBSERVABILITY_LISTEN__;") {
@@ -72,20 +72,11 @@ func TestCreateTLSCertificateAndRenderHTTPSConfig(t *testing.T) {
 	if !strings.Contains(result.Version.RenderedConfig, "return 301 https://$host$request_uri;") {
 		t.Fatal("expected rendered config to include http redirect")
 	}
-	if !strings.Contains(result.Version.RenderedConfig, "__ATSF_SUPPORT_DIR__/") {
-		t.Fatal("expected rendered config to keep support dir placeholder for certificates")
+	if !strings.Contains(result.Version.RenderedConfig, "__ATSF_CERT_DIR__/") {
+		t.Fatal("expected rendered config to keep cert dir placeholder for certificates")
 	}
 	if !strings.Contains(result.Version.SupportFilesJSON, ".crt") || !strings.Contains(result.Version.SupportFilesJSON, ".key") {
 		t.Fatal("expected support files to contain certificate and key")
-	}
-	if !strings.Contains(result.Version.SupportFilesJSON, "observability/log.lua") || !strings.Contains(result.Version.SupportFilesJSON, "observability/read.lua") {
-		t.Fatal("expected support files to contain managed openresty observability lua scripts")
-	}
-	if !strings.Contains(result.Version.SupportFilesJSON, "/atsflare/observability") || !strings.Contains(result.Version.SupportFilesJSON, "/atsflare/stub_status") {
-		t.Fatal("expected observability log lua to skip self-observability requests")
-	}
-	if !strings.Contains(result.Version.SupportFilesJSON, "window_start = now - (now % window_size)") || !strings.Contains(result.Version.SupportFilesJSON, "local window_size = 60") {
-		t.Fatal("expected support files to use fixed 60-second observability windows")
 	}
 }
 
@@ -205,7 +196,7 @@ func TestPreviewAndDiffConfigVersion(t *testing.T) {
 	if !strings.Contains(preview.MainConfig, "include __ATSF_ROUTE_CONFIG__;") {
 		t.Fatal("expected preview main config to include managed route config placeholder")
 	}
-	if !strings.Contains(preview.MainConfig, "log_by_lua_file __ATSF_LUA_DIR__/observability/log.lua;") {
+	if !strings.Contains(preview.MainConfig, "log_by_lua_file __ATSF_LUA_DIR__/log.lua;") {
 		t.Fatal("expected preview main config to include managed openresty lua log hook")
 	}
 	if !strings.Contains(preview.RenderedConfig, `proxy_set_header X-Release "candidate";`) {

@@ -39,8 +39,10 @@ func main() {
 			Image:                      cfg.OpenrestyDockerImage,
 			MainConfigPath:             cfg.MainConfigPath,
 			RouteConfigPath:            cfg.RouteConfigPath,
-			SupportDir:                 cfg.SupportDir,
-			NginxSupportDir:            cfg.OpenrestySupportDir,
+			CertDir:                    cfg.CertDir,
+			NginxCertDir:               cfg.OpenrestyCertDir,
+			LuaDir:                     cfg.LuaDir,
+			NginxLuaDir:                cfg.OpenrestyLuaDir,
 			OpenrestyObservabilityPort: cfg.OpenrestyObservabilityPort,
 		},
 	)
@@ -50,7 +52,8 @@ func main() {
 		"ip", cfg.NodeIP,
 		"heartbeat_interval", cfg.HeartbeatInterval,
 		"route_config", cfg.RouteConfigPath,
-		"support_dir", cfg.SupportDir,
+		"cert_dir", cfg.CertDir,
+		"lua_dir", cfg.LuaDir,
 	)
 
 	client := httpclient.New(cfg.ServerURL, cfg.InitialAuthToken(), cfg.RequestTimeout.Duration())
@@ -64,8 +67,10 @@ func main() {
 		MainConfigPath:               cfg.MainConfigPath,
 		RouteConfigPath:              cfg.RouteConfigPath,
 		RuntimeRouteConfigPath:       runtimeRouteConfigPath,
-		SupportDir:                   cfg.SupportDir,
-		NginxSupportDir:              cfg.OpenrestySupportDir,
+		CertDir:                      cfg.CertDir,
+		NginxCertDir:                 cfg.OpenrestyCertDir,
+		LuaDir:                       cfg.LuaDir,
+		NginxLuaDir:                  cfg.OpenrestyLuaDir,
 		OpenrestyObservabilityListen: nginx.ObservabilityListenAddress(cfg.OpenrestyPath, cfg.OpenrestyObservabilityPort),
 		OpenrestyObservabilityPort:   cfg.OpenrestyObservabilityPort,
 		Executor: nginx.NewExecutor(nginx.ExecutorOptions{
@@ -75,10 +80,16 @@ func main() {
 			Image:                      cfg.OpenrestyDockerImage,
 			MainConfigPath:             cfg.MainConfigPath,
 			RouteConfigPath:            cfg.RouteConfigPath,
-			SupportDir:                 cfg.SupportDir,
-			NginxSupportDir:            cfg.OpenrestySupportDir,
+			CertDir:                    cfg.CertDir,
+			NginxCertDir:               cfg.OpenrestyCertDir,
+			LuaDir:                     cfg.LuaDir,
+			NginxLuaDir:                cfg.OpenrestyLuaDir,
 			OpenrestyObservabilityPort: cfg.OpenrestyObservabilityPort,
 		}),
+	}
+	if err = runtimeManager.EnsureLuaAssets(); err != nil {
+		slog.Error("ensure managed lua assets failed", "error", err)
+		os.Exit(1)
 	}
 	runner := &agent.Runner{
 		Config:              cfg,

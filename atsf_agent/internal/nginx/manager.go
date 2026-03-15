@@ -18,7 +18,7 @@ import (
 	"atsflare-agent/internal/protocol"
 )
 
-const SupportDirPlaceholder = "__ATSF_SUPPORT_DIR__"
+const CertDirPlaceholder = "__ATSF_CERT_DIR__"
 const RouteConfigPlaceholder = "__ATSF_ROUTE_CONFIG__"
 const AccessLogPlaceholder = "__ATSF_ACCESS_LOG__"
 const LuaDirPlaceholder = "__ATSF_LUA_DIR__"
@@ -106,8 +106,10 @@ type DockerExecutor struct {
 	Image                      string
 	MainConfigPath             string
 	RouteConfigDir             string
-	SupportDir                 string
-	NginxSupportDir            string
+	CertDir                    string
+	NginxCertDir               string
+	LuaDir                     string
+	NginxLuaDir                string
 	OpenrestyObservabilityPort int
 	Runner                     CommandRunner
 }
@@ -188,7 +190,8 @@ func (e *DockerExecutor) runContainer(ctx context.Context) error {
 		"-p", fmt.Sprintf("127.0.0.1:%d:%d", e.OpenrestyObservabilityPort, e.OpenrestyObservabilityPort),
 		"-v", fmt.Sprintf("%s:%s", e.MainConfigPath, DockerMainConfigPath),
 		"-v", fmt.Sprintf("%s:/etc/nginx/conf.d", e.RouteConfigDir),
-		"-v", fmt.Sprintf("%s:%s", e.SupportDir, e.NginxSupportDir),
+		"-v", fmt.Sprintf("%s:%s", e.CertDir, e.NginxCertDir),
+		"-v", fmt.Sprintf("%s:%s", e.LuaDir, e.NginxLuaDir),
 		e.Image,
 	}
 	runOutput, runErr := e.Runner.Run(ctx, e.DockerBinary, runArgs...)
@@ -203,21 +206,28 @@ type Manager struct {
 	MainConfigPath               string
 	RouteConfigPath              string
 	RuntimeRouteConfigPath       string
-	SupportDir                   string
-	NginxSupportDir              string
+	CertDir                      string
+	NginxCertDir                 string
+	LuaDir                       string
+	NginxLuaDir                  string
 	OpenrestyObservabilityListen string
 	OpenrestyObservabilityPort   int
 	Executor                     Executor
 }
 
 func (m *Manager) Apply(ctx context.Context, mainConfig string, routeConfig string, supportFiles []protocol.SupportFile) error {
-	slog.Info("openresty apply started", "main_config", m.MainConfigPath, "route_config", m.RouteConfigPath, "support_files", len(supportFiles))
+	slog.Info("openresty apply started", "main_config", m.MainConfigPath, "route_config", m.RouteConfigPath, "cert_files", len(supportFiles))
 	backup, err := m.backup()
 	if err != nil {
 		return err
 	}
-	if err = m.writeSupportFiles(supportFiles); err != nil {
-		slog.Error("writing support files failed, restoring backup", "error", err)
+	if err = m.EnsureLuaAssets(); err != nil {
+		slog.Error("writing lua assets failed, restoring backup", "error", err)
+		_ = m.restore(backup)
+		return err
+	}
+	if err = m.writeCertFiles(supportFiles); err != nil {
+		slog.Error("writing cert files failed, restoring backup", "error", err)
 		_ = m.restore(backup)
 		return err
 	}
@@ -244,6 +254,31 @@ func (m *Manager) Apply(ctx context.Context, mainConfig string, routeConfig stri
 		return err
 	}
 	slog.Info("openresty apply completed successfully", "main_config", m.MainConfigPath, "route_config", m.RouteConfigPath)
+	return nil
+}
+
+func (m *Manager) EnsureLuaAssets() error {
+	if strings.TrimSpace(m.LuaDir) == "" {
+		return nil
+	}
+	if err := os.RemoveAll(m.LuaDir); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	if err := os.MkdirAll(m.LuaDir, 0o755); err != nil {
+		return err
+	}
+	for _, file := range ManagedObservabilityLuaFiles() {
+		targetPath, err := luaFileTargetPath(m.LuaDir, file.Path)
+		if err != nil {
+			return err
+		}
+		if err := os.MkdirAll(filepath.Dir(targetPath), 0o755); err != nil {
+			return err
+		}
+		if err := os.WriteFile(targetPath, []byte(file.Content), 0o644); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -308,15 +343,15 @@ func (m *Manager) CurrentChecksum() (string, error) {
 		normalizedMain = strings.ReplaceAll(normalizedMain, fmt.Sprintf("%d", m.OpenrestyObservabilityPort), ObservabilityPortPlaceholder)
 	}
 	normalizedRoute := string(data)
-	if m.NginxSupportDir != "" {
-		normalizedRoute = strings.ReplaceAll(normalizedRoute, m.NginxSupportDir, SupportDirPlaceholder)
+	if m.NginxCertDir != "" {
+		normalizedRoute = strings.ReplaceAll(normalizedRoute, m.NginxCertDir, CertDirPlaceholder)
 	}
-	files, err := m.readSupportFiles()
+	files, err := m.readCertFiles()
 	if err != nil {
 		return "", err
 	}
 	result := bundleChecksum(normalizedMain, normalizedRoute, files)
-	slog.Debug("openresty current checksum calculated", "main_config", m.MainConfigPath, "route_config", m.RouteConfigPath, "checksum", result, "support_files", len(files))
+	slog.Debug("openresty current checksum calculated", "main_config", m.MainConfigPath, "route_config", m.RouteConfigPath, "checksum", result, "cert_files", len(files))
 	return result, nil
 }
 
@@ -327,8 +362,10 @@ type ExecutorOptions struct {
 	Image                      string
 	MainConfigPath             string
 	RouteConfigPath            string
-	SupportDir                 string
-	NginxSupportDir            string
+	CertDir                    string
+	NginxCertDir               string
+	LuaDir                     string
+	NginxLuaDir                string
 	OpenrestyObservabilityPort int
 }
 
@@ -341,16 +378,28 @@ func NewExecutor(options ExecutorOptions) Executor {
 		}
 	}
 	mainConfigPath := options.MainConfigPath
-	if absPath, err := filepath.Abs(mainConfigPath); err == nil {
-		mainConfigPath = absPath
+	if mainConfigPath != "" {
+		if absPath, err := filepath.Abs(mainConfigPath); err == nil {
+			mainConfigPath = absPath
+		}
 	}
 	routeConfigDir := filepath.Dir(options.RouteConfigPath)
-	if absDir, err := filepath.Abs(routeConfigDir); err == nil {
-		routeConfigDir = absDir
+	if options.RouteConfigPath != "" {
+		if absDir, err := filepath.Abs(routeConfigDir); err == nil {
+			routeConfigDir = absDir
+		}
 	}
-	supportDir := options.SupportDir
-	if absDir, err := filepath.Abs(supportDir); err == nil {
-		supportDir = absDir
+	certDir := options.CertDir
+	if certDir != "" {
+		if absDir, err := filepath.Abs(certDir); err == nil {
+			certDir = absDir
+		}
+	}
+	luaDir := options.LuaDir
+	if luaDir != "" {
+		if absDir, err := filepath.Abs(luaDir); err == nil {
+			luaDir = absDir
+		}
 	}
 	return &DockerExecutor{
 		DockerBinary:               options.DockerBinary,
@@ -358,8 +407,10 @@ func NewExecutor(options ExecutorOptions) Executor {
 		Image:                      options.Image,
 		MainConfigPath:             mainConfigPath,
 		RouteConfigDir:             routeConfigDir,
-		SupportDir:                 supportDir,
-		NginxSupportDir:            options.NginxSupportDir,
+		CertDir:                    certDir,
+		NginxCertDir:               options.NginxCertDir,
+		LuaDir:                     luaDir,
+		NginxLuaDir:                options.NginxLuaDir,
 		OpenrestyObservabilityPort: options.OpenrestyObservabilityPort,
 		Runner:                     runner,
 	}
@@ -432,7 +483,9 @@ func (e *DockerExecutor) runEphemeralRuntimeCommandWithBinary(ctx context.Contex
 		"-v",
 		fmt.Sprintf("%s:/etc/nginx/conf.d", e.RouteConfigDir),
 		"-v",
-		fmt.Sprintf("%s:%s", e.SupportDir, e.NginxSupportDir),
+		fmt.Sprintf("%s:%s", e.CertDir, e.NginxCertDir),
+		"-v",
+		fmt.Sprintf("%s:%s", e.LuaDir, e.NginxLuaDir),
 		e.Image,
 		runtimeBinary,
 	}
@@ -465,8 +518,8 @@ func (m *Manager) backup() (*backupState, error) {
 	if err := os.MkdirAll(filepath.Dir(m.RouteConfigPath), 0o755); err != nil {
 		return nil, err
 	}
-	if m.SupportDir != "" {
-		if err := os.MkdirAll(m.SupportDir, 0o755); err != nil {
+	if m.CertDir != "" {
+		if err := os.MkdirAll(m.CertDir, 0o755); err != nil {
 			return nil, err
 		}
 	}
@@ -485,12 +538,12 @@ func (m *Manager) backup() (*backupState, error) {
 	} else if !os.IsNotExist(err) {
 		return nil, err
 	}
-	files, err := m.readSupportFiles()
+	files, err := m.readCertFiles()
 	if err != nil {
 		return nil, err
 	}
 	state.Files = files
-	slog.Debug("backup captured", "main_exists", state.MainExisted, "route_exists", state.RouteExisted, "support_files", len(state.Files))
+	slog.Debug("backup captured", "main_exists", state.MainExisted, "route_exists", state.RouteExisted, "cert_files", len(state.Files))
 	return state, nil
 }
 
@@ -498,7 +551,7 @@ func (m *Manager) restore(state *backupState) error {
 	if state == nil {
 		return nil
 	}
-	slog.Warn("restoring nginx backup", "main_existed", state.MainExisted, "route_existed", state.RouteExisted, "support_files", len(state.Files))
+	slog.Warn("restoring nginx backup", "main_existed", state.MainExisted, "route_existed", state.RouteExisted, "cert_files", len(state.Files))
 	if state.MainExisted {
 		if err := os.WriteFile(m.MainConfigPath, state.MainData, 0o644); err != nil {
 			return err
@@ -513,67 +566,67 @@ func (m *Manager) restore(state *backupState) error {
 	} else if err := os.Remove(m.RouteConfigPath); err != nil && !os.IsNotExist(err) {
 		return err
 	}
-	if m.SupportDir == "" {
+	if m.CertDir == "" {
 		return nil
 	}
-	if err := os.RemoveAll(m.SupportDir); err != nil && !os.IsNotExist(err) {
+	if err := os.RemoveAll(m.CertDir); err != nil && !os.IsNotExist(err) {
 		return err
 	}
-	if err := os.MkdirAll(m.SupportDir, 0o755); err != nil {
+	if err := os.MkdirAll(m.CertDir, 0o755); err != nil {
 		return err
 	}
 	for _, file := range state.Files {
-		targetPath, err := m.supportFileTargetPath(file.Path)
+		targetPath, err := m.certFileTargetPath(file.Path)
 		if err != nil {
 			return err
 		}
 		if err := os.MkdirAll(filepath.Dir(targetPath), 0o755); err != nil {
 			return err
 		}
-		if err := os.WriteFile(targetPath, []byte(file.Content), supportFileMode(file.Path)); err != nil {
+		if err := os.WriteFile(targetPath, []byte(file.Content), certFileMode(file.Path)); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (m *Manager) writeSupportFiles(supportFiles []protocol.SupportFile) error {
-	if m.SupportDir == "" {
+func (m *Manager) writeCertFiles(certFiles []protocol.SupportFile) error {
+	if m.CertDir == "" {
 		return nil
 	}
-	if err := os.RemoveAll(m.SupportDir); err != nil && !os.IsNotExist(err) {
+	if err := os.RemoveAll(m.CertDir); err != nil && !os.IsNotExist(err) {
 		return err
 	}
-	if err := os.MkdirAll(m.SupportDir, 0o755); err != nil {
+	if err := os.MkdirAll(m.CertDir, 0o755); err != nil {
 		return err
 	}
-	for _, file := range supportFiles {
-		targetPath, err := m.supportFileTargetPath(file.Path)
+	for _, file := range certFiles {
+		targetPath, err := m.certFileTargetPath(file.Path)
 		if err != nil {
 			return err
 		}
 		if err := os.MkdirAll(filepath.Dir(targetPath), 0o755); err != nil {
 			return err
 		}
-		if err := os.WriteFile(targetPath, []byte(file.Content), supportFileMode(file.Path)); err != nil {
+		if err := os.WriteFile(targetPath, []byte(file.Content), certFileMode(file.Path)); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (m *Manager) readSupportFiles() ([]protocol.SupportFile, error) {
-	if m.SupportDir == "" {
+func (m *Manager) readCertFiles() ([]protocol.SupportFile, error) {
+	if m.CertDir == "" {
 		return nil, nil
 	}
-	if _, err := os.Stat(m.SupportDir); err != nil {
+	if _, err := os.Stat(m.CertDir); err != nil {
 		if os.IsNotExist(err) {
 			return nil, nil
 		}
 		return nil, err
 	}
 	files := make([]protocol.SupportFile, 0)
-	err := filepath.Walk(m.SupportDir, func(path string, info os.FileInfo, err error) error {
+	err := filepath.Walk(m.CertDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -584,7 +637,7 @@ func (m *Manager) readSupportFiles() ([]protocol.SupportFile, error) {
 		if err != nil {
 			return err
 		}
-		relativePath, err := filepath.Rel(m.SupportDir, path)
+		relativePath, err := filepath.Rel(m.CertDir, path)
 		if err != nil {
 			return err
 		}
@@ -603,9 +656,9 @@ func (m *Manager) readSupportFiles() ([]protocol.SupportFile, error) {
 	return files, nil
 }
 
-func (m *Manager) supportFileTargetPath(relativePath string) (string, error) {
-	if strings.TrimSpace(m.SupportDir) == "" {
-		return "", errors.New("support dir 不能为空")
+func (m *Manager) certFileTargetPath(relativePath string) (string, error) {
+	if strings.TrimSpace(m.CertDir) == "" {
+		return "", errors.New("cert dir 不能为空")
 	}
 	candidate := strings.TrimSpace(relativePath)
 	if strings.Contains(candidate, `\`) {
@@ -613,25 +666,25 @@ func (m *Manager) supportFileTargetPath(relativePath string) (string, error) {
 	}
 	normalizedPath := filepath.Clean(filepath.FromSlash(candidate))
 	if normalizedPath == "." || normalizedPath == "" {
-		return "", errors.New("support file path 不能为空")
+		return "", errors.New("cert file path 不能为空")
 	}
 	if filepath.IsAbs(normalizedPath) || filepath.VolumeName(normalizedPath) != "" {
-		return "", fmt.Errorf("support file path %q must be relative", relativePath)
+		return "", fmt.Errorf("cert file path %q must be relative", relativePath)
 	}
-	targetPath := filepath.Join(m.SupportDir, normalizedPath)
-	relativeToBase, err := filepath.Rel(m.SupportDir, targetPath)
+	targetPath := filepath.Join(m.CertDir, normalizedPath)
+	relativeToBase, err := filepath.Rel(m.CertDir, targetPath)
 	if err != nil {
 		return "", err
 	}
 	if relativeToBase == ".." || strings.HasPrefix(relativeToBase, ".."+string(os.PathSeparator)) {
-		return "", fmt.Errorf("support file path %q escapes support dir", relativePath)
+		return "", fmt.Errorf("cert file path %q escapes cert dir", relativePath)
 	}
 	return targetPath, nil
 }
 
-func supportFileMode(relativePath string) fs.FileMode {
+func certFileMode(relativePath string) fs.FileMode {
 	switch strings.ToLower(filepath.Ext(strings.TrimSpace(relativePath))) {
-	case ".lua", ".crt", ".pem":
+	case ".crt", ".pem":
 		return 0o644
 	case ".key":
 		return 0o600
@@ -640,11 +693,37 @@ func supportFileMode(relativePath string) fs.FileMode {
 	}
 }
 
+func luaFileTargetPath(baseDir string, relativePath string) (string, error) {
+	if strings.TrimSpace(baseDir) == "" {
+		return "", errors.New("lua dir 不能为空")
+	}
+	candidate := strings.TrimSpace(relativePath)
+	if strings.Contains(candidate, `\`) {
+		candidate = strings.ReplaceAll(candidate, `\`, "/")
+	}
+	normalizedPath := filepath.Clean(filepath.FromSlash(candidate))
+	if normalizedPath == "." || normalizedPath == "" {
+		return "", errors.New("lua file path 不能为空")
+	}
+	if filepath.IsAbs(normalizedPath) || filepath.VolumeName(normalizedPath) != "" {
+		return "", fmt.Errorf("lua file path %q must be relative", relativePath)
+	}
+	targetPath := filepath.Join(baseDir, normalizedPath)
+	relativeToBase, err := filepath.Rel(baseDir, targetPath)
+	if err != nil {
+		return "", err
+	}
+	if relativeToBase == ".." || strings.HasPrefix(relativeToBase, ".."+string(os.PathSeparator)) {
+		return "", fmt.Errorf("lua file path %q escapes lua dir", relativePath)
+	}
+	return targetPath, nil
+}
+
 func (m *Manager) renderRouteConfig(content string) string {
-	if m.NginxSupportDir == "" {
+	if m.NginxCertDir == "" {
 		return content
 	}
-	return strings.ReplaceAll(content, SupportDirPlaceholder, m.NginxSupportDir)
+	return strings.ReplaceAll(content, CertDirPlaceholder, m.NginxCertDir)
 }
 
 func (m *Manager) renderMainConfig(content string) string {
@@ -693,10 +772,10 @@ func (m *Manager) accessLogRuntimePath() string {
 }
 
 func (m *Manager) luaRuntimePath() string {
-	if strings.TrimSpace(m.NginxSupportDir) == "" {
+	if strings.TrimSpace(m.NginxLuaDir) == "" {
 		return ""
 	}
-	return filepath.ToSlash(m.NginxSupportDir)
+	return filepath.ToSlash(m.NginxLuaDir)
 }
 
 func checksum(content string) string {

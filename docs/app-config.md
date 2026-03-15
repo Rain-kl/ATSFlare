@@ -260,8 +260,10 @@ go run ./cmd/agent -config ./agent.json
 	"openresty_path": "/usr/local/openresty/nginx/sbin/openresty",
 	"main_config_path": "/usr/local/openresty/nginx/conf/nginx.conf",
 	"route_config_path": "/usr/local/openresty/nginx/conf/conf.d/atsflare_routes.conf",
-	"support_dir": "/usr/local/openresty/nginx/conf/support",
-	"openresty_support_dir": "/usr/local/openresty/nginx/conf/support",
+	"cert_dir": "/usr/local/openresty/nginx/conf/certs",
+	"openresty_cert_dir": "/usr/local/openresty/nginx/conf/certs",
+	"lua_dir": "/usr/local/openresty/nginx/conf/lua",
+	"openresty_lua_dir": "/usr/local/openresty/nginx/conf/lua",
 	"openresty_observability_port": 18081,
 	"observability_buffer_path": "./data/observability-buffer.json",
 	"observability_replay_minutes": 15,
@@ -288,8 +290,10 @@ go run ./cmd/agent -config ./agent.json
 | `data_dir` | Agent 数据目录，用于存储托管配置、证书和状态文件 | 否 | 配置文件所在目录下的 `data` 子目录 | `./data` |
 | `main_config_path` | 第五版主配置接管时 OpenResty 主配置文件写入路径 | 第五版本机模式建议必填 | Docker 模式可使用受管默认路径；本机模式建议显式设置 | `/usr/local/openresty/nginx/conf/nginx.conf` |
 | `route_config_path` | 路由配置文件写入路径 | 否 | 默认为 `data_dir` 下托管路径 | `/etc/nginx/conf.d/atsflare_routes.conf` |
-| `support_dir` | Agent 在本机写入受管附属文件的目录，当前包含证书与 Lua 观测脚本 | 否 | 默认为 `data_dir` 下托管 support 目录 | `./data/etc/nginx/support` |
-| `openresty_support_dir` | OpenResty 实际读取受管附属文件的目录 | 否 | 本机模式默认等于 `support_dir`；Docker 模式默认 `/etc/nginx/atsflare-support` | `/usr/local/openresty/nginx/conf/support` |
+| `cert_dir` | Agent 在本机写入受管证书文件的目录 | 否 | 默认为 `data_dir` 下托管 certs 目录 | `./data/etc/nginx/certs` |
+| `openresty_cert_dir` | OpenResty 实际读取受管证书文件的目录 | 否 | 本机模式默认等于 `cert_dir`；Docker 模式默认 `/etc/nginx/atsflare-certs` | `/usr/local/openresty/nginx/conf/certs` |
+| `lua_dir` | Agent 在本机写入受管 Lua 观测脚本的目录；每次启动都会覆盖释放 | 否 | 默认为 `data_dir` 下托管 lua 目录 | `./data/etc/nginx/lua` |
+| `openresty_lua_dir` | OpenResty 实际读取受管 Lua 观测脚本的目录 | 否 | 本机模式默认等于 `lua_dir`；Docker 模式默认 `/etc/nginx/atsflare-lua` | `/usr/local/openresty/nginx/conf/lua` |
 | `observability_buffer_path` | Agent 本地观测补报缓冲文件路径；用于在 server 短暂离线时按时间窗口落盘待补传数据 | 否 | 默认为 `data_dir` 下托管观测缓冲文件 | `./data/var/lib/atsflare/observability-buffer.json` |
 | `observability_replay_minutes` | Agent 恢复心跳后允许批量补传的最近观测窗口时长（分钟） | 否 | `15` | `30` |
 | `state_path` | Agent 本地状态文件路径 | 否 | 默认为 `data_dir` 下托管状态文件 | `./data/agent-state.json` |
@@ -306,7 +310,6 @@ go run ./cmd/agent -config ./agent.json
 * 未配置 `openresty_path` 时，默认为 Docker OpenResty 模式
 * `openresty_observability_port` 默认仅绑定本地回环地址；若节点本机已有端口冲突，可改为其他未占用端口
 * `observability_replay_minutes` 只控制“允许补传最近多少分钟的窗口”；超出该窗口的历史观测会在本地自动裁剪
-* 为兼容旧节点，Agent 仍可读取历史字段 `cert_dir` / `openresty_cert_dir`，但保存配置时会统一写回 `support_dir` / `openresty_support_dir`
 * 配置保存时，`agent_version`、`nginx_version` 由程序运行时维护，不需要写入 JSON
 * 第五版主配置接管完成后，本机模式下应优先通过 `main_config_path` 由 Agent 写入受管主配置，而不是依赖节点手工维护 include 规则
 
@@ -318,7 +321,8 @@ go run ./cmd/agent -config ./agent.json
 | --- | --- |
 | `main_config_path` | 第五版 Docker 模式默认可落在 `data_dir/etc/nginx/nginx.conf`；本机模式建议显式配置 |
 | `route_config_path` | `data_dir/etc/nginx/conf.d/atsflare_routes.conf` |
-| `support_dir` | `data_dir/etc/nginx/support` |
+| `cert_dir` | `data_dir/etc/nginx/certs` |
+| `lua_dir` | `data_dir/etc/nginx/lua` |
 | `observability_buffer_path` | `data_dir/var/lib/atsflare/observability-buffer.json` |
 | `state_path` | `data_dir/var/lib/atsflare/agent-state.json` |
 
@@ -326,11 +330,13 @@ Docker OpenResty 模式下：
 
 | 字段 | 默认值 |
 | --- | --- |
-| `openresty_support_dir` | `/etc/nginx/atsflare-support` |
+| `openresty_cert_dir` | `/etc/nginx/atsflare-certs` |
+| `openresty_lua_dir` | `/etc/nginx/atsflare-lua` |
 
 补充说明：
 
-* Agent 当前会随受管配置一并向 OpenResty 注入 Lua 观测脚本，并在每次 heartbeat 前通过 `http://127.0.0.1:<openresty_observability_port>/atsflare/observability` 读取最近窗口请求指标
+* Agent 会在每次启动时把受管 Lua 观测脚本覆盖释放到 `lua_dir`，不再由 Server 随配置版本下发
+* OpenResty 通过 `openresty_lua_dir` 读取这些本地脚本，并在每次 heartbeat 前通过 `http://127.0.0.1:<openresty_observability_port>/atsflare/observability` 读取最近窗口请求指标
 * 若 server 短暂离线，Agent 会把最近窗口观测先写入 `observability_buffer_path`，待 heartbeat 恢复后按时间窗口批量补传最近 `observability_replay_minutes` 分钟的数据
 * 同一端口还会暴露仅本机可访问的 `stub_status`，用于采集 OpenResty 活动连接数
 
@@ -359,8 +365,10 @@ Docker OpenResty 模式下：
 	"openresty_path": "/usr/local/openresty/nginx/sbin/openresty",
 	"main_config_path": "/usr/local/openresty/nginx/conf/nginx.conf",
 	"route_config_path": "/usr/local/openresty/nginx/conf/conf.d/atsflare_routes.conf",
-	"support_dir": "/usr/local/openresty/nginx/conf/support",
-	"openresty_support_dir": "/usr/local/openresty/nginx/conf/support"
+	"cert_dir": "/usr/local/openresty/nginx/conf/certs",
+	"openresty_cert_dir": "/usr/local/openresty/nginx/conf/certs",
+	"lua_dir": "/usr/local/openresty/nginx/conf/lua",
+	"openresty_lua_dir": "/usr/local/openresty/nginx/conf/lua"
 }
 ```
 

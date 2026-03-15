@@ -191,6 +191,7 @@ func GetActiveConfigForAgent() (*AgentConfigResponse, error) {
 			return nil, err
 		}
 	}
+	supportFiles = filterCertificateSupportFiles(supportFiles)
 	slog.Debug("agent fetched active config", "version", version.Version, "checksum", version.Checksum)
 	return &AgentConfigResponse{
 		Version:        version.Version,
@@ -201,6 +202,21 @@ func GetActiveConfigForAgent() (*AgentConfigResponse, error) {
 		SupportFiles:   supportFiles,
 		CreatedAt:      version.CreatedAt,
 	}, nil
+}
+
+func filterCertificateSupportFiles(files []SupportFile) []SupportFile {
+	if len(files) == 0 {
+		return nil
+	}
+	filtered := make([]SupportFile, 0, len(files))
+	for _, file := range files {
+		path := strings.ToLower(strings.TrimSpace(file.Path))
+		switch {
+		case strings.HasSuffix(path, ".crt"), strings.HasSuffix(path, ".key"), strings.HasSuffix(path, ".pem"):
+			filtered = append(filtered, file)
+		}
+	}
+	return filtered
 }
 
 func ReportApplyLog(payload ApplyLogPayload) (*model.ApplyLog, error) {

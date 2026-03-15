@@ -14,10 +14,12 @@ import (
 const (
 	defaultDockerMainConfigRelativePath    = "etc/nginx/nginx.conf"
 	defaultDockerRouteConfigRelativePath   = "etc/nginx/conf.d/atsflare_routes.conf"
-	defaultSupportDirRelativePath          = "etc/nginx/support"
+	defaultCertDirRelativePath             = "etc/nginx/certs"
+	defaultLuaDirRelativePath              = "etc/nginx/lua"
 	defaultDockerStateRelativePath         = "var/lib/atsflare/agent-state.json"
 	defaultObservabilityBufferRelativePath = "var/lib/atsflare/observability-buffer.json"
-	defaultDockerOpenRestySupportDir       = "/etc/nginx/atsflare-support"
+	defaultDockerOpenRestyCertDir          = "/etc/nginx/atsflare-certs"
+	defaultDockerOpenRestyLuaDir           = "/etc/nginx/atsflare-lua"
 	defaultOpenRestyObservabilityPort      = 18081
 	defaultObservabilityReplayMinutes      = 15
 )
@@ -37,8 +39,10 @@ type Config struct {
 	DataDir                    string              `json:"data_dir"`
 	MainConfigPath             string              `json:"main_config_path"`
 	RouteConfigPath            string              `json:"route_config_path"`
-	SupportDir                 string              `json:"support_dir"`
-	OpenrestySupportDir        string              `json:"openresty_support_dir"`
+	CertDir                    string              `json:"cert_dir"`
+	OpenrestyCertDir           string              `json:"openresty_cert_dir"`
+	LuaDir                     string              `json:"lua_dir"`
+	OpenrestyLuaDir            string              `json:"openresty_lua_dir"`
 	OpenrestyObservabilityPort int                 `json:"openresty_observability_port"`
 	ObservabilityBufferPath    string              `json:"observability_buffer_path"`
 	ObservabilityReplayMinutes int                 `json:"observability_replay_minutes"`
@@ -61,10 +65,10 @@ type configFile struct {
 	DataDir                    string              `json:"data_dir"`
 	MainConfigPath             string              `json:"main_config_path"`
 	RouteConfigPath            string              `json:"route_config_path"`
-	SupportDir                 string              `json:"support_dir"`
-	OpenrestySupportDir        string              `json:"openresty_support_dir"`
-	LegacyCertDir              string              `json:"cert_dir"`
-	LegacyOpenrestyCertDir     string              `json:"openresty_cert_dir"`
+	CertDir                    string              `json:"cert_dir"`
+	OpenrestyCertDir           string              `json:"openresty_cert_dir"`
+	LuaDir                     string              `json:"lua_dir"`
+	OpenrestyLuaDir            string              `json:"openresty_lua_dir"`
 	OpenrestyObservabilityPort int                 `json:"openresty_observability_port"`
 	ObservabilityBufferPath    string              `json:"observability_buffer_path"`
 	ObservabilityReplayMinutes int                 `json:"observability_replay_minutes"`
@@ -95,8 +99,10 @@ func Load(path string) (*Config, error) {
 		DataDir:                    file.DataDir,
 		MainConfigPath:             file.MainConfigPath,
 		RouteConfigPath:            file.RouteConfigPath,
-		SupportDir:                 firstNonEmpty(file.SupportDir, file.LegacyCertDir),
-		OpenrestySupportDir:        firstNonEmpty(file.OpenrestySupportDir, file.LegacyOpenrestyCertDir),
+		CertDir:                    file.CertDir,
+		OpenrestyCertDir:           file.OpenrestyCertDir,
+		LuaDir:                     file.LuaDir,
+		OpenrestyLuaDir:            file.OpenrestyLuaDir,
 		OpenrestyObservabilityPort: file.OpenrestyObservabilityPort,
 		ObservabilityBufferPath:    file.ObservabilityBufferPath,
 		ObservabilityReplayMinutes: file.ObservabilityReplayMinutes,
@@ -148,14 +154,24 @@ func applyDefaults(cfg *Config, baseDir string) {
 			cfg.StatePath = joinManagedPath(cfg.DataDir, defaultDockerStateRelativePath)
 		}
 	}
-	if cfg.SupportDir == "" {
-		cfg.SupportDir = joinManagedPath(cfg.DataDir, defaultSupportDirRelativePath)
+	if cfg.CertDir == "" {
+		cfg.CertDir = joinManagedPath(cfg.DataDir, defaultCertDirRelativePath)
 	}
-	if cfg.OpenrestySupportDir == "" {
+	if cfg.OpenrestyCertDir == "" {
 		if cfg.OpenrestyPath != "" {
-			cfg.OpenrestySupportDir = cfg.SupportDir
+			cfg.OpenrestyCertDir = cfg.CertDir
 		} else {
-			cfg.OpenrestySupportDir = defaultDockerOpenRestySupportDir
+			cfg.OpenrestyCertDir = defaultDockerOpenRestyCertDir
+		}
+	}
+	if cfg.LuaDir == "" {
+		cfg.LuaDir = joinManagedPath(cfg.DataDir, defaultLuaDirRelativePath)
+	}
+	if cfg.OpenrestyLuaDir == "" {
+		if cfg.OpenrestyPath != "" {
+			cfg.OpenrestyLuaDir = cfg.LuaDir
+		} else {
+			cfg.OpenrestyLuaDir = defaultDockerOpenRestyLuaDir
 		}
 	}
 	if cfg.OpenrestyObservabilityPort <= 0 {
@@ -189,11 +205,17 @@ func normalizeManagedPaths(cfg *Config) {
 	if usesSlashPath(cfg.RouteConfigPath) {
 		cfg.RouteConfigPath = filepath.ToSlash(cfg.RouteConfigPath)
 	}
-	if usesSlashPath(cfg.SupportDir) {
-		cfg.SupportDir = filepath.ToSlash(cfg.SupportDir)
+	if usesSlashPath(cfg.CertDir) {
+		cfg.CertDir = filepath.ToSlash(cfg.CertDir)
 	}
-	if usesSlashPath(cfg.OpenrestySupportDir) {
-		cfg.OpenrestySupportDir = filepath.ToSlash(cfg.OpenrestySupportDir)
+	if usesSlashPath(cfg.OpenrestyCertDir) {
+		cfg.OpenrestyCertDir = filepath.ToSlash(cfg.OpenrestyCertDir)
+	}
+	if usesSlashPath(cfg.LuaDir) {
+		cfg.LuaDir = filepath.ToSlash(cfg.LuaDir)
+	}
+	if usesSlashPath(cfg.OpenrestyLuaDir) {
+		cfg.OpenrestyLuaDir = filepath.ToSlash(cfg.OpenrestyLuaDir)
 	}
 	if usesSlashPath(cfg.StatePath) {
 		cfg.StatePath = filepath.ToSlash(cfg.StatePath)

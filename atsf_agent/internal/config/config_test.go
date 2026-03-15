@@ -39,8 +39,11 @@ func TestLoadDockerModeUsesManagedPaths(t *testing.T) {
 	if cfg.RouteConfigPath != filepath.Join(dir, "data", defaultDockerRouteConfigRelativePath) {
 		t.Fatalf("unexpected route config path: %s", cfg.RouteConfigPath)
 	}
-	if cfg.SupportDir != filepath.Join(dir, "data", defaultSupportDirRelativePath) {
-		t.Fatalf("unexpected support dir: %s", cfg.SupportDir)
+	if cfg.CertDir != filepath.Join(dir, "data", defaultCertDirRelativePath) {
+		t.Fatalf("unexpected cert dir: %s", cfg.CertDir)
+	}
+	if cfg.LuaDir != filepath.Join(dir, "data", defaultLuaDirRelativePath) {
+		t.Fatalf("unexpected lua dir: %s", cfg.LuaDir)
 	}
 	if cfg.OpenrestyContainerName != "atsflare-openresty" {
 		t.Fatalf("unexpected openresty container name: %s", cfg.OpenrestyContainerName)
@@ -48,8 +51,11 @@ func TestLoadDockerModeUsesManagedPaths(t *testing.T) {
 	if cfg.OpenrestyDockerImage != "openresty/openresty:alpine" {
 		t.Fatalf("unexpected openresty image: %s", cfg.OpenrestyDockerImage)
 	}
-	if cfg.OpenrestySupportDir != defaultDockerOpenRestySupportDir {
-		t.Fatalf("unexpected openresty support dir: %s", cfg.OpenrestySupportDir)
+	if cfg.OpenrestyCertDir != defaultDockerOpenRestyCertDir {
+		t.Fatalf("unexpected openresty cert dir: %s", cfg.OpenrestyCertDir)
+	}
+	if cfg.OpenrestyLuaDir != defaultDockerOpenRestyLuaDir {
+		t.Fatalf("unexpected openresty lua dir: %s", cfg.OpenrestyLuaDir)
 	}
 	if cfg.StatePath != filepath.Join(dir, "data", defaultDockerStateRelativePath) {
 		t.Fatalf("unexpected state path: %s", cfg.StatePath)
@@ -103,8 +109,11 @@ func TestLoadPathModeKeepsExplicitPaths(t *testing.T) {
 	if cfg.ObservabilityBufferPath != filepath.Join(dir, "data", defaultObservabilityBufferRelativePath) {
 		t.Fatalf("unexpected observability buffer path: %s", cfg.ObservabilityBufferPath)
 	}
-	if cfg.OpenrestySupportDir != cfg.SupportDir {
-		t.Fatalf("expected path mode openresty support dir to equal support dir, got %s / %s", cfg.OpenrestySupportDir, cfg.SupportDir)
+	if cfg.OpenrestyCertDir != cfg.CertDir {
+		t.Fatalf("expected path mode openresty cert dir to equal cert dir, got %s / %s", cfg.OpenrestyCertDir, cfg.CertDir)
+	}
+	if cfg.OpenrestyLuaDir != cfg.LuaDir {
+		t.Fatalf("expected path mode openresty lua dir to equal lua dir, got %s / %s", cfg.OpenrestyLuaDir, cfg.LuaDir)
 	}
 	if cfg.OpenrestyObservabilityPort != defaultOpenRestyObservabilityPort {
 		t.Fatalf("unexpected path mode openresty observability port: %d", cfg.OpenrestyObservabilityPort)
@@ -146,8 +155,11 @@ func TestLoadUsesCustomDataDirForGeneratedFiles(t *testing.T) {
 	if cfg.ObservabilityBufferPath != "/srv/atsflare/"+defaultObservabilityBufferRelativePath {
 		t.Fatalf("unexpected observability buffer path: %s", cfg.ObservabilityBufferPath)
 	}
-	if cfg.SupportDir != "/srv/atsflare/"+defaultSupportDirRelativePath {
-		t.Fatalf("unexpected support dir: %s", cfg.SupportDir)
+	if cfg.CertDir != "/srv/atsflare/"+defaultCertDirRelativePath {
+		t.Fatalf("unexpected cert dir: %s", cfg.CertDir)
+	}
+	if cfg.LuaDir != "/srv/atsflare/"+defaultLuaDirRelativePath {
+		t.Fatalf("unexpected lua dir: %s", cfg.LuaDir)
 	}
 }
 

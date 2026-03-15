@@ -117,14 +117,16 @@ func TestDockerExecutorCheckHealthFailsWhenContainerStopped(t *testing.T) {
 		},
 	}
 	executor := &DockerExecutor{
-		DockerBinary:    "docker",
-		ContainerName:   "atsflare-openresty",
-		Image:           "openresty/openresty:alpine",
-		MainConfigPath:  filepath.Clean("/tmp/nginx.conf"),
-		RouteConfigDir:  filepath.Clean("/tmp/routes"),
-		SupportDir:      filepath.Clean("/tmp/support"),
-		NginxSupportDir: "/etc/nginx/atsflare-support",
-		Runner:          runner,
+		DockerBinary:   "docker",
+		ContainerName:  "atsflare-openresty",
+		Image:          "openresty/openresty:alpine",
+		MainConfigPath: filepath.Clean("/tmp/nginx.conf"),
+		RouteConfigDir: filepath.Clean("/tmp/routes"),
+		CertDir:        filepath.Clean("/tmp/certs"),
+		NginxCertDir:   "/etc/nginx/atsflare-certs",
+		LuaDir:         filepath.Clean("/tmp/lua"),
+		NginxLuaDir:    "/etc/nginx/atsflare-lua",
+		Runner:         runner,
 	}
 	if err := executor.CheckHealth(context.Background()); err == nil {
 		t.Fatal("expected CheckHealth to fail when container is not running")
@@ -141,14 +143,16 @@ func TestDockerExecutorStartsContainerWhenMissing(t *testing.T) {
 		},
 	}
 	executor := &DockerExecutor{
-		DockerBinary:    "docker",
-		ContainerName:   "atsflare-openresty",
-		Image:           "openresty/openresty:alpine",
-		MainConfigPath:  filepath.Clean("/tmp/nginx.conf"),
-		RouteConfigDir:  filepath.Clean("/tmp/routes"),
-		SupportDir:      filepath.Clean("/tmp/support"),
-		NginxSupportDir: "/etc/nginx/atsflare-support",
-		Runner:          runner,
+		DockerBinary:   "docker",
+		ContainerName:  "atsflare-openresty",
+		Image:          "openresty/openresty:alpine",
+		MainConfigPath: filepath.Clean("/tmp/nginx.conf"),
+		RouteConfigDir: filepath.Clean("/tmp/routes"),
+		CertDir:        filepath.Clean("/tmp/certs"),
+		NginxCertDir:   "/etc/nginx/atsflare-certs",
+		LuaDir:         filepath.Clean("/tmp/lua"),
+		NginxLuaDir:    "/etc/nginx/atsflare-lua",
+		Runner:         runner,
 	}
 
 	if err := executor.Test(context.Background()); err != nil {
@@ -176,14 +180,16 @@ func TestDockerExecutorStartsStoppedContainer(t *testing.T) {
 		},
 	}
 	executor := &DockerExecutor{
-		DockerBinary:    "docker",
-		ContainerName:   "atsflare-openresty",
-		Image:           "openresty/openresty:alpine",
-		MainConfigPath:  filepath.Clean("/tmp/nginx.conf"),
-		RouteConfigDir:  filepath.Clean("/tmp/routes"),
-		SupportDir:      filepath.Clean("/tmp/support"),
-		NginxSupportDir: "/etc/nginx/atsflare-support",
-		Runner:          runner,
+		DockerBinary:   "docker",
+		ContainerName:  "atsflare-openresty",
+		Image:          "openresty/openresty:alpine",
+		MainConfigPath: filepath.Clean("/tmp/nginx.conf"),
+		RouteConfigDir: filepath.Clean("/tmp/routes"),
+		CertDir:        filepath.Clean("/tmp/certs"),
+		NginxCertDir:   "/etc/nginx/atsflare-certs",
+		LuaDir:         filepath.Clean("/tmp/lua"),
+		NginxLuaDir:    "/etc/nginx/atsflare-lua",
+		Runner:         runner,
 	}
 
 	if err := executor.Reload(context.Background()); err != nil {
@@ -207,7 +213,8 @@ func TestDockerExecutorStartsStoppedContainer(t *testing.T) {
 func TestDockerExecutorRunContainerMountsManagedFiles(t *testing.T) {
 	mainConfigPath := filepath.Clean("/tmp/managed/nginx.conf")
 	routeConfigDir := filepath.Clean("/tmp/managed/conf.d")
-	supportDir := filepath.Clean("/tmp/managed/support")
+	certDir := filepath.Clean("/tmp/managed/certs")
+	luaDir := filepath.Clean("/tmp/managed/lua")
 	runner := &fakeRunner{}
 	executor := &DockerExecutor{
 		DockerBinary:               "docker",
@@ -215,8 +222,10 @@ func TestDockerExecutorRunContainerMountsManagedFiles(t *testing.T) {
 		Image:                      "openresty/openresty:alpine",
 		MainConfigPath:             mainConfigPath,
 		RouteConfigDir:             routeConfigDir,
-		SupportDir:                 supportDir,
-		NginxSupportDir:            "/etc/nginx/atsflare-support",
+		CertDir:                    certDir,
+		NginxCertDir:               "/etc/nginx/atsflare-certs",
+		LuaDir:                     luaDir,
+		NginxLuaDir:                "/etc/nginx/atsflare-lua",
 		OpenrestyObservabilityPort: 18081,
 		Runner:                     runner,
 	}
@@ -237,7 +246,8 @@ func TestDockerExecutorRunContainerMountsManagedFiles(t *testing.T) {
 		"-p", "127.0.0.1:18081:18081",
 		"-v", mainConfigPath + ":" + DockerMainConfigPath,
 		"-v", routeConfigDir + ":/etc/nginx/conf.d",
-		"-v", supportDir + ":/etc/nginx/atsflare-support",
+		"-v", certDir + ":/etc/nginx/atsflare-certs",
+		"-v", luaDir + ":/etc/nginx/atsflare-lua",
 		"openresty/openresty:alpine",
 	}
 	if !reflect.DeepEqual(runner.calls[0].args, expectedArgs) {
@@ -260,8 +270,10 @@ func TestDockerExecutorRecreatesContainerOnStartup(t *testing.T) {
 		Image:                      "openresty/openresty:alpine",
 		MainConfigPath:             filepath.Clean("/tmp/nginx.conf"),
 		RouteConfigDir:             filepath.Clean("/tmp/routes"),
-		SupportDir:                 filepath.Clean("/tmp/support"),
-		NginxSupportDir:            "/etc/nginx/atsflare-support",
+		CertDir:                    filepath.Clean("/tmp/certs"),
+		NginxCertDir:               "/etc/nginx/atsflare-certs",
+		LuaDir:                     filepath.Clean("/tmp/lua"),
+		NginxLuaDir:                "/etc/nginx/atsflare-lua",
 		OpenrestyObservabilityPort: 18081,
 		Runner:                     runner,
 	}
@@ -287,8 +299,10 @@ func TestNewExecutorUsesAbsoluteDockerMountPath(t *testing.T) {
 		Image:                      "openresty/openresty:alpine",
 		MainConfigPath:             "./data/etc/nginx/nginx.conf",
 		RouteConfigPath:            "./data/etc/nginx/conf.d/atsflare_routes.conf",
-		SupportDir:                 "./data/etc/nginx/support",
-		NginxSupportDir:            "/etc/nginx/atsflare-support",
+		CertDir:                    "./data/etc/nginx/certs",
+		NginxCertDir:               "/etc/nginx/atsflare-certs",
+		LuaDir:                     "./data/etc/nginx/lua",
+		NginxLuaDir:                "/etc/nginx/atsflare-lua",
 		OpenrestyObservabilityPort: 18081,
 	})
 
@@ -330,19 +344,21 @@ func TestManagerApplyAndChecksumIncludeMainConfig(t *testing.T) {
 	tempDir := t.TempDir()
 	mainPath := filepath.Join(tempDir, "nginx.conf")
 	routePath := filepath.Join(tempDir, "conf.d", "atsflare_routes.conf")
-	supportDir := filepath.Join(tempDir, "support")
+	certDir := filepath.Join(tempDir, "certs")
 	manager := &Manager{
 		MainConfigPath:  mainPath,
 		RouteConfigPath: routePath,
-		SupportDir:      supportDir,
-		NginxSupportDir: "/etc/nginx/atsflare-support",
+		CertDir:         certDir,
+		NginxCertDir:    "/etc/nginx/atsflare-certs",
+		LuaDir:          filepath.Join(tempDir, "lua"),
+		NginxLuaDir:     "/etc/nginx/atsflare-lua",
 		Executor:        &fakeExecutor{},
 	}
 
 	err := manager.Apply(
 		context.Background(),
 		"include __ATSF_ROUTE_CONFIG__;\naccess_log __ATSF_ACCESS_LOG__ atsflare_json;\n",
-		"ssl_certificate __ATSF_SUPPORT_DIR__/1.crt;\n",
+		"ssl_certificate __ATSF_CERT_DIR__/1.crt;\n",
 		[]protocol.SupportFile{{Path: "1.crt", Content: "cert"}},
 	)
 	if err != nil {
@@ -362,7 +378,7 @@ func TestManagerApplyAndChecksumIncludeMainConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to read route config: %v", err)
 	}
-	if string(routeData) != "ssl_certificate /etc/nginx/atsflare-support/1.crt;\n" {
+	if string(routeData) != "ssl_certificate /etc/nginx/atsflare-certs/1.crt;\n" {
 		t.Fatalf("unexpected route config: %s", string(routeData))
 	}
 
@@ -372,7 +388,7 @@ func TestManagerApplyAndChecksumIncludeMainConfig(t *testing.T) {
 	}
 	expected := bundleChecksum(
 		"include __ATSF_ROUTE_CONFIG__;\naccess_log __ATSF_ACCESS_LOG__ atsflare_json;\n",
-		"ssl_certificate __ATSF_SUPPORT_DIR__/1.crt;\n",
+		"ssl_certificate __ATSF_CERT_DIR__/1.crt;\n",
 		[]protocol.SupportFile{{Path: "1.crt", Content: "cert"}},
 	)
 	if value != expected {
@@ -388,8 +404,10 @@ func TestManagerApplyUsesRuntimeRouteConfigPath(t *testing.T) {
 		MainConfigPath:         mainPath,
 		RouteConfigPath:        routePath,
 		RuntimeRouteConfigPath: DockerRouteConfigPath,
-		SupportDir:             filepath.Join(tempDir, "support"),
-		NginxSupportDir:        "/etc/nginx/atsflare-support",
+		CertDir:                filepath.Join(tempDir, "certs"),
+		NginxCertDir:           "/etc/nginx/atsflare-certs",
+		LuaDir:                 filepath.Join(tempDir, "lua"),
+		NginxLuaDir:            "/etc/nginx/atsflare-lua",
 		Executor:               &fakeExecutor{},
 	}
 
@@ -462,13 +480,15 @@ func TestManagerApplyWritesSupportFilesAndReplacesPlaceholder(t *testing.T) {
 	manager := &Manager{
 		MainConfigPath:               filepath.Join(tempDir, "nginx.conf"),
 		RouteConfigPath:              filepath.Join(tempDir, "routes.conf"),
-		SupportDir:                   filepath.Join(tempDir, "support"),
-		NginxSupportDir:              "/etc/nginx/atsflare-support",
+		CertDir:                      filepath.Join(tempDir, "certs"),
+		NginxCertDir:                 "/etc/nginx/atsflare-certs",
+		LuaDir:                       filepath.Join(tempDir, "lua"),
+		NginxLuaDir:                  "/etc/nginx/atsflare-lua",
 		OpenrestyObservabilityListen: "18081",
 		Executor:                     &fakeExecutor{},
 	}
 
-	err := manager.Apply(context.Background(), "include __ATSF_ROUTE_CONFIG__;\nserver { listen __ATSF_OBSERVABILITY_LISTEN__; }", "ssl_certificate __ATSF_SUPPORT_DIR__/1.crt;", []protocol.SupportFile{
+	err := manager.Apply(context.Background(), "include __ATSF_ROUTE_CONFIG__;\nserver { listen __ATSF_OBSERVABILITY_LISTEN__; }", "ssl_certificate __ATSF_CERT_DIR__/1.crt;", []protocol.SupportFile{
 		{Path: "1.crt", Content: "cert-data"},
 		{Path: "1.key", Content: "key-data"},
 	})
@@ -480,7 +500,7 @@ func TestManagerApplyWritesSupportFilesAndReplacesPlaceholder(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to read route config: %v", err)
 	}
-	if !strings.Contains(string(routeData), "/etc/nginx/atsflare-support/1.crt") {
+	if !strings.Contains(string(routeData), "/etc/nginx/atsflare-certs/1.crt") {
 		t.Fatalf("expected placeholder replacement in route config, got %s", string(routeData))
 	}
 	mainData, err := os.ReadFile(manager.MainConfigPath)
@@ -490,25 +510,27 @@ func TestManagerApplyWritesSupportFilesAndReplacesPlaceholder(t *testing.T) {
 	if !strings.Contains(string(mainData), "listen 18081;") {
 		t.Fatalf("expected observability listen placeholder replacement in main config, got %s", string(mainData))
 	}
-	certData, err := os.ReadFile(filepath.Join(manager.SupportDir, "1.crt"))
+	certData, err := os.ReadFile(filepath.Join(manager.CertDir, "1.crt"))
 	if err != nil {
 		t.Fatalf("failed to read cert file: %v", err)
 	}
 	if string(certData) != "cert-data" {
 		t.Fatalf("unexpected cert file content: %s", string(certData))
 	}
-	luaInfo, err := os.Stat(filepath.Join(manager.SupportDir, "observability", "log.lua"))
-	if err == nil {
-		t.Fatalf("expected no lua file in this test, got %v", luaInfo)
+	luaInfo, err := os.Stat(filepath.Join(manager.LuaDir, "log.lua"))
+	if err != nil {
+		t.Fatalf("expected managed lua file to exist, stat err = %v", err)
+	}
+	if luaInfo.Mode().Perm() != 0o644 {
+		t.Fatalf("unexpected lua mode: %o", luaInfo.Mode().Perm())
 	}
 }
 
-func TestSupportFileMode(t *testing.T) {
+func TestCertFileMode(t *testing.T) {
 	testCases := []struct {
 		path string
 		want os.FileMode
 	}{
-		{path: "observability/log.lua", want: 0o644},
 		{path: "1.crt", want: 0o644},
 		{path: "1.pem", want: 0o644},
 		{path: "1.key", want: 0o600},
@@ -516,53 +538,39 @@ func TestSupportFileMode(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		if got := supportFileMode(testCase.path); got != testCase.want {
+		if got := certFileMode(testCase.path); got != testCase.want {
 			t.Fatalf("unexpected mode for %s: got %o want %o", testCase.path, got, testCase.want)
 		}
 	}
 }
 
-func TestManagerApplyWritesLuaSupportFilesReadable(t *testing.T) {
+func TestManagerEnsureLuaAssetsWritesReadableFiles(t *testing.T) {
 	tempDir := t.TempDir()
 	manager := &Manager{
-		MainConfigPath:  filepath.Join(tempDir, "nginx.conf"),
-		RouteConfigPath: filepath.Join(tempDir, "routes.conf"),
-		SupportDir:      filepath.Join(tempDir, "support"),
-		NginxSupportDir: "/etc/nginx/atsflare-support",
-		Executor:        &fakeExecutor{},
+		LuaDir:      filepath.Join(tempDir, "lua"),
+		NginxLuaDir: "/etc/nginx/atsflare-lua",
 	}
 
-	err := manager.Apply(context.Background(), "main", "route", []protocol.SupportFile{
-		{Path: "observability/log.lua", Content: "return"},
-		{Path: "1.key", Content: "secret"},
-	})
+	err := manager.EnsureLuaAssets()
 	if err != nil {
-		t.Fatalf("Apply failed: %v", err)
+		t.Fatalf("EnsureLuaAssets failed: %v", err)
 	}
 
-	luaInfo, err := os.Stat(filepath.Join(manager.SupportDir, "observability", "log.lua"))
+	luaInfo, err := os.Stat(filepath.Join(manager.LuaDir, "log.lua"))
 	if err != nil {
 		t.Fatalf("failed to stat lua file: %v", err)
 	}
 	if luaInfo.Mode().Perm() != 0o644 {
 		t.Fatalf("unexpected lua mode: %o", luaInfo.Mode().Perm())
 	}
-
-	keyInfo, err := os.Stat(filepath.Join(manager.SupportDir, "1.key"))
-	if err != nil {
-		t.Fatalf("failed to stat key file: %v", err)
-	}
-	if keyInfo.Mode().Perm() != 0o600 {
-		t.Fatalf("unexpected key mode: %o", keyInfo.Mode().Perm())
-	}
 }
 
-func TestManagerRollbackRestoresSupportFiles(t *testing.T) {
+func TestManagerRollbackRestoresCertFiles(t *testing.T) {
 	tempDir := t.TempDir()
 	routePath := filepath.Join(tempDir, "routes.conf")
 	mainPath := filepath.Join(tempDir, "nginx.conf")
-	supportDir := filepath.Join(tempDir, "support")
-	if err := os.MkdirAll(supportDir, 0o755); err != nil {
+	certDir := filepath.Join(tempDir, "certs")
+	if err := os.MkdirAll(certDir, 0o755); err != nil {
 		t.Fatalf("MkdirAll failed: %v", err)
 	}
 	if err := os.WriteFile(mainPath, []byte("old-main"), 0o644); err != nil {
@@ -571,14 +579,16 @@ func TestManagerRollbackRestoresSupportFiles(t *testing.T) {
 	if err := os.WriteFile(routePath, []byte("old-route"), 0o644); err != nil {
 		t.Fatalf("WriteFile failed: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(supportDir, "1.crt"), []byte("old-cert"), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(certDir, "1.crt"), []byte("old-cert"), 0o600); err != nil {
 		t.Fatalf("WriteFile failed: %v", err)
 	}
 	manager := &Manager{
 		MainConfigPath:  mainPath,
 		RouteConfigPath: routePath,
-		SupportDir:      supportDir,
-		NginxSupportDir: "/etc/nginx/atsflare-support",
+		CertDir:         certDir,
+		NginxCertDir:    "/etc/nginx/atsflare-certs",
+		LuaDir:          filepath.Join(tempDir, "lua"),
+		NginxLuaDir:     "/etc/nginx/atsflare-lua",
 		Executor: &fakeExecutor{
 			testErr: errors.New("openresty test failed"),
 		},
@@ -605,7 +615,7 @@ func TestManagerRollbackRestoresSupportFiles(t *testing.T) {
 	if string(routeData) != "old-route" {
 		t.Fatalf("expected route rollback, got %s", string(routeData))
 	}
-	certData, err := os.ReadFile(filepath.Join(supportDir, "1.crt"))
+	certData, err := os.ReadFile(filepath.Join(certDir, "1.crt"))
 	if err != nil {
 		t.Fatalf("failed to read cert file: %v", err)
 	}
@@ -614,9 +624,9 @@ func TestManagerRollbackRestoresSupportFiles(t *testing.T) {
 	}
 }
 
-func TestManagerSupportFileTargetPathRejectsEscapes(t *testing.T) {
-	manager := &Manager{SupportDir: filepath.Join(t.TempDir(), "support")}
-	if err := os.MkdirAll(manager.SupportDir, 0o755); err != nil {
+func TestManagerCertFileTargetPathRejectsEscapes(t *testing.T) {
+	manager := &Manager{CertDir: filepath.Join(t.TempDir(), "certs")}
+	if err := os.MkdirAll(manager.CertDir, 0o755); err != nil {
 		t.Fatalf("MkdirAll failed: %v", err)
 	}
 
@@ -637,7 +647,7 @@ func TestManagerSupportFileTargetPathRejectsEscapes(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		targetPath, err := manager.supportFileTargetPath(testCase.path)
+		targetPath, err := manager.certFileTargetPath(testCase.path)
 		if testCase.shouldErr {
 			if err == nil {
 				t.Fatalf("expected path %q to be rejected, got target %q", testCase.path, targetPath)
@@ -647,19 +657,21 @@ func TestManagerSupportFileTargetPathRejectsEscapes(t *testing.T) {
 		if err != nil {
 			t.Fatalf("expected path %q to be accepted: %v", testCase.path, err)
 		}
-		if !strings.HasPrefix(targetPath, manager.SupportDir) {
-			t.Fatalf("expected target path %q to stay under %q", targetPath, manager.SupportDir)
+		if !strings.HasPrefix(targetPath, manager.CertDir) {
+			t.Fatalf("expected target path %q to stay under %q", targetPath, manager.CertDir)
 		}
 	}
 }
 
-func TestManagerApplyRejectsSupportFilePathTraversal(t *testing.T) {
+func TestManagerApplyRejectsCertFilePathTraversal(t *testing.T) {
 	tempDir := t.TempDir()
 	manager := &Manager{
 		MainConfigPath:  filepath.Join(tempDir, "nginx.conf"),
 		RouteConfigPath: filepath.Join(tempDir, "routes.conf"),
-		SupportDir:      filepath.Join(tempDir, "support"),
-		NginxSupportDir: "/etc/nginx/atsflare-support",
+		CertDir:         filepath.Join(tempDir, "certs"),
+		NginxCertDir:    "/etc/nginx/atsflare-certs",
+		LuaDir:          filepath.Join(tempDir, "lua"),
+		NginxLuaDir:     "/etc/nginx/atsflare-lua",
 		Executor:        &fakeExecutor{},
 	}
 

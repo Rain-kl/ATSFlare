@@ -285,8 +285,8 @@ export LOG_LEVEL='info'
 
 验证点：
 
-1. 首次启动后确认 `data/etc/nginx/nginx.conf`、`data/etc/nginx/conf.d/atsflare_routes.conf` 与 `data/etc/nginx/support` 已由 Agent 创建
-2. 确认容器实际挂载了主配置、路由目录和证书目录
+1. 首次启动后确认 `data/etc/nginx/nginx.conf`、`data/etc/nginx/conf.d/atsflare_routes.conf`、`data/etc/nginx/certs` 与 `data/etc/nginx/lua` 已由 Agent 创建
+2. 确认容器实际挂载了主配置、路由目录、证书目录和 Lua 目录
 3. 确认宿主机本地可访问 `http://127.0.0.1:18081/atsflare/observability` 与 `http://127.0.0.1:18081/atsflare/stub_status`
 3. 在管理端发布一次新版本后，确认节点 `current_version` 追平激活版本
 4. 在节点详情查看“当前目标版本”与“最近应用”，确认主配置/路由配置快照和 checksum 已可见
@@ -300,7 +300,7 @@ docker exec atsflare-openresty openresty -t
 
 说明：
 
-* `docker inspect` 重点确认主配置文件、`conf.d` 目录和证书目录都来自 Agent 受管路径
+* `docker inspect` 重点确认主配置文件、`conf.d` 目录、证书目录和 Lua 目录都来自 Agent 受管路径
 * 观测端口默认只绑定 `127.0.0.1`；若节点已有冲突，可在 `agent.json` 中调整 `openresty_observability_port`
 * 若容器名使用默认值，请将上述命令中的名称替换为 `atsflare-openresty`
 
@@ -315,8 +315,10 @@ docker exec atsflare-openresty openresty -t
   "openresty_path": "/usr/local/openresty/nginx/sbin/openresty",
   "main_config_path": "/usr/local/openresty/nginx/conf/nginx.conf",
   "route_config_path": "/usr/local/openresty/nginx/conf/conf.d/atsflare_routes.conf",
-  "support_dir": "/usr/local/openresty/nginx/conf/support",
-  "openresty_support_dir": "/usr/local/openresty/nginx/conf/support",
+  "cert_dir": "/usr/local/openresty/nginx/conf/certs",
+  "openresty_cert_dir": "/usr/local/openresty/nginx/conf/certs",
+  "lua_dir": "/usr/local/openresty/nginx/conf/lua",
+  "openresty_lua_dir": "/usr/local/openresty/nginx/conf/lua",
   "openresty_observability_port": 18081
 }
 ```
