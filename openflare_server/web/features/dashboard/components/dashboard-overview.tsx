@@ -248,7 +248,6 @@ export function DashboardOverview() {
       <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
         <AppCard
           title="24 小时网络与磁盘趋势"
-          description="把 OpenResty 吞吐和磁盘读写放到同一屏，方便判断是流量拉升还是资源抖动。"
         >
           <div className="space-y-6">
             <TrendChart
@@ -311,7 +310,6 @@ export function DashboardOverview() {
 
         <AppCard
           title="Top 节点榜单"
-          description="把流量、错误与容量压力节点并排展示，保留快速定位热点与瓶颈的入口。"
         >
           <div className="grid gap-6 xl:grid-cols-1">
             <div>
@@ -353,7 +351,7 @@ export function DashboardOverview() {
       <div className="grid gap-6 xl:grid-cols-3">
         <AppCard
           title="来源分布"
-          description="聚合最近 24 小时主要来源国家，优先识别流量重心变化。"
+          description="聚合最近 24 小时主要来源国家。"
         >
           <RankChart
             items={overview.distributions.source_countries.map((item) => ({
@@ -381,7 +379,7 @@ export function DashboardOverview() {
 
         <AppCard
           title="Top Domain"
-          description="观察主要流量集中在哪些域名，方便判断业务热度与异常集中点。"
+          description="观察主要流量集中在哪些域名。"
         >
           <RankChart
             items={overview.distributions.top_domains.map((item) => ({
@@ -396,7 +394,7 @@ export function DashboardOverview() {
 
       <AppCard
         title="节点健康列表"
-        description="按异常数量和资源压力排序，优先显示最需要关注的节点。"
+        description="按异常数量和资源压力排序。"
         action={
           <Link
             href="/node"

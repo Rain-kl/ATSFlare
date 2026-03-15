@@ -236,17 +236,6 @@ export function WorldStage({
                   : '节点覆盖信号'}
             </div>
 
-            <div
-              className={cn(
-                'absolute top-16 left-6 z-10 rounded-full px-3 py-1 text-[11px] backdrop-blur',
-                isDark
-                  ? 'bg-slate-900/45 text-slate-200'
-                  : 'bg-white/85 text-slate-600 shadow-[0_10px_24px_rgba(148,163,184,0.16)]',
-              )}
-            >
-              拖动平移，滚轮缩放
-            </div>
-
             <div className="absolute top-4 right-4 z-10 flex flex-wrap gap-2">
               <LegendPill
                 label="国家底色: 来源热度"

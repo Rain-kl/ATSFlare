@@ -812,7 +812,6 @@ export function NodeDetailPage({ nodeId }: { nodeId: string }) {
 
               <AppCard
                 title="实时资源"
-                description="读取节点最近一次快照，快速判断资源压力与吞吐情况。"
               >
                 {observabilityQuery.isLoading ? (
                   <LoadingState />
@@ -874,7 +873,6 @@ export function NodeDetailPage({ nodeId }: { nodeId: string }) {
 
               <AppCard
                 title="网络流量"
-                description="首屏优先看 OpenResty 吞吐、节点网络与最近窗口流量，快速判断是否存在网络或流量异常。"
               >
                 {observabilityQuery.isLoading ? (
                   <LoadingState />
@@ -994,7 +992,7 @@ export function NodeDetailPage({ nodeId }: { nodeId: string }) {
             <div className="grid gap-6 xl:grid-cols-2">
               <AppCard
                 title="24 小时请求趋势"
-                description="按小时聚合该节点的请求量和错误量，判断是否存在突发流量或持续异常。"
+                description="按小时聚合该节点的请求量和错误量。"
               >
                 <TrendChart
                   labels={
@@ -1027,7 +1025,7 @@ export function NodeDetailPage({ nodeId }: { nodeId: string }) {
 
               <AppCard
                 title="24 小时容量趋势"
-                description="观察该节点 CPU 与内存使用率在 24 小时内的变化，辅助扩容和排障。"
+                description="观察该节点 CPU 与内存使用率在 24 小时内的变化。"
               >
                 <TrendChart
                   labels={
@@ -1363,7 +1361,7 @@ export function NodeDetailPage({ nodeId }: { nodeId: string }) {
 
             <AppCard
               title="当前目标版本"
-              description="展示当前全局激活配置版本，便于直接核对节点应追上的主配置与路由配置。"
+              description="展示当前全局激活配置版本。"
               action={
                 activeConfigVersion ? (
                   <SecondaryButton

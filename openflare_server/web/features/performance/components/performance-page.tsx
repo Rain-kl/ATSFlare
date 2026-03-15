@@ -1312,9 +1312,6 @@ export function PerformancePage() {
                                         <p className="text-sm font-semibold text-[var(--foreground-primary)]">
                                             当前渲染预览
                                         </p>
-                                        <p className="mt-1 text-xs text-[var(--foreground-secondary)]">
-                                            基于当前结构化参数和模板生成的主配置文件。
-                                        </p>
                                     </div>
                                     <StatusBadge
                                         label={`${preview.route_count} 条规则`}

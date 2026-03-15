@@ -20,7 +20,7 @@ export function ConfigVersionSnapshotModal({
       isOpen={Boolean(version)}
       onClose={onClose}
       title={version ? `版本 ${version.version}` : '查看快照'}
-      description="在弹窗中查看快照 JSON 与渲染结果，避免把页面主视图撑长。"
+      description="在弹窗中查看快照 JSON 与渲染结果。"
       size="xl"
       footer={
         <div className="flex justify-end">

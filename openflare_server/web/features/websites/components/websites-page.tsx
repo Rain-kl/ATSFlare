@@ -96,7 +96,7 @@ export function WebsitesPage() {
       <div className="space-y-6">
         <PageHeader
           title="网站"
-          description="主界面只保留网站列表卡片。新增网站时可直接绑定证书，也可以在弹窗内先添加证书后再应用。"
+          description="新增网站和添加证书。"
           action={
             <div className="flex flex-wrap gap-3">
               <Link

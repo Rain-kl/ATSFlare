@@ -259,8 +259,8 @@ export function VersionUpgradeModal({
                                             : release.in_progress
                                                 ? '升级中...'
                                                 : selectedChannel === 'preview'
-                                                    ? '升级到预览版'
-                                                    : '升级到正式版'}
+                                                    ? '升级预览版'
+                                                    : '升级正式版'}
                                     </PrimaryButton>
                                 </div>
                             ) : null}
@@ -271,7 +271,6 @@ export function VersionUpgradeModal({
                 {release ? (
                     <AppCard
                         title="升级日志"
-                        description="展示当前自动升级任务的下载、校验与替换进度。"
                     >
                         {upgradeLogs.length > 0 ? (
                             <div className="space-y-3">
@@ -321,7 +320,6 @@ export function VersionUpgradeModal({
                         ) : (
                             <EmptyState
                                 title="暂无升级日志"
-                                description="开始自动升级后，这里会滚动展示后端返回的执行日志。"
                             />
                         )}
                     </AppCard>
@@ -330,7 +328,6 @@ export function VersionUpgradeModal({
                 {canUpgrade ? (
                     <AppCard
                         title="手动升级"
-                        description="上传服务端二进制后，服务端会先检查版本，再由你确认是否执行升级。"
                     >
                         <div className="space-y-4">
                             <ResourceField
@@ -481,7 +478,6 @@ export function VersionUpgradeModal({
                             ) : (
                                 <EmptyState
                                     title="尚未上传升级包"
-                                    description="上传后会在这里展示识别出的版本信息，并允许你确认升级。"
                                 />
                             )}
                         </div>

@@ -939,7 +939,7 @@ export function SettingsPage() {
           <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
             <AppCard
               title="Agent 接入设置"
-              description="集中维护 Agent 运行参数、更新仓库与 IP 归属方式。运行参数会通过心跳响应下发到 Agent。"
+              description="运行参数会通过心跳响应下发到 Agent。"
               action={
                 <PrimaryButton
                   type="button"
@@ -1028,8 +1028,7 @@ export function SettingsPage() {
                       Agent 更新仓库
                     </p>
                     <p className="text-sm text-[var(--foreground-muted)]">
-                      自动更新和手动更新动作在节点页触发，这里维护 Agent
-                      自更新使用的仓库地址。
+                      上游更新仓库
                     </p>
                   </div>
                   <div className="mt-4">
@@ -1219,7 +1218,7 @@ export function SettingsPage() {
                   </div>
                   <ResourceField
                     label="一键部署命令"
-                    hint="命令会使用安装脚本自动注册 Agent，并在首次注册后换发专属 agent_token。"
+                    hint="命令会使用安装脚本自动注册 Agent。"
                   >
                     <CodeBlock className="break-all whitespace-pre-wrap">
                       {discoveryCommand || '请先填写可访问的 Server URL。'}
@@ -1229,9 +1228,7 @@ export function SettingsPage() {
               )}
             </AppCard>
             <AppCard
-              title="版本与构建信息"
-              description="版本检查与升级入口已移动到顶栏“版本”。这里保留构建模式和当前运行状态说明。"
-            >
+              title="版本与构建信息">
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-4">
                   <p className="text-xs tracking-[0.2em] text-[var(--foreground-muted)] uppercase">

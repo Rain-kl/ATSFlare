@@ -187,7 +187,7 @@ export function NodesPage() {
       <div className="space-y-6">
         <PageHeader
           title="节点管理"
-          description="节点列表只保留状态、版本与最近活动等关键内容。节点部署、Token、更新模式与手动升级入口统一收敛到详情页。"
+          description="显示节点相关信息。"
           action={
             <>
               <SecondaryButton type="button" onClick={handleCreate}>

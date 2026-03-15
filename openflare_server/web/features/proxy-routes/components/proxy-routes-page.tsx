@@ -805,7 +805,6 @@ export function ProxyRoutesPage() {
 
           <ResourceField
             label="备注"
-            hint="可选，便于标记用途、责任人或特殊说明。"
             error={form.formState.errors.remark?.message}
           >
             <ResourceTextarea
