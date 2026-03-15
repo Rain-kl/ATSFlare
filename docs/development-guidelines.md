@@ -1,24 +1,12 @@
 # OpenFlare 开发规范
 
-## 1. 适用范围
+本文档描述 OpenFlare `1.0.0` 正式版之后的开发基线。
 
-本规范适用于当前代码基线下的所有 Server、Agent 与管理端前端开发工作。
+超出 [docs/design.md](./design.md) 边界的需求，必须先更新设计文档。
 
-当前状态：
+## 1. 技术基线
 
-* 第一版、第二版、第三版已完成
-* `docs/design.md` 是当前系统边界的唯一设计基线
-* `openflare_server/web` 新版前端已完成迁移并成为正式基线
-* 第五版（0.5.x）已完成
-* 第六版（0.6.x）以节点流量数据采集、访问分析与看板升级为主线
-
-超出设计边界的需求，必须先更新 [docs/design.md](./design.md)。
-
----
-
-## 2. 技术基线
-
-### 2.1 Server
+### 1.1 Server
 
 `openflare_server` 继续作为单体控制面：
 
@@ -26,15 +14,9 @@
 * Gin
 * GORM
 * SQLite
-* 现有 OpenFlare 登录体系
+* 现有登录体系
 
-约束：
-
-* 默认不引入 Redis、MQ、对象存储等新基础设施
-* 不为未确认的平台化能力预埋复杂抽象
-* OpenResty 性能参数、缓存参数与主配置模板优先复用现有 `Option` 体系管理，不为单一版本额外引入配置中心
-
-### 2.2 Agent
+### 1.2 Agent
 
 `openflare_agent` 继续作为 Go 单体程序：
 
@@ -43,11 +25,10 @@
 * 节点本地执行
 * `openresty_path` 优先
 * 无 `openresty_path` 时默认 Docker OpenResty
-* 生成资源默认写入 `./data`，由 `data_dir` 统一覆盖
 
-### 2.3 Frontend
+### 1.3 Frontend
 
-新版前端基线以当前 `openflare_server/web` 实现为准：
+前端基线以 `openflare_server/web` 为准：
 
 * Next.js 15 App Router
 * React 19
@@ -55,40 +36,36 @@
 * Tailwind CSS 4
 * TanStack Query
 * React Hook Form + Zod
-* Zustand（仅限轻量客户端状态）
-* 静态导出并由 Go Server 托管
+* Zustand 仅用于轻量客户端状态
 
-前端详细约束统一以 [docs/frontend-development-guidelines.md](./frontend-development-guidelines.md) 为准；本文件只保留跨项目层面的强约束。
+前端细则见 [docs/frontend-development-guidelines.md](./frontend-development-guidelines.md)。
 
----
+## 2. 分层与目录约束
 
-## 3. 分层与目录约束
-
-### 3.1 Server
+### 2.1 Server
 
 * `controller/`：参数解析、调用 service、返回响应
-* `service/`：业务逻辑、校验、渲染、事务编排
+* `service/`：业务逻辑、校验、事务编排、渲染
 * `model/`：模型定义与持久化
 * `router/`：路由注册
 * `middleware/`：认证、鉴权、限流等横切逻辑
-* `common/`：配置、全局运行时状态与初始化入口
-* `utils/`：纯工具函数与通用 helper；按功能聚合，多个同类 helper 应拆到对应子目录
+* `common/`：配置、全局状态与初始化入口
+* `utils/`：纯工具函数与通用 helper
 
 禁止：
 
 * 在 `controller/` 堆积业务逻辑
-* 在 `middleware/` 中实现业务流程
+* 在 `middleware/` 实现业务流程
 * 为简单需求新增平台层抽象
-* 在 `common/` 混放不依赖全局状态的纯工具实现
 
-### 3.2 Agent
+### 2.2 Agent
 
 保持现有模块边界：
 
 * `config`
 * `heartbeat`
 * `sync`
-* `openresty`（保留目录名，内部负责 OpenResty 运行时管理）
+* `openresty`
 * `state`
 * `httpclient`
 * `protocol`
@@ -99,29 +76,25 @@
 * 每个模块职责单一
 * 外部命令调用集中封装
 * 状态落盘与配置落盘分离
-* 主配置文件写入、备份、校验、回滚与受管 include 写入应归并到 OpenResty 运行时管理模块
 
-### 3.3 Frontend
+### 2.3 Frontend
 
-前端分层与目录必须与当前工程保持一致：
+前端分层保持：
 
-* `app/`：路由、布局、页面组装
-* `features/`：业务模块
-* `components/`：跨模块复用组件
-* `lib/`：请求、环境、工具、常量
-* `store/`：少量跨页面 UI 状态
-* `types/`：共享类型
+* `app/`
+* `features/`
+* `components/`
+* `lib/`
+* `store/`
+* `types/`
 
 要求：
 
 * 页面路由与布局放在 `app/`
 * API 请求统一收敛到 `lib/api/`
 * 业务逻辑优先放在 `features/`
-* 不重新引入旧版 CRA / Semantic UI 结构
 
----
-
-## 4. 数据模型规范
+## 3. 数据模型规范
 
 当前有效实体：
 
@@ -137,42 +110,30 @@
 * `node_metric_snapshots`
 * `traffic_analytics_rollups`
 * `node_health_events`
-* `options`（运行时参数与 OpenResty 调优参数继续复用现有配置表，不扩展为独立新实体）
+* `options`
 
 通用约束：
 
 * 不新增平台化对象，除非设计文档明确要求
-* `proxy_routes` 仍保持一条域名对应一个 `origin_url`
+* `proxy_routes` 维持一条域名对应一个 `origin_url`
 * `config_versions` 必须保存完整快照与渲染结果
 * 全局同时只能有一个激活版本
 * 回滚通过重新激活旧版本实现
-* 第五版新增的 OpenResty 性能参数必须由 Server 统一保存与校验，并参与版本渲染
-* 域名证书匹配必须同时支持精确匹配与通配符匹配
-* 节点专属 `agent_token` 必须可立即失效
-* `nodes` 只保留控制面与摘要状态，不直接承接第六版新增的高频资源字段、完整系统画像和大块统计结果
-* `nodes` 允许保留世界地图展示所需的少量低频字段，如位置名、纬度和经度；这类字段不得演变成高频观测事实承载体
-* `node_system_profiles` 负责存储低频变化的节点事实信息；只有需要列表摘要展示的极少数字段可以回写到 `nodes`
-* 第六版新增的请求明细、资源快照和聚合统计必须按节点与时间窗口关联
-* `node_metric_snapshots` 必须是追加式时间序列快照，不通过覆盖 `nodes` 当前值替代历史
-* `traffic_analytics_rollups` 必须区分时间粒度与统计范围，优先存储窗口聚合而不是无限制保留原始逐请求明细
-* `node_access_logs` 仅保留管理端排查所需的受控访问字段与短期保留窗口，不承担全文检索或长期归档职责
-* `node_health_events` 必须具备事件类型、严重级别、首次触发时间、最近触发时间和恢复时间，便于首页总览做异常归并
-* 访问分析优先复用现有 Server/SQLite 基线，不为第六版引入新的时序数据库或消息队列
-* 聚合统计与原始明细的保留策略必须明确，避免无限制累积
+* `nodes` 只保留控制面状态与低频摘要
+* 观测数据必须按节点与时间窗口关联
+* 快照与聚合结果采用追加式模型，不覆盖历史
+* 原始访问明细必须有受控保留策略
 
----
+## 4. API 与鉴权规范
 
-## 5. API 与鉴权规范
-
-### 5.1 API
+### 4.1 API
 
 * 管理端与 Agent API 统一使用 JSON
 * 成功与失败都必须返回清晰 `message`
-* 列表接口返回稳定字段
 * Agent API 固定放在 `/api/agent/*`
-* 第六版总览页与节点详情页优先新增专用聚合接口，不继续依赖多个旧列表接口在前端拼装
+* 总览与节点详情优先使用专用聚合接口
 
-统一响应结构保持现有风格：
+统一响应结构：
 
 ```json
 {
@@ -182,61 +143,38 @@
 }
 ```
 
-### 5.2 鉴权
+### 4.2 鉴权
 
 管理端：
 
-* 继续复用 OpenFlare 登录、角色与 session
+* 继续复用现有登录、角色与 Session
 
 Agent：
 
 * 正式请求统一使用节点专属 `agent_token`
 * 首次接入可使用全局 `discovery_token`
 * 请求头统一使用 `X-Agent-Token`
-* Agent 认证逻辑不得与用户登录态混用
 
 禁止：
 
-* 将本地 OpenResty 操作暴露为远程执行接口
-* 用通用 shell/命令执行方式替代受限节点操作接口
+* 暴露远程 shell 或任意命令执行入口
 * 在日志中打印完整 Token
-* 为性能优化需求开放任意 OpenResty 文本片段上传或任意指令下发
-* 允许绕过系统占位符约束直接保存不可渲染的 OpenResty 主配置模板
+* 允许绕过占位符约束保存不可渲染的主配置模板
 
----
-
-## 6. 发布与运行规范
+## 5. 发布与运行规范
 
 发布逻辑必须保持以下事实：
 
 * 发布时读取全部启用的 `proxy_routes`
-* 发布时同时读取 Server 侧 OpenResty 主配置参数、反代性能参数与缓存参数
+* 同时读取 OpenResty 主配置参数、反代性能参数与缓存参数
 * 生成完整 OpenResty 配置
 * 计算 `checksum`
 * 写入 `config_versions`
 * 通过切换 `is_active` 激活版本
 
-Go 版本基线约束：
+版本约束：
 
-* 当 `go.mod` 中的 Go 主版本或次版本发生变化时，必须同步检查并更新所有相关构建入口，至少包括 Docker 构建使用的基础镜像版本以及 GitHub Actions 中的 release / docker 发布工作流
-* 版本升级后必须确保本地构建、Docker 构建与发布工作流使用一致的 Go 版本，避免因为 `go.mod`、`Dockerfile` 与 CI 工作流版本漂移导致发布失败
-
-第五版新增要求：
-
-* “完整 OpenResty 配置”至少包括主配置文件与路由配置文件
-* 主配置文件的真相源在 Server，Agent 只负责受控写入、校验与回滚
-* 性能优化参数必须通过结构化字段渲染，禁止直接拼接未经校验的自由文本
-* 新增参数命名统一采用 `OpenResty...` 前缀，布尔值、整数、大小单位和时间单位必须在更新入口做校验
-* 主配置模板编辑必须保留系统要求的占位符，由 Server 在发布与预览时再渲染为最终 `nginx.conf`
-
-版本号格式保持：
-
-```text
-YYYYMMDD-NNN
-```
-
-限制：
-
+* 版本号格式固定为 `YYYYMMDD-NNN`
 * 不在线修改历史版本
 * 不做按节点分组的差异化版本
 * 预览与 diff 是只读能力，不产生发布记录
@@ -244,135 +182,26 @@ YYYYMMDD-NNN
 Agent 必须满足：
 
 * 启动后读取或生成本地 `node_id`
-* 未显式配置 `node_name` 时自动获取主机名
-* 未显式配置 `node_ip` 时自动探测本机 IP
 * 周期性心跳与同步
-* 常规同步判定优先通过 heartbeat 响应中的激活版本 `version` / `checksum` 摘要完成；仅在 Agent 本地状态与摘要不一致时，再请求完整激活配置
-* heartbeat 请求体允许携带最近周期内的系统画像变更、资源快照、磁盘 IO 快照、入站/出站流量快照、访问聚合批次和健康事件
+* 常规同步优先依据 heartbeat 返回的版本摘要判断
 * 发现新版本时先备份旧文件
-* 写入新的主配置、路由配置与必要证书文件
+* 写入主配置、路由配置与必要证书文件
 * 先执行 `openresty -t`
 * 成功后执行 `openresty -s reload`
 * 失败时自动回滚并上报最终结果
-* 周期性向 Server 回传 OpenResty 当前健康状态与最近运行错误摘要
-* 支持自动注册与 Token 置换
-* 支持接收 Server 下发运行参数
-* 支持接收 Server 下发的受限运行指令，当前仅允许 OpenResty 重启
-* 支持自我更新，但失败不影响心跳与同步
-* 主配置接管模式下，必须保证主配置与受管 include 一起回滚，不能只回滚其中一部分
-* 请求明细采集失败、聚合失败或单次 heartbeat 上报失败时，不得阻断后续心跳与配置同步主链路
-* 节点侧指标采集必须优先读取 OpenResty 与本机运行时状态，不允许引入任意 shell 采集脚本拼接执行
-* 大批量请求上报必须具备批次边界和体积控制，避免单次 heartbeat 无限制膨胀
-* 节点侧应优先做窗口聚合后再上报，避免把逐请求原始日志持续搬运到 Server
-* 低频系统画像应支持变更检测，避免每次 heartbeat 重复上报大块静态信息
-* UV、来源分布、状态码分布等统计应在节点侧或服务端按窗口聚合，禁止前端再对原始明细做重型计算
 
-第六版新增规范：
+## 6. 测试与交付要求
 
-* 总览页默认展示世界地图节点分布、核心访问指标、趋势图和关键异常，不再以多个对称摘要卡片作为唯一主结构
-* 总览页必须能直接展示系统整体运行状况，至少覆盖节点在线率、OpenResty 健康、配置追平状态、容量风险与流量异常
-* 总览页异常区优先展示可行动的问题，如离线节点、配置落后节点、资源逼近阈值节点、错误率异常节点
-* 世界地图看板如需真实落点，应优先消费节点上维护的低频位置元数据，不在前端引入不可控的临时地理解析逻辑
-* 节点详情页第一屏至少覆盖系统信息、实时资源占用、网络流量与 24 小时历史趋势
-* 系统信息卡片除现有 Agent 版本、Nginx 版本、当前配置外，新增操作系统、CPU 型号、在线时长
-* 实时资源卡片展示 CPU、内存、存储占用，优先以仪表盘或等效高密度可视化呈现
-* 网络流量卡片展示经过 OpenResty 的入站和出站流量，并按 KB/MB/GB 自动换算
-* 节点详情页保留“当前目标版本”等高价值运维信息，但应下移到趋势区之后，避免抢占首屏
-* 节点详情页需要区分“静态画像”和“实时状态”，禁止把二者混在一组无层次字段列表中
+* 关键业务逻辑必须有单元测试或等效回归测试
+* Agent 主链路修改必须验证同步、应用与回滚
+* 前端页面至少覆盖加载态、空态、错误态与成功反馈
+* Go 版本调整时，同步检查 `go.mod`、Dockerfile 与 CI 工作流
 
-第六版实现约束补充：
+## 7. 文档维护要求
 
-* 优先新增 `dashboard` / `node detail` 聚合 service，避免在旧 `node` service 上不断打补丁叠加查询逻辑
-* SQLite 查询应优先围绕“节点 + 时间窗口 + 粒度”建立索引与查询入口，避免首页每次全表扫描历史快照
-* TopN 榜单、来源分布、状态码分布等复杂结果允许以受控 JSON 结构写入聚合表，但必须保证字段稳定可测试
-* 异常阈值判断必须收敛在服务端统一实现，前端只负责展示，不复制阈值逻辑
-* 测试至少覆盖 heartbeat 扩展兼容性、聚合正确性、异常恢复状态切换和关键 dashboard 查询口径
-
----
-
-## 7. 前端约束
-
-前端新增开发必须遵循 [docs/frontend-development-guidelines.md](./frontend-development-guidelines.md)，其中以下要求属于项目级强约束：
-
-* 页面与布局放在 `app/`，业务逻辑放在 `features/`
-* 请求统一通过 `lib/api/`
-* 构建产物必须保持可被 Go Server 静态托管
-* 主题能力必须覆盖布局、基础组件与业务页面
-* 不引入新的大型 UI 框架与旧式页面结构
-
----
-
-## 8. 代码风格与日志
-
-### 8.1 Go
-
-* 错误必须显式处理
-* 函数尽量单一职责
-* 输入校验放在边界层
-* 业务枚举使用明确常量
-* 不写无意义注释
-
-### 8.2 命名
-
-* 统一使用 `route`、`version`、`node`、`agent`
-* 不混用 `client`、`edge`、`worker` 指代 Agent
-
-### 8.3 日志
-
-必须覆盖关键事件：
-
-* 发布成功/失败
-* Agent 注册
-* 心跳异常
-* 配置下载失败
-* OpenResty 校验或 reload 成功/失败
-* 回滚触发
-
-要求：
-
-* Server 与 Agent 统一使用 `slog` 输出结构化日志
-* 日志足够定位问题
-* 不打印敏感凭证完整值
-
----
-
-## 9. 测试与验收
-
-基线回归至少覆盖：
-
-* 路由校验与渲染
-* 激活版本切换
-* 节点在线状态判定
-* 证书导入与匹配
-* 自定义请求头渲染
-* OpenResty 主配置渲染
-* OpenResty 性能参数与缓存参数校验
-* Agent 同步、回滚、本地状态读写
-* 自动注册与 Token 置换
-* Agent 设置下发与更新链路
-* 预览与 diff 的只读行为
-
-新增需求时：
-
-* 先补单元测试或服务层测试
-* 再补联调验证步骤
-* 涉及发布链路、Agent 链路、鉴权链路的改动，必须补回归测试
-* 涉及 OpenResty 主配置或缓存行为的改动，必须补 `openresty -t` 校验场景与失败回滚场景
-
----
-
-## 10. 文档维护
-
-出现以下情况必须同步更新文档：
+当以下内容变化时，必须同步更新对应文档：
 
 * 产品范围或系统边界变化：更新 `docs/design.md`
-* 开发约束、接口约定、前后端分层变化：更新本文件
-* 前端目录分层、请求层、主题体系变化：更新 `docs/frontend-development-guidelines.md`
-* 部署方式变化：更新 `docs/deployment.md` 和 `README.md`
-* 环境变量或配置项变化：更新 `docs/app-config.md`
-
-## 11. Swagger 约束
-
-* Server 提供 Swagger UI 入口：`/swagger/index.html`
-* Swagger UI 仅对已登录的管理端用户开放
-* 新增或修改 API 时，必须同步更新 Swag 注解并重新生成 `openflare_server/docs`
+* 开发约束、接口约定、测试基线变化：更新本文档
+* 前端工程约束变化：更新 `docs/frontend-development-guidelines.md`
+* 配置项或部署方式变化：更新 `docs/app-config.md`、`docs/deployment.md` 与 `README.md`

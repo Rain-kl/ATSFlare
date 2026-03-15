@@ -1,12 +1,13 @@
 <p align="right">
-    <a href="./README.md">中文</a> | <strong>English</strong>
+  <a href="./README.md">中文</a> | <strong>English</strong>
 </p>
 
 <div align="center">
+  <img src="./openflare_server/web/public/logo.png" width="120" height="120" alt="OpenFlare logo">
 
 # OpenFlare
 
-_✨ control plane for reverse proxy management ✨_
+A lightweight, self-hosted OpenResty control plane for reverse proxy management, configuration rollout, node sync, TLS assets, and practical observability.
 
 </div>
 
@@ -17,31 +18,83 @@ _✨ control plane for reverse proxy management ✨_
   <a href="https://github.com/Rain-kl/OpenFlare/releases/latest">
     <img src="https://img.shields.io/github/v/release/Rain-kl/OpenFlare?color=brightgreen&include_prereleases" alt="release">
   </a>
-  <a href="https://github.com/Rain-kl/OpenFlare/releases/latest">
-    <img src="https://img.shields.io/github/downloads/Rain-kl/OpenFlare/total?color=brightgreen&include_prereleases" alt="release">
+  <a href="https://github.com/Rain-kl/OpenFlare/pkgs/container/openflare">
+    <img src="https://img.shields.io/badge/GHCR-ghcr.io%2Frain--kl%2Fopenflare-brightgreen" alt="ghcr">
   </a>
   <a href="https://goreportcard.com/report/github.com/Rain-kl/OpenFlare">
     <img src="https://goreportcard.com/badge/github.com/Rain-kl/OpenFlare" alt="GoReportCard">
   </a>
 </p>
 
-## Repository layout
+OpenFlare `1.0.0` is the current stable baseline. Phase six is complete and fully shipped; the repository documentation now focuses on the living system rather than historical implementation notes.
 
-- `openflare_server`: Gin + GORM + SQLite control plane, including admin API, Agent API and Web UI
-- `openflare_agent`: single-binary Go Agent for registration, heartbeat, config sync and OpenResty reload
-- `docs`: design, development guidelines, implementation plan and deployment docs
+## Why It Exists
 
-## Quick start
+OpenFlare is built for a simple but recurring operational need:
+
+* manage domain-to-origin reverse proxy rules from one control plane
+* publish immutable OpenResty configuration versions
+* let Agents pull, validate, reload, and roll back safely
+* manage certificates, domains, node credentials, and version state
+* expose practical dashboards for traffic, node health, and rollout status
+
+It is not trying to be a CDN SaaS platform, a multi-tenant control plane, or a general-purpose logging system.
+
+## Core Capabilities
+
+* Versioned configuration with preview, publish, activate, and rollback
+* Node onboarding with `discovery_token` or per-node `agent_token`
+* Automated Agent apply flow with `openresty -t`, reload, and rollback
+* Managed OpenResty templates, performance settings, and cache settings
+* TLS certificate and domain management with exact and wildcard matching
+* Request analytics, node snapshots, and health event reporting
+* Controlled Server and Agent upgrade flows
+* A production frontend built with Next.js App Router, React 19, and Tailwind CSS 4
+
+## Architecture
+
+```text
+OpenFlare Server (Gin + GORM + SQLite + Web UI)
+        |
+        | HTTP API / Config Pull
+        v
+OpenFlare Agent (register / heartbeat / sync / apply / update)
+        |
+        v
+Local OpenResty or Docker OpenResty
+        |
+        v
+Origin
+```
+
+Responsibilities:
+
+* `openflare_server`: admin UI, management APIs, Agent APIs, rendering, rollout, and state storage
+* `openflare_agent`: node registration, heartbeat, sync, local apply, validation, reload, rollback, and self-update
+* `openflare_server/web`: the production admin frontend, exported statically and served by the Go server
+
+## UI Preview
+
+### Dashboard Overview
+
+![OpenFlare dashboard overview](./docs/assets/readme/dashboard-overview.png)
+
+### Node Detail and Install Command
+
+![OpenFlare node detail](./docs/assets/readme/node-detail.png)
+
+### Version Release Workflow
+
+![OpenFlare version release](./docs/assets/readme/version-release.png)
+
+## Quick Start
 
 ### 1. Start the Server
-
-The fastest way is to run the published GHCR image with Docker Compose:
 
 ```yaml
 services:
   openflare:
     image: ghcr.io/rain-kl/openflare:latest
-    container_name: openflare
     restart: unless-stopped
     ports:
       - "3000:3000"
@@ -49,6 +102,8 @@ services:
       SESSION_SECRET: replace-with-random-string
       SQLITE_PATH: /data/openflare.db
       GIN_MODE: release
+      LOG_LEVEL: info
+      PORT: "3000"
     volumes:
       - openflare-data:/data
 
@@ -60,42 +115,16 @@ volumes:
 docker compose up -d
 ```
 
-Default URL: `http://localhost:3000`
+Open `http://localhost:3000`
 
-Notes:
+Default credentials:
 
-* Replace `SESSION_SECRET` with a random string
-* Replace `latest` with a fixed version tag if needed, for example `ghcr.io/rain-kl/openflare:v0.3.0`
-* SQLite data is persisted in the Docker volume `openflare-data`
-* For source build and full deployment steps, see [docs/deployment.md](./docs/deployment.md)
+* Username: `root`
+* Password: `123456`
 
-### 1.1 Server environment variables
+### 2. Install an Agent
 
-Common environment variables:
-
-| Variable | Description | Default behavior |
-| --- | --- | --- |
-| `PORT` | Server listen port | Defaults to `3000` |
-| `GIN_MODE` | Gin runtime mode | Runs in release mode unless set to `debug` |
-| `SESSION_SECRET` | Session signing secret; should be set explicitly in production | Falls back to the built-in default |
-| `SQLITE_PATH` | SQLite database file path | Uses the built-in SQLite path |
-| `SQL_DSN` | MySQL DSN; when set, MySQL is used instead of SQLite | Uses SQLite when unset |
-| `REDIS_CONN_STRING` | Redis connection string for session/rate-limit related features | Redis is disabled when unset |
-| `UPLOAD_PATH` | Upload directory path | Defaults to `upload` |
-| `AGENT_TOKEN` | Legacy/global Agent token compatibility setting | Not required in the current default setup |
-
-Example:
-
-```bash
-export SESSION_SECRET='replace-with-random-string'
-export SQLITE_PATH='./openflare.db'
-export GIN_MODE='release'
-export PORT='3000'
-```
-
-### 2. Install Agent with Discovery Token
-
-Use this for first-time node bootstrap. The Agent will auto-register with `discovery_token` and exchange it for a node-specific `agent_token`.
+First-time registration with `discovery_token`:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Rain-kl/OpenFlare/main/scripts/install-agent.sh | bash -s -- \
@@ -103,9 +132,7 @@ curl -fsSL https://raw.githubusercontent.com/Rain-kl/OpenFlare/main/scripts/inst
   --discovery-token YOUR_DISCOVERY_TOKEN
 ```
 
-### 3. Install Agent with Agent Token
-
-Use this when the node has already been created in the control plane and you already have a dedicated `agent_token`.
+Registration with a per-node `agent_token`:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Rain-kl/OpenFlare/main/scripts/install-agent.sh | bash -s -- \
@@ -113,43 +140,80 @@ curl -fsSL https://raw.githubusercontent.com/Rain-kl/OpenFlare/main/scripts/inst
   --agent-token YOUR_AGENT_TOKEN
 ```
 
-Notes:
+The installer writes to `/opt/openflare-agent` by default, creates `openflare-agent.service`, and can be re-run for reinstall or upgrade.
 
-* Replace `--server-url` with your actual control plane address, for example `http://192.168.1.10:3000`
-* On Linux, the installer defaults to `/opt/openflare-agent` and creates the `openflare-agent` systemd service
-* Re-running the same command upgrades the Agent to the latest release
+### 3. Publish Your First Config
 
-## Delivery channels
+1. Sign in and create a reverse proxy rule
+2. Review the preview or diff
+3. Activate the new version
+4. Wait for Agents to pick it up on the next heartbeat
 
-Current release outputs:
+Version numbers follow `YYYYMMDD-NNN`. Versions are immutable; rollback is implemented by reactivating an older version.
 
-* Server binaries: GitHub Releases
-* Server Docker image: GitHub Container Registry at `ghcr.io/rain-kl/openflare`
-* Agent binaries: GitHub Releases
+## Repository Layout
+
+* `openflare_server`: monolithic control plane built with Gin, GORM, and SQLite
+* `openflare_server/web`: admin frontend built with Next.js 15 App Router
+* `openflare_agent`: Go Agent
+* `scripts`: install and helper scripts
+* `docs`: design, guidelines, deployment, and configuration docs
+
+## Local Development
+
+### Server
+
+```bash
+cd openflare_server
+export SESSION_SECRET='replace-with-random-string'
+export SQLITE_PATH='./openflare.db'
+go run .
+```
+
+### Frontend
+
+```bash
+cd openflare_server/web
+corepack enable
+pnpm install
+pnpm build
+```
+
+### Agent
+
+```bash
+cd openflare_agent
+go run ./cmd/agent -config /path/to/agent.json
+```
+
+### Useful Checks
+
+```bash
+cd openflare_server
+GOCACHE=/tmp/openflare-go-cache go test ./...
+```
+
+```bash
+cd openflare_agent
+GOCACHE=/tmp/openflare-go-cache go test ./...
+```
+
+## Admin Surface
+
+The admin UI currently covers:
+
+* reverse proxy rules
+* config versions
+* node management
+* apply logs
+* TLS certificates
+* domain management
+* user management
+* settings
+* version upgrades
+
+Swagger UI is available at `/swagger/index.html` after login.
 
 ## License
 
-OpenFlare is licensed under the [Apache License 2.0](./LICENSE) and ships with a repository-level [NOTICE](./NOTICE).
-
-If you redistribute modified versions, keep the license text, copyright notices and any required NOTICE attributions.
-
-## Contributing
-
-Before contributing, please read the project docs listed below.
-
-Unless explicitly stated otherwise, any contribution intentionally submitted for inclusion in this repository is provided under Apache License 2.0.
-
-## Documentation
-
-See:
-
-1. [docs/deployment.md](./docs/deployment.md)
-2. [docs/design.md](./docs/design.md)
-3. [docs/development-guidelines.md](./docs/development-guidelines.md)
-4. [docs/development-plan.md](./docs/development-plan.md)
-
-Frontend notes:
-
-* The new admin frontend lives in `openflare_server/web`
-* `pnpm` is the default package manager
-* `pnpm build` exports static assets into `openflare_server/web/build`
+OpenFlare is released under the [Apache License 2.0](./LICENSE).
