@@ -8,7 +8,7 @@
 
 ### 1.1 Server
 
-* Go 1.23+
+* Go 1.24+
 * Node.js 18+
 * 可写 SQLite 文件目录
 

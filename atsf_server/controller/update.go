@@ -6,8 +6,10 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"golang.org/x/net/websocket"
 )
 
 type confirmManualUpgradeRequest struct {
@@ -72,6 +74,42 @@ func UpgradeServer(c *gin.Context) {
 		"message": "服务升级任务已启动，下载完成后将自动重启。",
 		"data":    release,
 	})
+}
+
+// StreamServerUpgradeLogs godoc
+// @Summary Stream server upgrade logs over websocket
+// @Tags Update
+// @Router /api/update/logs/ws [get]
+func StreamServerUpgradeLogs(c *gin.Context) {
+	websocket.Handler(func(conn *websocket.Conn) {
+		defer func() {
+			_ = conn.Close()
+		}()
+
+		updates, unsubscribe := service.SubscribeServerUpgradeStream()
+		defer unsubscribe()
+
+		heartbeatTicker := time.NewTicker(15 * time.Second)
+		defer heartbeatTicker.Stop()
+
+		for {
+			select {
+			case snapshot, ok := <-updates:
+				if !ok {
+					return
+				}
+				if err := websocket.JSON.Send(conn, snapshot); err != nil {
+					return
+				}
+			case <-heartbeatTicker.C:
+				if err := websocket.JSON.Send(conn, service.ServerUpgradeStreamSnapshot{}); err != nil {
+					return
+				}
+			case <-c.Request.Context().Done():
+				return
+			}
+		}
+	}).ServeHTTP(c.Writer, c.Request)
 }
 
 // UploadManualServerBinary godoc

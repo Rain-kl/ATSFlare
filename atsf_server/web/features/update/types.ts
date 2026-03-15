@@ -21,6 +21,12 @@ export interface LatestReleaseInfo {
   upgrade_logs: UpgradeLogItem[];
 }
 
+export interface UpgradeStreamSnapshot {
+  in_progress: boolean;
+  upgrade_status: 'idle' | 'running' | 'succeeded' | 'failed' | string;
+  upgrade_logs: UpgradeLogItem[];
+}
+
 export interface UploadedServerBinaryInfo {
   upload_token: string;
   file_name: string;

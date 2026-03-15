@@ -44,6 +44,12 @@ var serverUpgradeState struct {
 	logs       []ServerUpgradeLogRecord
 }
 
+var serverUpgradeSubscribers struct {
+	sync.Mutex
+	nextID    int
+	listeners map[int]chan ServerUpgradeStreamSnapshot
+}
+
 var manualServerBinaryState struct {
 	sync.Mutex
 	candidate *manualServerBinaryCandidate
@@ -72,6 +78,12 @@ type ServerUpgradeLogRecord struct {
 	Level     string    `json:"level"`
 	Message   string    `json:"message"`
 	CreatedAt time.Time `json:"created_at"`
+}
+
+type ServerUpgradeStreamSnapshot struct {
+	InProgress    bool                     `json:"in_progress"`
+	UpgradeStatus string                   `json:"upgrade_status"`
+	UpgradeLogs   []ServerUpgradeLogRecord `json:"upgrade_logs"`
 }
 
 type githubReleaseResponse struct {
@@ -137,17 +149,23 @@ func ScheduleServerUpgrade(channel string) (*LatestServerRelease, error) {
 	resetServerUpgradeLogsLocked()
 	serverUpgradeState.status = "running"
 	appendServerUpgradeLogLocked("info", fmt.Sprintf("Automatic upgrade scheduled for channel: %s.", normalizedChannel.String()))
+	serverUpgradeState.Unlock()
+	broadcastServerUpgradeSnapshot()
 
 	prepared, err := prepareServerUpgrade(context.Background(), normalizedChannel)
 	if err != nil {
+		serverUpgradeState.Lock()
 		serverUpgradeState.status = "failed"
 		appendServerUpgradeLogLocked("error", err.Error())
 		serverUpgradeState.Unlock()
+		broadcastServerUpgradeSnapshot()
 		return nil, err
 	}
 
+	serverUpgradeState.Lock()
 	serverUpgradeState.inProgress = true
 	serverUpgradeState.Unlock()
+	broadcastServerUpgradeSnapshot()
 
 	prepared.release.InProgress = true
 
@@ -262,6 +280,7 @@ func ConfirmManualServerUpgrade(uploadToken string) (*UploadedServerBinary, erro
 	serverUpgradeState.status = "running"
 	appendServerUpgradeLogLocked("info", fmt.Sprintf("Manual upgrade confirmed for version: %s.", strings.TrimSpace(candidate.DetectedVersion)))
 	serverUpgradeState.Unlock()
+	broadcastServerUpgradeSnapshot()
 
 	go func(task *manualServerBinaryCandidate) {
 		time.Sleep(serverUpgradeDispatchDelay)
@@ -852,6 +871,15 @@ func snapshotServerUpgradeState() (bool, string, []ServerUpgradeLogRecord) {
 	return serverUpgradeState.inProgress, status, logs
 }
 
+func snapshotServerUpgradeStream() ServerUpgradeStreamSnapshot {
+	inProgress, status, logs := snapshotServerUpgradeState()
+	return ServerUpgradeStreamSnapshot{
+		InProgress:    inProgress,
+		UpgradeStatus: status,
+		UpgradeLogs:   logs,
+	}
+}
+
 func resetServerUpgradeLogsLocked() {
 	serverUpgradeState.logs = nil
 }
@@ -871,6 +899,7 @@ func recordServerUpgradeLog(level string, message string) {
 	serverUpgradeState.Lock()
 	appendServerUpgradeLogLocked(level, message)
 	serverUpgradeState.Unlock()
+	broadcastServerUpgradeSnapshot()
 }
 
 func markServerUpgradeSucceeded() {
@@ -879,6 +908,7 @@ func markServerUpgradeSucceeded() {
 	serverUpgradeState.status = "succeeded"
 	appendServerUpgradeLogLocked("info", "Upgrade binary is ready; server restart will begin.")
 	serverUpgradeState.Unlock()
+	broadcastServerUpgradeSnapshot()
 }
 
 func recordServerUpgradeFailure(err error) {
@@ -889,6 +919,65 @@ func recordServerUpgradeFailure(err error) {
 		appendServerUpgradeLogLocked("error", err.Error())
 	}
 	serverUpgradeState.Unlock()
+	broadcastServerUpgradeSnapshot()
+}
+
+func SubscribeServerUpgradeStream() (<-chan ServerUpgradeStreamSnapshot, func()) {
+	serverUpgradeSubscribers.Lock()
+	if serverUpgradeSubscribers.listeners == nil {
+		serverUpgradeSubscribers.listeners = make(map[int]chan ServerUpgradeStreamSnapshot)
+	}
+	serverUpgradeSubscribers.nextID++
+	listenerID := serverUpgradeSubscribers.nextID
+	listener := make(chan ServerUpgradeStreamSnapshot, 8)
+	serverUpgradeSubscribers.listeners[listenerID] = listener
+	serverUpgradeSubscribers.Unlock()
+
+	listener <- snapshotServerUpgradeStream()
+
+	unsubscribe := func() {
+		serverUpgradeSubscribers.Lock()
+		ch, ok := serverUpgradeSubscribers.listeners[listenerID]
+		if ok {
+			delete(serverUpgradeSubscribers.listeners, listenerID)
+		}
+		serverUpgradeSubscribers.Unlock()
+		if ok {
+			close(ch)
+		}
+	}
+
+	return listener, unsubscribe
+}
+
+func broadcastServerUpgradeSnapshot() {
+	snapshot := snapshotServerUpgradeStream()
+
+	serverUpgradeSubscribers.Lock()
+	if len(serverUpgradeSubscribers.listeners) == 0 {
+		serverUpgradeSubscribers.Unlock()
+		return
+	}
+	listeners := make([]chan ServerUpgradeStreamSnapshot, 0, len(serverUpgradeSubscribers.listeners))
+	for _, listener := range serverUpgradeSubscribers.listeners {
+		listeners = append(listeners, listener)
+	}
+	serverUpgradeSubscribers.Unlock()
+
+	for _, listener := range listeners {
+		select {
+		case listener <- snapshot:
+		default:
+			select {
+			case <-listener:
+			default:
+			}
+			select {
+			case listener <- snapshot:
+			default:
+			}
+		}
+	}
 }
 
 func UpdateHTTPClientForTest() *http.Client {

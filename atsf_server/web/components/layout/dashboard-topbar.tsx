@@ -8,14 +8,18 @@ import { useAuth } from '@/components/providers/auth-provider';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { getPublicStatus } from '@/features/auth/api/public';
 import {
+  createUpgradeLogsWebSocket,
   confirmManualServerUpgrade,
   getLatestRelease,
+  parseUpgradeStreamSnapshot,
   upgradeServer,
   uploadServerBinary,
 } from '@/features/update/api/update';
 import { VersionUpgradeModal } from '@/features/update/components/version-upgrade-modal';
 import type {
+  LatestReleaseInfo,
   ReleaseChannel,
+  UpgradeStreamSnapshot,
   UploadedServerBinaryInfo,
 } from '@/features/update/types';
 import { publicEnv } from '@/lib/env/public-env';
@@ -46,6 +50,8 @@ export function DashboardTopbar() {
   const [uploadedBinary, setUploadedBinary] =
     useState<UploadedServerBinaryInfo | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [upgradeStream, setUpgradeStream] =
+    useState<UpgradeStreamSnapshot | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const isRoot = (user?.role ?? 0) >= 100;
   const upgradeStatusPollInterval = 3000;
@@ -147,6 +153,51 @@ export function DashboardTopbar() {
   });
 
   useEffect(() => {
+    if (!isVersionModalOpen || !isRoot) {
+      setUpgradeStream(null);
+      return;
+    }
+
+    let closed = false;
+    let reconnectTimer: number | null = null;
+    let socket: WebSocket | null = null;
+
+    const connect = () => {
+      if (closed) {
+        return;
+      }
+
+      socket = createUpgradeLogsWebSocket();
+      if (!socket) {
+        return;
+      }
+
+      socket.onmessage = (event) => {
+        const snapshot = parseUpgradeStreamSnapshot(String(event.data));
+        if (snapshot) {
+          setUpgradeStream(snapshot);
+        }
+      };
+
+      socket.onclose = () => {
+        if (!closed) {
+          reconnectTimer = window.setTimeout(connect, 1500);
+        }
+      };
+    };
+
+    connect();
+
+    return () => {
+      closed = true;
+      if (reconnectTimer !== null) {
+        window.clearTimeout(reconnectTimer);
+      }
+      socket?.close();
+    };
+  }, [isRoot, isVersionModalOpen]);
+
+  useEffect(() => {
     if (!isUserMenuOpen) {
       return;
     }
@@ -245,6 +296,10 @@ export function DashboardTopbar() {
     selectedReleaseChannel === 'preview'
       ? previewReleaseQuery.data
       : stableReleaseQuery.data;
+  const releaseWithStream = mergeReleaseWithUpgradeStream(
+    selectedRelease,
+    upgradeStream,
+  );
   const selectedReleaseError =
     selectedReleaseChannel === 'preview'
       ? previewReleaseQuery.error
@@ -345,7 +400,7 @@ export function DashboardTopbar() {
         isOpen={isVersionModalOpen}
         onClose={() => setIsVersionModalOpen(false)}
         currentVersion={currentVersion}
-        release={selectedRelease}
+        release={releaseWithStream}
         selectedChannel={selectedReleaseChannel}
         uploadedBinary={uploadedBinary}
         isLoading={
@@ -375,4 +430,20 @@ export function DashboardTopbar() {
       />
     </>
   );
+}
+
+function mergeReleaseWithUpgradeStream(
+  release: LatestReleaseInfo | null | undefined,
+  stream: UpgradeStreamSnapshot | null,
+) {
+  if (!release || !stream) {
+    return release;
+  }
+
+  return {
+    ...release,
+    in_progress: stream.in_progress,
+    upgrade_status: stream.upgrade_status,
+    upgrade_logs: stream.upgrade_logs,
+  };
 }

@@ -22,7 +22,7 @@
 
 `atsf_server` 继续作为单体控制面：
 
-* Go 1.23+
+* Go 1.24+
 * Gin
 * GORM
 * SQLite
@@ -215,6 +215,11 @@ Agent：
 * 计算 `checksum`
 * 写入 `config_versions`
 * 通过切换 `is_active` 激活版本
+
+Go 版本基线约束：
+
+* 当 `go.mod` 中的 Go 主版本或次版本发生变化时，必须同步检查并更新所有相关构建入口，至少包括 Docker 构建使用的基础镜像版本以及 GitHub Actions 中的 release / docker 发布工作流
+* 版本升级后必须确保本地构建、Docker 构建与发布工作流使用一致的 Go 版本，避免因为 `go.mod`、`Dockerfile` 与 CI 工作流版本漂移导致发布失败
 
 第五版新增要求：
 
