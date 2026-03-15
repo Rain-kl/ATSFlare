@@ -79,3 +79,21 @@ func TestIsValidProvider(t *testing.T) {
 		}
 	}
 }
+
+func TestLookupGeoInfoWithProviderUsesTemporaryProvider(t *testing.T) {
+	previousFactory := providerFactory
+	providerFactory = func(provider string) (GeoIPService, error) {
+		return &fakeProvider{}, nil
+	}
+	defer func() {
+		providerFactory = previousFactory
+	}()
+
+	info, err := LookupGeoInfoWithProvider("ipinfo", net.ParseIP("8.8.8.8"))
+	if err != nil {
+		t.Fatalf("expected lookup to succeed, got %v", err)
+	}
+	if info == nil || info.ISOCode != "CN" || info.Name != "China" {
+		t.Fatalf("unexpected geo info: %#v", info)
+	}
+}

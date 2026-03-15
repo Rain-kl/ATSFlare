@@ -2,6 +2,7 @@ import { apiRequest } from '@/lib/api/client';
 
 import type {
   BootstrapTokenPayload,
+  GeoIPLookupResult,
   OptionItem,
   SettingsProfile,
   UpdateSelfPayload,
@@ -15,6 +16,13 @@ export function updateOption(key: string, value: string) {
   return apiRequest<void>('/option/', {
     method: 'PUT',
     body: JSON.stringify({ key, value }),
+  });
+}
+
+export function lookupGeoIP(provider: string, ip: string) {
+  return apiRequest<GeoIPLookupResult>('/option/geoip/lookup', {
+    method: 'POST',
+    body: JSON.stringify({ provider, ip }),
   });
 }
 

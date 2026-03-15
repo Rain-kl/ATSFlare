@@ -16,6 +16,7 @@ import (
 var CurrentProvider GeoIPService
 var geoCache *providerCache
 var providerMutex sync.RWMutex
+var providerFactory = newProvider
 
 const (
 	ProviderDisabled = "disabled"
@@ -111,7 +112,7 @@ func GetRegionUnicodeEmoji(isoCode string) string {
 
 func InitGeoIP() {
 	providerName := normalizeProvider(common.GeoIPProvider)
-	nextProvider, err := newProvider(providerName)
+	nextProvider, err := providerFactory(providerName)
 	if err != nil {
 		slog.Error("initialize GeoIP provider failed", "provider", providerName, "error", err)
 		nextProvider = &EmptyProvider{}
@@ -140,6 +141,24 @@ func GetGeoInfo(ip net.IP) (*GeoInfo, error) {
 		geoCache.Set(cacheKey, info)
 	}
 	return info, err
+}
+
+func LookupGeoInfoWithProvider(providerName string, ip net.IP) (*GeoInfo, error) {
+	if ip == nil {
+		return nil, fmt.Errorf("IP address cannot be nil")
+	}
+
+	provider, err := providerFactory(normalizeProvider(providerName))
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if closeErr := provider.Close(); closeErr != nil {
+			slog.Warn("close temporary GeoIP provider failed", "provider", provider.Name(), "error", closeErr)
+		}
+	}()
+
+	return provider.GetGeoInfo(ip)
 }
 
 func UpdateDatabase() error {
@@ -209,4 +228,16 @@ func getProvider() GeoIPService {
 
 func float64Pointer(value float64) *float64 {
 	return &value
+}
+
+func ProviderFactoryForTest() func(string) (GeoIPService, error) {
+	return providerFactory
+}
+
+func SetProviderFactoryForTest(factory func(string) (GeoIPService, error)) {
+	if factory == nil {
+		providerFactory = newProvider
+		return
+	}
+	providerFactory = factory
 }

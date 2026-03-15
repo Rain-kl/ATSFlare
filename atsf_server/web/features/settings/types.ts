@@ -9,6 +9,15 @@ export interface BootstrapTokenPayload {
   discovery_token: string;
 }
 
+export interface GeoIPLookupResult {
+  provider: string;
+  ip: string;
+  iso_code: string;
+  name: string;
+  latitude?: number | null;
+  longitude?: number | null;
+}
+
 export interface UpdateSelfPayload {
   username: string;
   display_name: string;

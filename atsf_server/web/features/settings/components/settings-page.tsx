@@ -21,12 +21,14 @@ import {
   getBootstrapToken,
   getOptions,
   getSettingsProfile,
+  lookupGeoIP,
   rotateBootstrapToken,
   updateOption,
   updateSelf,
 } from '@/features/settings/api/settings';
 import type {
   BootstrapTokenPayload,
+  GeoIPLookupResult,
   OptionItem,
   UpdateSelfPayload,
 } from '@/features/settings/types';
@@ -230,6 +232,7 @@ export function SettingsPage() {
   const [emailAddress, setEmailAddress] = useState('');
   const [emailCode, setEmailCode] = useState('');
   const [emailTurnstileToken, setEmailTurnstileToken] = useState('');
+  const [geoIPTestIP, setGeoIPTestIP] = useState('8.8.8.8');
 
   const isRoot = (user?.role ?? 0) >= 100;
 
@@ -443,6 +446,11 @@ export function SettingsPage() {
     },
   });
 
+  const geoIPLookupMutation = useMutation({
+    mutationFn: ({ provider, ip }: { provider: string; ip: string }) =>
+      lookupGeoIP(provider, ip),
+  });
+
   const discoveryToken = bootstrapQuery.data?.discovery_token ?? '';
   const discoveryCommand =
     isRoot && operationFields.ServerAddress && discoveryToken
@@ -504,6 +512,17 @@ export function SettingsPage() {
     await queryClient.invalidateQueries({ queryKey: ['public-status'] });
     setFeedback({ tone: 'success', message: successMessage });
   };
+
+  const handleGeoIPLookup = () => {
+    geoIPLookupMutation.reset();
+    geoIPLookupMutation.mutate({
+      provider: operationFields.GeoIPProvider,
+      ip: geoIPTestIP.trim(),
+    });
+  };
+
+  const geoIPLookupResult: GeoIPLookupResult | undefined =
+    geoIPLookupMutation.data;
 
   const handleProfileSave = () => {
     void runBusyAction('profile', async () => {
@@ -946,7 +965,10 @@ export function SettingsPage() {
                         [
                           ['AgentHeartbeatInterval', String(heartbeat)],
                           ['NodeOfflineThreshold', String(offline)],
-                          ['AgentUpdateRepo', operationFields.AgentUpdateRepo.trim()],
+                          [
+                            'AgentUpdateRepo',
+                            operationFields.AgentUpdateRepo.trim(),
+                          ],
                           ['GeoIPProvider', operationFields.GeoIPProvider],
                         ],
                         '运维设置已保存。',
@@ -1006,7 +1028,8 @@ export function SettingsPage() {
                       Agent 更新仓库
                     </p>
                     <p className="text-sm text-[var(--foreground-muted)]">
-                      自动更新和手动更新动作在节点页触发，这里维护 Agent 自更新使用的仓库地址。
+                      自动更新和手动更新动作在节点页触发，这里维护 Agent
+                      自更新使用的仓库地址。
                     </p>
                   </div>
                   <div className="mt-4">
@@ -1031,7 +1054,8 @@ export function SettingsPage() {
                       IP 归属方式
                     </p>
                     <p className="text-sm text-[var(--foreground-muted)]">
-                      控制世界地图等场景使用的 IP 归属解析来源。选择 MaxMind 时会按需下载本地 mmdb 数据库。
+                      控制世界地图等场景使用的 IP 归属解析来源。选择 MaxMind
+                      时会按需下载本地 mmdb 数据库。
                     </p>
                   </div>
                   <div className="mt-4">
@@ -1055,6 +1079,84 @@ export function SettingsPage() {
                         <option value="ipinfo">ipinfo.io</option>
                       </ResourceSelect>
                     </ResourceField>
+                  </div>
+                  <div className="mt-5 rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] p-5">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
+                      <ResourceField
+                        label="测试 IP"
+                      >
+                        <ResourceInput
+                          value={geoIPTestIP}
+                          onChange={(event) =>
+                            setGeoIPTestIP(event.target.value)
+                          }
+                          placeholder="例如 8.8.8.8"
+                        />
+                      </ResourceField>
+                      <PrimaryButton
+                        type="button"
+                        onClick={handleGeoIPLookup}
+                        disabled={geoIPLookupMutation.isPending}
+                      >
+                        {geoIPLookupMutation.isPending
+                          ? '查询中...'
+                          : '查询归属'}
+                      </PrimaryButton>
+                    </div>
+
+                    <div className="mt-4 space-y-3">
+                      {geoIPLookupMutation.isError ? (
+                        <InlineMessage
+                          tone="danger"
+                          message={getErrorMessage(geoIPLookupMutation.error)}
+                        />
+                      ) : null}
+
+                      {geoIPLookupResult ? (
+                        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                          <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-base)] px-4 py-4">
+                            <p className="text-xs tracking-[0.2em] text-[var(--foreground-muted)] uppercase">
+                              查询 IP
+                            </p>
+                            <p className="mt-2 text-sm font-semibold text-[var(--foreground-primary)]">
+                              {geoIPLookupResult.ip}
+                            </p>
+                          </div>
+                          <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-base)] px-4 py-4">
+                            <p className="text-xs tracking-[0.2em] text-[var(--foreground-muted)] uppercase">
+                              国家 / 地区
+                            </p>
+                            <p className="mt-2 text-sm font-semibold text-[var(--foreground-primary)]">
+                              {geoIPLookupResult.name || '—'}
+                            </p>
+                          </div>
+                          <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-base)] px-4 py-4">
+                            <p className="text-xs tracking-[0.2em] text-[var(--foreground-muted)] uppercase">
+                              ISO Code
+                            </p>
+                            <div className="mt-2">
+                              <StatusBadge
+                                label={geoIPLookupResult.iso_code || '—'}
+                                variant="info"
+                              />
+                            </div>
+                          </div>
+                          <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-base)] px-4 py-4">
+                            <p className="text-xs tracking-[0.2em] text-[var(--foreground-muted)] uppercase">
+                              经纬度
+                            </p>
+                            <p className="mt-2 text-sm font-semibold text-[var(--foreground-primary)]">
+                              {geoIPLookupResult.latitude !== undefined &&
+                              geoIPLookupResult.latitude !== null &&
+                              geoIPLookupResult.longitude !== undefined &&
+                              geoIPLookupResult.longitude !== null
+                                ? `${geoIPLookupResult.latitude.toFixed(4)}, ${geoIPLookupResult.longitude.toFixed(4)}`
+                                : '—'}
+                            </p>
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1281,7 +1383,9 @@ export function SettingsPage() {
                     }
                     disabled={busyKey === 'system-general'}
                   >
-                    {busyKey === 'system-general' ? '保存中...' : '保存通用设置'}
+                    {busyKey === 'system-general'
+                      ? '保存中...'
+                      : '保存通用设置'}
                   </PrimaryButton>
                 </div>
               }
@@ -1904,9 +2008,7 @@ export function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="设置"
-      />
+      <PageHeader title="设置" />
 
       {feedback ? (
         <InlineMessage tone={feedback.tone} message={feedback.message} />
