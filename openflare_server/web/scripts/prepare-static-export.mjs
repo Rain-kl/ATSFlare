@@ -1,4 +1,4 @@
-import { cpSync, existsSync, mkdirSync, rmSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, renameSync, rmSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const root = process.cwd();
@@ -10,5 +10,10 @@ if (!existsSync(outDir)) {
 }
 
 rmSync(buildDir, { recursive: true, force: true });
-mkdirSync(buildDir, { recursive: true });
-cpSync(outDir, buildDir, { recursive: true });
+
+try {
+  renameSync(outDir, buildDir);
+} catch (error) {
+  mkdirSync(buildDir, { recursive: true });
+  cpSync(outDir, buildDir, { recursive: true });
+}
