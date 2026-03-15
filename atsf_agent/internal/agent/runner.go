@@ -320,8 +320,11 @@ func (r *Runner) nodePayload(nodeID string) protocol.NodePayload {
 	}
 	profile := observability.BuildProfile(r.Config, r.StateStore)
 	managedOpenRestyMetrics := observability.CollectManagedOpenRestyMetrics(r.Config)
+	trafficReport, accessLogs, fallbackMetrics := observability.BuildTrafficObservability(r.Config, r.StateStore, managedOpenRestyMetrics)
+	if managedOpenRestyMetrics == nil {
+		managedOpenRestyMetrics = fallbackMetrics
+	}
 	metricSnapshot := observability.BuildSnapshot(r.Config, r.StateStore, managedOpenRestyMetrics)
-	trafficReport, accessLogs := observability.BuildTrafficObservability(r.Config, r.StateStore, managedOpenRestyMetrics)
 	healthEvents := observability.BuildHealthEvents(snapshot)
 	return protocol.NodePayload{
 		NodeID:           nodeID,

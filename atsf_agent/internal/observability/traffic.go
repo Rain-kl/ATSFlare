@@ -18,37 +18,41 @@ import (
 )
 
 type accessLogRecord struct {
-	Timestamp  string `json:"ts"`
-	Host       string `json:"host"`
-	RemoteAddr string `json:"remote_addr"`
-	Path       string `json:"path"`
-	Status     int    `json:"status"`
+	Timestamp     string `json:"ts"`
+	Host          string `json:"host"`
+	RemoteAddr    string `json:"remote_addr"`
+	Path          string `json:"path"`
+	Status        int    `json:"status"`
+	BytesSent     int64  `json:"bytes_sent"`
+	RequestLength int64  `json:"request_length"`
 }
 
 var combinedAccessLogPattern = regexp.MustCompile(`^(\S+)\s+\S+\s+\S+\s+\[([^\]]+)\]\s+"(?:\S+)\s+(\S+)(?:\s+[^"]*)?"\s+(\d{3})\s+\S+`)
 
 type trafficAggregate struct {
-	windowStartedAt time.Time
-	windowEndedAt   time.Time
-	requestCount    int64
-	errorCount      int64
-	statusCodes     map[string]int64
-	topDomains      map[string]int64
-	visitors        map[string]struct{}
-	logs            []protocol.NodeAccessLog
+	windowStartedAt  time.Time
+	windowEndedAt    time.Time
+	requestCount     int64
+	errorCount       int64
+	openrestyRxBytes int64
+	openrestyTxBytes int64
+	statusCodes      map[string]int64
+	topDomains       map[string]int64
+	visitors         map[string]struct{}
+	logs             []protocol.NodeAccessLog
 }
 
 func BuildTrafficReport(cfg *config.Config, stateStore *state.Store, managed *managedOpenRestyMetrics) *protocol.NodeTrafficReport {
-	report, _ := BuildTrafficObservability(cfg, stateStore, managed)
+	report, _, _ := BuildTrafficObservability(cfg, stateStore, managed)
 	return report
 }
 
-func BuildTrafficObservability(cfg *config.Config, stateStore *state.Store, managed *managedOpenRestyMetrics) (*protocol.NodeTrafficReport, []protocol.NodeAccessLog) {
+func BuildTrafficObservability(cfg *config.Config, stateStore *state.Store, managed *managedOpenRestyMetrics) (*protocol.NodeTrafficReport, []protocol.NodeAccessLog, *managedOpenRestyMetrics) {
 	if cfg == nil || stateStore == nil {
 		if managed != nil && managed.TrafficReport != nil {
-			return managed.TrafficReport, nil
+			return managed.TrafficReport, nil, managed
 		}
-		return nil, nil
+		return nil, nil, managed
 	}
 
 	aggregate := readAccessLogDelta(cfg, stateStore)
@@ -57,12 +61,13 @@ func BuildTrafficObservability(cfg *config.Config, stateStore *state.Store, mana
 		accessLogs = aggregate.accessLogs()
 	}
 	if managed != nil && managed.TrafficReport != nil {
-		return managed.TrafficReport, accessLogs
+		return managed.TrafficReport, accessLogs, managed
 	}
 	if aggregate == nil {
-		return nil, accessLogs
+		return nil, accessLogs, managed
 	}
-	return aggregate.report(), accessLogs
+	fallbackManaged := aggregate.managedMetrics()
+	return aggregate.report(), accessLogs, fallbackManaged
 }
 
 func readAccessLogDelta(cfg *config.Config, stateStore *state.Store) *trafficAggregate {
@@ -162,6 +167,12 @@ func (aggregate *trafficAggregate) consume(line []byte) {
 	if record.Status > 0 {
 		aggregate.statusCodes[strconv.Itoa(record.Status)]++
 	}
+	if record.RequestLength > 0 {
+		aggregate.openrestyRxBytes += record.RequestLength
+	}
+	if record.BytesSent > 0 {
+		aggregate.openrestyTxBytes += record.BytesSent
+	}
 	if host := strings.TrimSpace(record.Host); host != "" {
 		aggregate.topDomains[host]++
 	}
@@ -178,11 +189,13 @@ func (aggregate *trafficAggregate) consume(line []byte) {
 }
 
 type parsedAccessLogRecord struct {
-	Timestamp  time.Time
-	Host       string
-	RemoteAddr string
-	Path       string
-	Status     int
+	Timestamp     time.Time
+	Host          string
+	RemoteAddr    string
+	Path          string
+	Status        int
+	BytesSent     int64
+	RequestLength int64
 }
 
 func parseAccessLogRecord(raw string) (parsedAccessLogRecord, bool) {
@@ -203,11 +216,13 @@ func parseJSONAccessLogRecord(raw string) (parsedAccessLogRecord, bool) {
 		return parsedAccessLogRecord{}, false
 	}
 	return parsedAccessLogRecord{
-		Timestamp:  timestamp,
-		Host:       strings.TrimSpace(record.Host),
-		RemoteAddr: strings.TrimSpace(record.RemoteAddr),
-		Path:       normalizeAccessLogPath(record.Path),
-		Status:     record.Status,
+		Timestamp:     timestamp,
+		Host:          strings.TrimSpace(record.Host),
+		RemoteAddr:    strings.TrimSpace(record.RemoteAddr),
+		Path:          normalizeAccessLogPath(record.Path),
+		Status:        record.Status,
+		BytesSent:     record.BytesSent,
+		RequestLength: record.RequestLength,
 	}, true
 }
 
@@ -254,6 +269,21 @@ func (aggregate *trafficAggregate) accessLogs() []protocol.NodeAccessLog {
 		return []protocol.NodeAccessLog{}
 	}
 	return append([]protocol.NodeAccessLog(nil), aggregate.logs...)
+}
+
+func (aggregate *trafficAggregate) managedMetrics() *managedOpenRestyMetrics {
+	if aggregate == nil {
+		return nil
+	}
+	report := aggregate.report()
+	if report == nil && aggregate.openrestyRxBytes <= 0 && aggregate.openrestyTxBytes <= 0 {
+		return nil
+	}
+	return &managedOpenRestyMetrics{
+		TrafficReport:    report,
+		OpenrestyRxBytes: aggregate.openrestyRxBytes,
+		OpenrestyTxBytes: aggregate.openrestyTxBytes,
+	}
 }
 
 func parseAccessLogTime(value string) (time.Time, error) {

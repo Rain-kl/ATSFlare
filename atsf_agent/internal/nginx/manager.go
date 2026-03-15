@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io/fs"
 	"log/slog"
 	"os"
 	"os/exec"
@@ -529,7 +530,7 @@ func (m *Manager) restore(state *backupState) error {
 		if err := os.MkdirAll(filepath.Dir(targetPath), 0o755); err != nil {
 			return err
 		}
-		if err := os.WriteFile(targetPath, []byte(file.Content), 0o600); err != nil {
+		if err := os.WriteFile(targetPath, []byte(file.Content), supportFileMode(file.Path)); err != nil {
 			return err
 		}
 	}
@@ -554,7 +555,7 @@ func (m *Manager) writeSupportFiles(supportFiles []protocol.SupportFile) error {
 		if err := os.MkdirAll(filepath.Dir(targetPath), 0o755); err != nil {
 			return err
 		}
-		if err := os.WriteFile(targetPath, []byte(file.Content), 0o600); err != nil {
+		if err := os.WriteFile(targetPath, []byte(file.Content), supportFileMode(file.Path)); err != nil {
 			return err
 		}
 	}
@@ -626,6 +627,17 @@ func (m *Manager) supportFileTargetPath(relativePath string) (string, error) {
 		return "", fmt.Errorf("support file path %q escapes support dir", relativePath)
 	}
 	return targetPath, nil
+}
+
+func supportFileMode(relativePath string) fs.FileMode {
+	switch strings.ToLower(filepath.Ext(strings.TrimSpace(relativePath))) {
+	case ".lua", ".crt", ".pem":
+		return 0o644
+	case ".key":
+		return 0o600
+	default:
+		return 0o644
+	}
 }
 
 func (m *Manager) renderRouteConfig(content string) string {

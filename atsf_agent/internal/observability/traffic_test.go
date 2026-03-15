@@ -85,20 +85,23 @@ func TestBuildTrafficObservabilityReturnsAccessLogs(t *testing.T) {
 	}
 	logPath := filepath.Join(filepath.Dir(routeConfigPath), "atsflare_access.log")
 	content := []byte(
-		"{\"ts\":\"2026-03-14T08:00:00Z\",\"host\":\"app.example.com\",\"path\":\"/login\",\"remote_addr\":\"10.0.0.1\",\"status\":200}\n" +
-			"{\"ts\":\"2026-03-14T08:00:05Z\",\"host\":\"api.example.com\",\"path\":\"/v1/ping\",\"remote_addr\":\"10.0.0.2\",\"status\":502}\n",
+		"{\"ts\":\"2026-03-14T08:00:00Z\",\"host\":\"app.example.com\",\"path\":\"/login\",\"remote_addr\":\"10.0.0.1\",\"status\":200,\"request_length\":128,\"bytes_sent\":512}\n" +
+			"{\"ts\":\"2026-03-14T08:00:05Z\",\"host\":\"api.example.com\",\"path\":\"/v1/ping\",\"remote_addr\":\"10.0.0.2\",\"status\":502,\"request_length\":64,\"bytes_sent\":256}\n",
 	)
 	if err := os.WriteFile(logPath, content, 0o644); err != nil {
 		t.Fatalf("WriteFile failed: %v", err)
 	}
 
 	stateStore := state.NewStore(filepath.Join(tempDir, "state.json"))
-	report, accessLogs := BuildTrafficObservability(&config.Config{RouteConfigPath: routeConfigPath}, stateStore, nil)
+	report, accessLogs, fallbackMetrics := BuildTrafficObservability(&config.Config{RouteConfigPath: routeConfigPath}, stateStore, nil)
 	if report == nil || report.RequestCount != 2 {
 		t.Fatalf("expected traffic report, got %+v", report)
 	}
 	if len(accessLogs) != 2 {
 		t.Fatalf("expected access logs, got %+v", accessLogs)
+	}
+	if fallbackMetrics == nil || fallbackMetrics.OpenrestyRxBytes != 192 || fallbackMetrics.OpenrestyTxBytes != 768 {
+		t.Fatalf("expected fallback throughput metrics, got %+v", fallbackMetrics)
 	}
 	if accessLogs[0].Path != "/login" || accessLogs[1].Path != "/v1/ping" {
 		t.Fatalf("unexpected access log paths: %+v", accessLogs)

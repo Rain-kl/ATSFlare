@@ -497,6 +497,64 @@ func TestManagerApplyWritesSupportFilesAndReplacesPlaceholder(t *testing.T) {
 	if string(certData) != "cert-data" {
 		t.Fatalf("unexpected cert file content: %s", string(certData))
 	}
+	luaInfo, err := os.Stat(filepath.Join(manager.SupportDir, "observability", "log.lua"))
+	if err == nil {
+		t.Fatalf("expected no lua file in this test, got %v", luaInfo)
+	}
+}
+
+func TestSupportFileMode(t *testing.T) {
+	testCases := []struct {
+		path string
+		want os.FileMode
+	}{
+		{path: "observability/log.lua", want: 0o644},
+		{path: "1.crt", want: 0o644},
+		{path: "1.pem", want: 0o644},
+		{path: "1.key", want: 0o600},
+		{path: "misc.txt", want: 0o644},
+	}
+
+	for _, testCase := range testCases {
+		if got := supportFileMode(testCase.path); got != testCase.want {
+			t.Fatalf("unexpected mode for %s: got %o want %o", testCase.path, got, testCase.want)
+		}
+	}
+}
+
+func TestManagerApplyWritesLuaSupportFilesReadable(t *testing.T) {
+	tempDir := t.TempDir()
+	manager := &Manager{
+		MainConfigPath:  filepath.Join(tempDir, "nginx.conf"),
+		RouteConfigPath: filepath.Join(tempDir, "routes.conf"),
+		SupportDir:      filepath.Join(tempDir, "support"),
+		NginxSupportDir: "/etc/nginx/atsflare-support",
+		Executor:        &fakeExecutor{},
+	}
+
+	err := manager.Apply(context.Background(), "main", "route", []protocol.SupportFile{
+		{Path: "observability/log.lua", Content: "return"},
+		{Path: "1.key", Content: "secret"},
+	})
+	if err != nil {
+		t.Fatalf("Apply failed: %v", err)
+	}
+
+	luaInfo, err := os.Stat(filepath.Join(manager.SupportDir, "observability", "log.lua"))
+	if err != nil {
+		t.Fatalf("failed to stat lua file: %v", err)
+	}
+	if luaInfo.Mode().Perm() != 0o644 {
+		t.Fatalf("unexpected lua mode: %o", luaInfo.Mode().Perm())
+	}
+
+	keyInfo, err := os.Stat(filepath.Join(manager.SupportDir, "1.key"))
+	if err != nil {
+		t.Fatalf("failed to stat key file: %v", err)
+	}
+	if keyInfo.Mode().Perm() != 0o600 {
+		t.Fatalf("unexpected key mode: %o", keyInfo.Mode().Perm())
+	}
 }
 
 func TestManagerRollbackRestoresSupportFiles(t *testing.T) {
