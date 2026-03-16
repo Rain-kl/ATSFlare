@@ -4,6 +4,11 @@ permissions:
 
 on:
   workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version/tag to publish, for example v1.0.0-beta"
+        required: false
+        type: string
   push:
     tags: ["v*"]
 
@@ -22,17 +27,28 @@ jobs:
 
       - name: Resolve version metadata
         id: version
+        env:
+          INPUT_VERSION: ${{ github.event.inputs.version }}
         run: |
           SHOULD_RUN=true
           POINTED_TAG="$(git tag --points-at HEAD --list 'v*' | sort -V | tail -n1)"
+          INPUT_VERSION="${INPUT_VERSION//[[:space:]]/}"
 
-          if [[ "${GITHUB_REF}" == refs/heads/main ]] && [[ -n "$POINTED_TAG" ]]; then
-            SHOULD_RUN=true
-            VERSION="$POINTED_TAG"
-          elif [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
             VERSION="${GITHUB_REF_NAME}"
+          elif [[ -n "$INPUT_VERSION" ]]; then
+            VERSION="$INPUT_VERSION"
+          elif [[ -n "$POINTED_TAG" ]]; then
+            VERSION="$POINTED_TAG"
+          elif [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            echo "workflow_dispatch requires an explicit version input when HEAD is not tagged" >&2
+            exit 1
+          elif [[ "${GITHUB_REF}" == refs/heads/main ]]; then
+            echo "main branch release requires the current commit to be tagged" >&2
+            exit 1
           else
-            VERSION="$(git describe --tags)"
+            echo "unable to resolve release version from the current ref" >&2
+            exit 1
           fi
 
           echo "should_run=$SHOULD_RUN" >> "$GITHUB_OUTPUT"

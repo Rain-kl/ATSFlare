@@ -2,6 +2,11 @@ name: Docker image builds
 
 on:
   workflow_dispatch:
+    inputs:
+      version:
+        description: "Image version/tag to publish, for example v1.0.0-beta"
+        required: false
+        type: string
   push:
     tags: ["v*"]
 
@@ -35,9 +40,25 @@ jobs:
 
       - name: Set image metadata
         shell: bash
+        env:
+          INPUT_VERSION: ${{ github.event.inputs.version }}
         run: |
+          POINTED_TAG="$(git tag --points-at HEAD --list 'v*' | sort -V | tail -n1)"
+          INPUT_VERSION="${INPUT_VERSION//[[:space:]]/}"
+
           echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
-          echo "VERSION=$(git describe --tags)" >> "$GITHUB_ENV"
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            VERSION="${GITHUB_REF_NAME}"
+          elif [[ -n "$INPUT_VERSION" ]]; then
+            VERSION="$INPUT_VERSION"
+          elif [[ -n "$POINTED_TAG" ]]; then
+            VERSION="$POINTED_TAG"
+          else
+            echo "workflow_dispatch requires an explicit version input when HEAD is not tagged" >&2
+            exit 1
+          fi
+
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -99,9 +120,25 @@ jobs:
 
       - name: Set image metadata
         shell: bash
+        env:
+          INPUT_VERSION: ${{ github.event.inputs.version }}
         run: |
+          POINTED_TAG="$(git tag --points-at HEAD --list 'v*' | sort -V | tail -n1)"
+          INPUT_VERSION="${INPUT_VERSION//[[:space:]]/}"
+
           echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
-          echo "VERSION=$(git describe --tags)" >> "$GITHUB_ENV"
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            VERSION="${GITHUB_REF_NAME}"
+          elif [[ -n "$INPUT_VERSION" ]]; then
+            VERSION="$INPUT_VERSION"
+          elif [[ -n "$POINTED_TAG" ]]; then
+            VERSION="$POINTED_TAG"
+          else
+            echo "workflow_dispatch requires an explicit version input when HEAD is not tagged" >&2
+            exit 1
+          fi
+
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
 
       - name: Download digests
         uses: actions/download-artifact@v4
