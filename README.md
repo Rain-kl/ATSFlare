@@ -118,11 +118,9 @@ services:
       - "3000:3000"
     environment:
       SESSION_SECRET: replace-with-random-string
-      SQLITE_PATH: /data/openflare.db
       DSN: postgres://openflare:replace-with-strong-password@postgres:5432/openflare?sslmode=disable
       GIN_MODE: release
       LOG_LEVEL: info
-      PORT: "3000"
     volumes:
       - openflare-data:/data
 
