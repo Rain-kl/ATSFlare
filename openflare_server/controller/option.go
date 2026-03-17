@@ -211,7 +211,7 @@ func GetOptions(c *gin.Context) {
 // @Param payload body model.Option true "Option payload"
 // @Success 200 {object} map[string]interface{}
 // @Failure 400 {object} map[string]interface{}
-// @Router /api/option/ [put]
+// @Router /api/option/update [post]
 func UpdateOption(c *gin.Context) {
 	var option model.Option
 	err := json.NewDecoder(c.Request.Body).Decode(&option)

@@ -26,6 +26,6 @@ export function publishConfigVersion() {
 
 export function activateConfigVersion(id: number) {
   return apiRequest<ConfigVersionItem>(`/config-versions/${id}/activate`, {
-    method: 'PUT',
+    method: 'POST',
   });
 }

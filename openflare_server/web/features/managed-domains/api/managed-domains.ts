@@ -18,15 +18,15 @@ export function createManagedDomain(payload: ManagedDomainMutationPayload) {
 }
 
 export function updateManagedDomain(id: number, payload: ManagedDomainMutationPayload) {
-  return apiRequest<ManagedDomainItem>(`/managed-domains/${id}`, {
-    method: 'PUT',
+  return apiRequest<ManagedDomainItem>(`/managed-domains/${id}/update`, {
+    method: 'POST',
     body: JSON.stringify(payload),
   });
 }
 
 export function deleteManagedDomain(id: number) {
-  return apiRequest<void>(`/managed-domains/${id}`, {
-    method: 'DELETE',
+  return apiRequest<void>(`/managed-domains/${id}/delete`, {
+    method: 'POST',
   });
 }
 

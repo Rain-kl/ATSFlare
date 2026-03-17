@@ -84,7 +84,7 @@ func RotateNodeBootstrapToken(c *gin.Context) {
 // @Param payload body service.NodeInput true "Node payload"
 // @Success 200 {object} map[string]interface{}
 // @Failure 400 {object} map[string]interface{}
-// @Router /api/nodes/{id} [put]
+// @Router /api/nodes/{id}/update [post]
 func UpdateNode(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil || id == 0 {
@@ -114,7 +114,7 @@ func UpdateNode(c *gin.Context) {
 // @Param id path int true "Node ID"
 // @Success 200 {object} map[string]interface{}
 // @Failure 400 {object} map[string]interface{}
-// @Router /api/nodes/{id} [delete]
+// @Router /api/nodes/{id}/delete [post]
 func DeleteNode(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil || id == 0 {

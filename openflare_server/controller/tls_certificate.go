@@ -143,7 +143,7 @@ func CreateTLSCertificate(c *gin.Context) {
 // @Param payload body service.TLSCertificateInput true "TLS certificate payload"
 // @Success 200 {object} map[string]interface{}
 // @Failure 400 {object} map[string]interface{}
-// @Router /api/tls-certificates/{id} [put]
+// @Router /api/tls-certificates/{id}/update [post]
 func UpdateTLSCertificate(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil || id == 0 {
@@ -233,7 +233,7 @@ func ImportTLSCertificateFile(c *gin.Context) {
 // @Param id path int true "Certificate ID"
 // @Success 200 {object} map[string]interface{}
 // @Failure 400 {object} map[string]interface{}
-// @Router /api/tls-certificates/{id} [delete]
+// @Router /api/tls-certificates/{id}/delete [post]
 func DeleteTLSCertificate(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil || id == 0 {

@@ -131,7 +131,7 @@ func PublishConfigVersion(c *gin.Context) {
 // @Param id path int true "Version ID"
 // @Success 200 {object} map[string]interface{}
 // @Failure 400 {object} map[string]interface{}
-// @Router /api/config-versions/{id}/activate [put]
+// @Router /api/config-versions/{id}/activate [post]
 func ActivateConfigVersion(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil || id == 0 {

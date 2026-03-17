@@ -19,15 +19,15 @@ export function createProxyRoute(payload: ProxyRouteMutationPayload) {
 }
 
 export function updateProxyRoute(id: number, payload: ProxyRouteMutationPayload) {
-  return apiRequest<ProxyRouteItem>(`/proxy-routes/${id}`, {
-    method: 'PUT',
+  return apiRequest<ProxyRouteItem>(`/proxy-routes/${id}/update`, {
+    method: 'POST',
     body: JSON.stringify(payload),
   });
 }
 
 export function deleteProxyRoute(id: number) {
-  return apiRequest<void>(`/proxy-routes/${id}`, {
-    method: 'DELETE',
+  return apiRequest<void>(`/proxy-routes/${id}/delete`, {
+    method: 'POST',
   });
 }
 

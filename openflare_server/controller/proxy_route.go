@@ -75,7 +75,7 @@ func CreateProxyRoute(c *gin.Context) {
 // @Param payload body service.ProxyRouteInput true "Proxy route payload"
 // @Success 200 {object} map[string]interface{}
 // @Failure 400 {object} map[string]interface{}
-// @Router /api/proxy-routes/{id} [put]
+// @Router /api/proxy-routes/{id}/update [post]
 func UpdateProxyRoute(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil || id == 0 {
@@ -116,7 +116,7 @@ func UpdateProxyRoute(c *gin.Context) {
 // @Param id path int true "Route ID"
 // @Success 200 {object} map[string]interface{}
 // @Failure 400 {object} map[string]interface{}
-// @Router /api/proxy-routes/{id} [delete]
+// @Router /api/proxy-routes/{id}/delete [post]
 func DeleteProxyRoute(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil || id == 0 {

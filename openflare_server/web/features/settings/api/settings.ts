@@ -13,8 +13,8 @@ export function getOptions() {
 }
 
 export function updateOption(key: string, value: string) {
-  return apiRequest<void>('/option/', {
-    method: 'PUT',
+  return apiRequest<void>('/option/update', {
+    method: 'POST',
     body: JSON.stringify({ key, value }),
   });
 }
@@ -41,8 +41,8 @@ export function getSettingsProfile() {
 }
 
 export function updateSelf(payload: UpdateSelfPayload) {
-  return apiRequest<void>('/user/self', {
-    method: 'PUT',
+  return apiRequest<void>('/user/self/update', {
+    method: 'POST',
     body: JSON.stringify(payload),
   });
 }

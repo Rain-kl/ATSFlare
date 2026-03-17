@@ -84,7 +84,7 @@ func TestPhase2ManagedDomainLifecycle(t *testing.T) {
 		t.Fatalf("expected exact certificate id %d, got %#v", exactID, candidate["certificate_id"])
 	}
 
-	updateResp := performJSONRequest(t, engine, token, http.MethodPut, "/api/managed-domains/"+toString(uint(exactDomain["id"].(float64))), map[string]any{
+	updateResp := performJSONRequest(t, engine, token, http.MethodPost, "/api/managed-domains/"+toString(uint(exactDomain["id"].(float64)))+"/update", map[string]any{
 		"domain":  "api.example.com",
 		"cert_id": exactID,
 		"enabled": false,
@@ -105,7 +105,7 @@ func TestPhase2ManagedDomainLifecycle(t *testing.T) {
 		t.Fatalf("expected wildcard certificate id %d, got %#v", wildcardID, candidate["certificate_id"])
 	}
 
-	deleteResp := performJSONRequest(t, engine, token, http.MethodDelete, "/api/managed-domains/"+toString(uint(wildcardDomain["id"].(float64))), nil)
+	deleteResp := performJSONRequest(t, engine, token, http.MethodPost, "/api/managed-domains/"+toString(uint(wildcardDomain["id"].(float64)))+"/delete", nil)
 	if !deleteResp.Success {
 		t.Fatalf("expected delete success, got %s", deleteResp.Message)
 	}

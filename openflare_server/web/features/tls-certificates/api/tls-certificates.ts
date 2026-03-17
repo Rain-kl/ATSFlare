@@ -31,8 +31,8 @@ export function updateTlsCertificate(
   id: number,
   payload: TlsCertificateMutationPayload,
 ) {
-  return apiRequest<TlsCertificateItem>(`/tls-certificates/${id}`, {
-    method: 'PUT',
+  return apiRequest<TlsCertificateItem>(`/tls-certificates/${id}/update`, {
+    method: 'POST',
     body: JSON.stringify(payload),
   });
 }
@@ -51,7 +51,7 @@ export function importTlsCertificateFiles(payload: TlsCertificateFileImportPaylo
 }
 
 export function deleteTlsCertificate(id: number) {
-  return apiRequest<void>(`/tls-certificates/${id}`, {
-    method: 'DELETE',
+  return apiRequest<void>(`/tls-certificates/${id}/delete`, {
+    method: 'POST',
   });
 }

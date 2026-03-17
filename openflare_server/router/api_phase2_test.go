@@ -41,19 +41,19 @@ func TestPhase2RateLimitOptionsHotReload(t *testing.T) {
 
 	loginCookie := loginAsRoot(t, engine)
 
-	performSessionJSONRequest(t, engine, loginCookie, http.MethodPut, "/api/option/", map[string]any{
+	performSessionJSONRequest(t, engine, loginCookie, http.MethodPost, "/api/option/update", map[string]any{
 		"key":   "GlobalApiRateLimitNum",
 		"value": "450",
 	})
-	performSessionJSONRequest(t, engine, loginCookie, http.MethodPut, "/api/option/", map[string]any{
+	performSessionJSONRequest(t, engine, loginCookie, http.MethodPost, "/api/option/update", map[string]any{
 		"key":   "GlobalApiRateLimitDuration",
 		"value": "240",
 	})
-	performSessionJSONRequest(t, engine, loginCookie, http.MethodPut, "/api/option/", map[string]any{
+	performSessionJSONRequest(t, engine, loginCookie, http.MethodPost, "/api/option/update", map[string]any{
 		"key":   "CriticalRateLimitNum",
 		"value": "150",
 	})
-	performSessionJSONRequest(t, engine, loginCookie, http.MethodPut, "/api/option/", map[string]any{
+	performSessionJSONRequest(t, engine, loginCookie, http.MethodPost, "/api/option/update", map[string]any{
 		"key":   "CriticalRateLimitDuration",
 		"value": "900",
 	})
@@ -330,7 +330,7 @@ func TestPhase2AgentLifecycle(t *testing.T) {
 		t.Fatalf("expected 2 apply logs, got %d", len(logs))
 	}
 
-	updatedNodeResp := performJSONRequest(t, engine, adminToken, http.MethodPut, "/api/nodes/"+toString(createdNode.ID), map[string]any{
+	updatedNodeResp := performJSONRequest(t, engine, adminToken, http.MethodPost, "/api/nodes/"+toString(createdNode.ID)+"/update", map[string]any{
 		"name":                "shanghai-edge-1-renamed",
 		"geo_manual_override": true,
 		"geo_name":            "Tokyo",
@@ -355,7 +355,7 @@ func TestPhase2AgentLifecycle(t *testing.T) {
 		t.Fatal("expected node to be shown as offline after timeout")
 	}
 
-	deleteResp := performJSONRequest(t, engine, adminToken, http.MethodDelete, "/api/nodes/"+toString(createdNode.ID), nil)
+	deleteResp := performJSONRequest(t, engine, adminToken, http.MethodPost, "/api/nodes/"+toString(createdNode.ID)+"/delete", nil)
 	if !deleteResp.Success {
 		t.Fatalf("expected delete node success, got %s", deleteResp.Message)
 	}
@@ -401,7 +401,7 @@ func TestPhase2CustomHeadersPreviewAndDiffLifecycle(t *testing.T) {
 
 	performJSONRequest(t, engine, token, http.MethodPost, "/api/config-versions/publish", nil)
 
-	performJSONRequest(t, engine, token, http.MethodPut, "/api/proxy-routes/"+toString(createdRoute.ID), map[string]any{
+	performJSONRequest(t, engine, token, http.MethodPost, "/api/proxy-routes/"+toString(createdRoute.ID)+"/update", map[string]any{
 		"domain":      "preview.example.com",
 		"origin_url":  "https://origin-b.internal",
 		"origin_host": "preview-upstream.internal",

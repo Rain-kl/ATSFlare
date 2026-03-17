@@ -27,8 +27,8 @@ export function createUser(payload: UserMutationPayload) {
 }
 
 export function updateUser(payload: UserMutationPayload & { id: number }) {
-  return apiRequest<void>('/user/', {
-    method: 'PUT',
+  return apiRequest<void>('/user/update', {
+    method: 'POST',
     body: JSON.stringify(payload),
   });
 }

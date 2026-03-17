@@ -32,8 +32,8 @@ func SetApiRouter(router *gin.Engine) {
 			selfRoute.Use(middleware.UserAuth(), middleware.NoTokenAuth())
 			{
 				selfRoute.GET("/self", controller.GetSelf)
-				selfRoute.PUT("/self", controller.UpdateSelf)
-				selfRoute.DELETE("/self", controller.DeleteSelf)
+				selfRoute.POST("/self/update", controller.UpdateSelf)
+				selfRoute.POST("/self/delete", controller.DeleteSelf)
 				selfRoute.GET("/token", controller.GenerateToken)
 			}
 
@@ -45,15 +45,15 @@ func SetApiRouter(router *gin.Engine) {
 				adminRoute.GET("/:id", controller.GetUser)
 				adminRoute.POST("/", controller.CreateUser)
 				adminRoute.POST("/manage", controller.ManageUser)
-				adminRoute.PUT("/", controller.UpdateUser)
-				adminRoute.DELETE("/:id", controller.DeleteUser)
+				adminRoute.POST("/update", controller.UpdateUser)
+				adminRoute.POST("/:id/delete", controller.DeleteUser)
 			}
 		}
 		optionRoute := apiRouter.Group("/option")
 		optionRoute.Use(middleware.RootAuth(), middleware.NoTokenAuth())
 		{
 			optionRoute.GET("/", controller.GetOptions)
-			optionRoute.PUT("/", controller.UpdateOption)
+			optionRoute.POST("/update", controller.UpdateOption)
 			optionRoute.POST("/geoip/lookup", controller.LookupGeoIP)
 		}
 		updateRoute := apiRouter.Group("/update")
@@ -71,15 +71,15 @@ func SetApiRouter(router *gin.Engine) {
 			fileRoute.GET("/", controller.GetAllFiles)
 			fileRoute.GET("/search", controller.SearchFiles)
 			fileRoute.POST("/", middleware.UploadRateLimit(), controller.UploadFile)
-			fileRoute.DELETE("/:id", controller.DeleteFile)
+			fileRoute.POST("/:id/delete", controller.DeleteFile)
 		}
 		proxyRoute := apiRouter.Group("/proxy-routes")
 		proxyRoute.Use(middleware.AdminAuth())
 		{
 			proxyRoute.GET("/", controller.GetProxyRoutes)
 			proxyRoute.POST("/", controller.CreateProxyRoute)
-			proxyRoute.PUT("/:id", controller.UpdateProxyRoute)
-			proxyRoute.DELETE("/:id", controller.DeleteProxyRoute)
+			proxyRoute.POST("/:id/update", controller.UpdateProxyRoute)
+			proxyRoute.POST("/:id/delete", controller.DeleteProxyRoute)
 		}
 		managedDomainRoute := apiRouter.Group("/managed-domains")
 		managedDomainRoute.Use(middleware.AdminAuth())
@@ -87,8 +87,8 @@ func SetApiRouter(router *gin.Engine) {
 			managedDomainRoute.GET("/", controller.GetManagedDomains)
 			managedDomainRoute.GET("/match", controller.MatchManagedDomainCertificate)
 			managedDomainRoute.POST("/", controller.CreateManagedDomain)
-			managedDomainRoute.PUT("/:id", controller.UpdateManagedDomain)
-			managedDomainRoute.DELETE("/:id", controller.DeleteManagedDomain)
+			managedDomainRoute.POST("/:id/update", controller.UpdateManagedDomain)
+			managedDomainRoute.POST("/:id/delete", controller.DeleteManagedDomain)
 		}
 		tlsCertificateRoute := apiRouter.Group("/tls-certificates")
 		tlsCertificateRoute.Use(middleware.AdminAuth())
@@ -97,9 +97,9 @@ func SetApiRouter(router *gin.Engine) {
 			tlsCertificateRoute.GET("/:id", controller.GetTLSCertificate)
 			tlsCertificateRoute.GET("/:id/content", controller.GetTLSCertificateContent)
 			tlsCertificateRoute.POST("/", controller.CreateTLSCertificate)
-			tlsCertificateRoute.PUT("/:id", controller.UpdateTLSCertificate)
+			tlsCertificateRoute.POST("/:id/update", controller.UpdateTLSCertificate)
 			tlsCertificateRoute.POST("/import-file", controller.ImportTLSCertificateFile)
-			tlsCertificateRoute.DELETE("/:id", controller.DeleteTLSCertificate)
+			tlsCertificateRoute.POST("/:id/delete", controller.DeleteTLSCertificate)
 		}
 		configVersionRoute := apiRouter.Group("/config-versions")
 		configVersionRoute.Use(middleware.AdminAuth())
@@ -109,7 +109,7 @@ func SetApiRouter(router *gin.Engine) {
 			configVersionRoute.GET("/preview", controller.PreviewConfigVersion)
 			configVersionRoute.GET("/diff", controller.DiffConfigVersion)
 			configVersionRoute.POST("/publish", controller.PublishConfigVersion)
-			configVersionRoute.PUT("/:id/activate", controller.ActivateConfigVersion)
+			configVersionRoute.POST("/:id/activate", controller.ActivateConfigVersion)
 		}
 		dashboardRoute := apiRouter.Group("/dashboard")
 		dashboardRoute.Use(middleware.AdminAuth())
@@ -127,8 +127,8 @@ func SetApiRouter(router *gin.Engine) {
 			nodeRoute.GET("/:id/observability", controller.GetNodeObservability)
 			nodeRoute.POST("/:id/agent-update", controller.RequestNodeAgentUpdate)
 			nodeRoute.POST("/:id/openresty-restart", controller.RequestNodeOpenrestyRestart)
-			nodeRoute.PUT("/:id", controller.UpdateNode)
-			nodeRoute.DELETE("/:id", controller.DeleteNode)
+			nodeRoute.POST("/:id/update", controller.UpdateNode)
+			nodeRoute.POST("/:id/delete", controller.DeleteNode)
 		}
 		applyLogRoute := apiRouter.Group("/apply-logs")
 		applyLogRoute.Use(middleware.AdminAuth())

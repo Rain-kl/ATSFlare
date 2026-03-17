@@ -76,7 +76,7 @@ func CreateManagedDomain(c *gin.Context) {
 // @Param payload body service.ManagedDomainInput true "Managed domain payload"
 // @Success 200 {object} map[string]interface{}
 // @Failure 400 {object} map[string]interface{}
-// @Router /api/managed-domains/{id} [put]
+// @Router /api/managed-domains/{id}/update [post]
 func UpdateManagedDomain(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil || id == 0 {
@@ -117,7 +117,7 @@ func UpdateManagedDomain(c *gin.Context) {
 // @Param id path int true "Managed domain ID"
 // @Success 200 {object} map[string]interface{}
 // @Failure 400 {object} map[string]interface{}
-// @Router /api/managed-domains/{id} [delete]
+// @Router /api/managed-domains/{id}/delete [post]
 func DeleteManagedDomain(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil || id == 0 {

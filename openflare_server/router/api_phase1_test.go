@@ -110,7 +110,7 @@ func TestPhase1PublishLifecycle(t *testing.T) {
 		"remark":      "updated route",
 	}
 	routePath := "/api/proxy-routes/" + toString(createdRoute.ID)
-	resp = performJSONRequest(t, engine, token, http.MethodPut, routePath, updateBody)
+	resp = performJSONRequest(t, engine, token, http.MethodPost, routePath+"/update", updateBody)
 	decodeResponseData(t, resp, &createdRoute)
 	if createdRoute.OriginURL != "https://origin-b.internal" {
 		t.Fatalf("unexpected updated route origin: %s", createdRoute.OriginURL)
@@ -141,7 +141,7 @@ func TestPhase1PublishLifecycle(t *testing.T) {
 	}
 
 	activatePath := "/api/config-versions/" + toString(version1.ID) + "/activate"
-	resp = performJSONRequest(t, engine, token, http.MethodPut, activatePath, nil)
+	resp = performJSONRequest(t, engine, token, http.MethodPost, activatePath, nil)
 	decodeResponseData(t, resp, &activeVersion)
 	if activeVersion.ID != version1.ID || !activeVersion.IsActive {
 		t.Fatal("expected version1 to become active after rollback activation")
@@ -162,7 +162,7 @@ func TestPhase1PublishLifecycle(t *testing.T) {
 	}
 
 	deletePath := "/api/proxy-routes/" + toString(createdRoute.ID)
-	resp = performJSONRequest(t, engine, token, http.MethodDelete, deletePath, nil)
+	resp = performJSONRequest(t, engine, token, http.MethodPost, deletePath+"/delete", nil)
 	if !resp.Success {
 		t.Fatalf("expected delete route success, got: %s", resp.Message)
 	}
@@ -210,7 +210,7 @@ func TestPhase1HTTPSAndCertificateImportLifecycle(t *testing.T) {
 	}
 
 	updatedCertPEM, updatedKeyPEM := generateCertificatePairForRouterTest(t, []string{"secure.example.com", "www.secure.example.com"})
-	updateCertificateResp := performJSONRequest(t, engine, token, http.MethodPut, "/api/tls-certificates/"+toString(manualCertificate.ID), map[string]any{
+	updateCertificateResp := performJSONRequest(t, engine, token, http.MethodPost, "/api/tls-certificates/"+toString(manualCertificate.ID)+"/update", map[string]any{
 		"name":     "secure-example-updated",
 		"cert_pem": updatedCertPEM,
 		"key_pem":  updatedKeyPEM,
@@ -250,7 +250,7 @@ func TestPhase1HTTPSAndCertificateImportLifecycle(t *testing.T) {
 		t.Fatal("expected route to persist https certificate binding")
 	}
 
-	updateResp := performJSONRequest(t, engine, token, http.MethodPut, "/api/proxy-routes/"+toString(route.ID), map[string]any{
+	updateResp := performJSONRequest(t, engine, token, http.MethodPost, "/api/proxy-routes/"+toString(route.ID)+"/update", map[string]any{
 		"domain":        "secure.example.com",
 		"origin_url":    "http://origin-secure.internal",
 		"enabled":       true,
@@ -264,7 +264,7 @@ func TestPhase1HTTPSAndCertificateImportLifecycle(t *testing.T) {
 		t.Fatalf("expected route to disable https flags, got %+v", route)
 	}
 
-	updateResp = performJSONRequest(t, engine, token, http.MethodPut, "/api/proxy-routes/"+toString(route.ID), map[string]any{
+	updateResp = performJSONRequest(t, engine, token, http.MethodPost, "/api/proxy-routes/"+toString(route.ID)+"/update", map[string]any{
 		"domain":        "secure.example.com",
 		"origin_url":    "https://origin-secure.internal",
 		"enabled":       true,

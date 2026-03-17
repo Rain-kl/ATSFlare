@@ -22,15 +22,15 @@ export function createNode(payload: NodeMutationPayload) {
 }
 
 export function updateNode(id: number, payload: NodeMutationPayload) {
-  return apiRequest<NodeItem>(`/nodes/${id}`, {
-    method: 'PUT',
+  return apiRequest<NodeItem>(`/nodes/${id}/update`, {
+    method: 'POST',
     body: JSON.stringify(payload),
   });
 }
 
 export function deleteNode(id: number) {
-  return apiRequest<void>(`/nodes/${id}`, {
-    method: 'DELETE',
+  return apiRequest<void>(`/nodes/${id}/delete`, {
+    method: 'POST',
   });
 }
 
