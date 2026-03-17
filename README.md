@@ -3,7 +3,8 @@
 </p>
 
 <div align="center">
-  <img src="./openflare_server/web/public/logo.png" width="120" height="120" alt="OpenFlare logo">
+
+[//]: # (  <img src="./openflare_server/web/public/logo.png" width="120" height="120" alt="OpenFlare logo">)
 
 # OpenFlare
 
