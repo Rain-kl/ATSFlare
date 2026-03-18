@@ -128,7 +128,18 @@ func (e *DockerExecutor) Test(ctx context.Context) error {
 }
 
 func (e *DockerExecutor) Reload(ctx context.Context) error {
-	return e.EnsureRuntime(ctx, true)
+	if err := e.validateMountSources(); err != nil {
+		return err
+	}
+	output, err := e.Runner.Run(ctx, e.DockerBinary, "inspect", "-f", "{{.State.Running}}", e.ContainerName)
+	if err != nil || strings.TrimSpace(string(output)) != "true" {
+		return e.EnsureRuntime(ctx, false)
+	}
+	output, err = e.Runner.Run(ctx, e.DockerBinary, "exec", e.ContainerName, dockerRuntimeCommand, "-s", "reload")
+	if err != nil {
+		return fmt.Errorf("docker exec %s reload failed: %w: %s", dockerRuntimeCommand, err, string(output))
+	}
+	return nil
 }
 
 func (e *DockerExecutor) EnsureRuntime(ctx context.Context, recreate bool) error {
@@ -298,11 +309,6 @@ func (m *Manager) Apply(ctx context.Context, mainConfig string, routeConfig stri
 	renderedRouteConfig := m.renderRouteConfig(routeConfig)
 	if err = os.WriteFile(m.RouteConfigPath, []byte(renderedRouteConfig), 0o644); err != nil {
 		slog.Error("writing openresty route config failed, restoring backup", "error", err)
-		_ = m.restore(backup)
-		return err
-	}
-	if err = m.Executor.Test(ctx); err != nil {
-		slog.Error("openresty test failed after config write, restoring backup", "error", err)
 		_ = m.restore(backup)
 		return err
 	}

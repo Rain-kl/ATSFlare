@@ -217,17 +217,56 @@ func TestDockerExecutorStartsStoppedContainer(t *testing.T) {
 		t.Fatalf("Reload failed: %v", err)
 	}
 
-	if len(runner.calls) != 3 {
-		t.Fatalf("expected 3 calls, got %d", len(runner.calls))
+	if len(runner.calls) != 4 {
+		t.Fatalf("expected 4 calls, got %d", len(runner.calls))
 	}
 	if runner.calls[0].args[0] != "inspect" {
 		t.Fatalf("expected docker inspect on first call, got %#v", runner.calls[0])
 	}
-	if runner.calls[1].args[0] != "rm" {
-		t.Fatalf("expected docker rm on second call, got %#v", runner.calls[1])
+	if runner.calls[1].args[0] != "inspect" {
+		t.Fatalf("expected docker inspect on second call, got %#v", runner.calls[1])
 	}
-	if runner.calls[2].args[0] != "run" {
-		t.Fatalf("expected docker run on third call, got %#v", runner.calls[2])
+	if runner.calls[2].args[0] != "rm" {
+		t.Fatalf("expected docker rm on third call, got %#v", runner.calls[2])
+	}
+	if runner.calls[3].args[0] != "run" {
+		t.Fatalf("expected docker run on fourth call, got %#v", runner.calls[3])
+	}
+}
+
+func TestDockerExecutorReloadsRunningContainerInPlace(t *testing.T) {
+	mainConfigPath, routeConfigDir, certDir, luaDir := prepareDockerMountSources(t)
+	runner := &fakeRunner{
+		runFn: func(name string, args ...string) ([]byte, error) {
+			if len(args) >= 1 && args[0] == "inspect" {
+				return []byte("true"), nil
+			}
+			return []byte("ok"), nil
+		},
+	}
+	executor := &DockerExecutor{
+		DockerBinary:   "docker",
+		ContainerName:  "openflare-openresty",
+		Image:          "openresty/openresty:alpine",
+		MainConfigPath: mainConfigPath,
+		RouteConfigDir: routeConfigDir,
+		CertDir:        certDir,
+		NginxCertDir:   "/etc/nginx/openflare-certs",
+		LuaDir:         luaDir,
+		NginxLuaDir:    "/etc/nginx/openflare-lua",
+		Runner:         runner,
+	}
+
+	if err := executor.Reload(context.Background()); err != nil {
+		t.Fatalf("Reload failed: %v", err)
+	}
+
+	expected := []runCall{
+		{name: "docker", args: []string{"inspect", "-f", "{{.State.Running}}", "openflare-openresty"}},
+		{name: "docker", args: []string{"exec", "openflare-openresty", "openresty", "-s", "reload"}},
+	}
+	if !reflect.DeepEqual(runner.calls, expected) {
+		t.Fatalf("unexpected calls: %#v", runner.calls)
 	}
 }
 
@@ -676,7 +715,7 @@ func TestManagerRollbackRestoresCertFiles(t *testing.T) {
 		LuaDir:          filepath.Join(tempDir, "lua"),
 		NginxLuaDir:     "/etc/nginx/openflare-lua",
 		Executor: &fakeExecutor{
-			testErr: errors.New("openresty test failed"),
+			reloadErr: errors.New("openresty reload failed"),
 		},
 	}
 
