@@ -957,7 +957,7 @@ export function PerformancePage() {
                                             }))
                                         }
                                         placeholder="例如：10.0.0.2, 1.1.1.1"
-                                        minRows={3}
+                                        rows={3}
                                     />
                                 </ResourceField>
                                 <ToggleField
