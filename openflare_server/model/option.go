@@ -80,7 +80,6 @@ func InitOptionMap() {
 	common.OptionMap["OpenRestyGzipEnabled"] = strconv.FormatBool(common.OpenRestyGzipEnabled)
 	common.OptionMap["OpenRestyGzipMinLength"] = strconv.Itoa(common.OpenRestyGzipMinLength)
 	common.OptionMap["OpenRestyGzipCompLevel"] = strconv.Itoa(common.OpenRestyGzipCompLevel)
-	common.OptionMap["OpenRestyResolvers"] = common.OpenRestyResolvers
 	common.OptionMap["OpenRestyCacheEnabled"] = strconv.FormatBool(common.OpenRestyCacheEnabled)
 	common.OptionMap["OpenRestyCachePath"] = common.OpenRestyCachePath
 	common.OptionMap["OpenRestyCacheLevels"] = common.OpenRestyCacheLevels
@@ -132,6 +131,11 @@ func updateOptionMap(key string, value string) {
 		common.OptionMap = make(map[string]string)
 	}
 	common.OptionMap[key] = value
+	if key == "OpenRestyResolvers" {
+		delete(common.OptionMap, key)
+		common.OptionMapRWMutex.Unlock()
+		return
+	}
 	if strings.HasSuffix(key, "Permission") {
 		intValue, _ := strconv.Atoi(value)
 		switch key {
@@ -299,8 +303,6 @@ func updateOptionMap(key string, value string) {
 		if v, err := strconv.Atoi(value); err == nil && v > 0 {
 			common.OpenRestyGzipCompLevel = v
 		}
-	case "OpenRestyResolvers":
-		common.OpenRestyResolvers = strings.TrimSpace(value)
 	case "OpenRestyCacheEnabled":
 		common.OpenRestyCacheEnabled = value == "true"
 	case "OpenRestyCachePath":

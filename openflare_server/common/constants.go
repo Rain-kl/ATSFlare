@@ -81,7 +81,6 @@ var OpenRestyProxyBusyBuffersSize = "64k"
 var OpenRestyGzipEnabled = true
 var OpenRestyGzipMinLength = 1024
 var OpenRestyGzipCompLevel = 5
-var OpenRestyResolvers = ""
 var OpenRestyCacheEnabled = false
 var OpenRestyCachePath = ""
 var OpenRestyCacheLevels = "1:2"
@@ -126,7 +125,7 @@ http {
     gzip {{OpenRestyGzip}};
     gzip_min_length {{OpenRestyGzipMinLength}};
     gzip_comp_level {{OpenRestyGzipCompLevel}};
-{{OpenRestyResolverDirective}}{{OpenRestyCacheBlock}}    include {{OpenRestyRouteConfigInclude}};
+{{OpenRestyCacheBlock}}    include {{OpenRestyRouteConfigInclude}};
 }
 `
 

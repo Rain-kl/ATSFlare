@@ -76,15 +76,14 @@ OpenResty 性能参数与缓存参数继续统一保存在 `Option` 表。当前
 * `OpenRestyProxyReadTimeout`
 * `OpenRestyProxyBufferingEnabled`
 * `OpenRestyGzipEnabled`
-* `OpenRestyResolvers`
 * `OpenRestyCacheEnabled`
 * `OpenRestyCachePath`
 * `OpenRestyCacheMaxSize`
 
 这类参数必须以结构化方式校验、保存并参与版本渲染。
 
-* `OpenRestyResolvers` 由管理端性能页面维护，支持填写多个 DNS 服务器 IP；留空时不额外生成 `resolver` 指令。
-* 规则内如使用多主机名上游做负载均衡，或希望主机名上游渲染为带 keepalive 的 named `upstream`，必须先配置 `OpenRestyResolvers`；否则会回退为 direct `proxy_pass`，或在不安全的多上游场景直接阻止发布。
+* 管理端不再暴露 `resolver` 配置；规则上游统一渲染为 named `upstream` 并启用 keepalive，单上游如带 base path 或 query，会在 `proxy_pass` 中补回原始 URI。
+* 多上游仍要求每个上游都为纯 `scheme://host[:port]`，且同一规则内协议一致，避免在负载均衡模式下引入不可预测的 URI 差异。
 * `OpenRestyCacheEnabled` 用于启用缓存基础设施与全局默认参数；实际是否缓存、按 URL / 后缀 / 路径等命中策略由各条 `proxy_routes` 单独决定，不再默认对所有规则开启缓存。
 * 默认缓存 Key 为 `$scheme$host$request_uri`，更贴近代理域名维度；如需按其他维度命中，可在性能页显式覆盖。
 * 默认 `keepalive_timeout` 为 `20` 秒，默认 `proxy_connect_timeout` 为 `3` 秒，优先兼顾资源占用与回源失败切换速度。

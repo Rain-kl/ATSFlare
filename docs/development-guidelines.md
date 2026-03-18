@@ -116,7 +116,7 @@
 
 * 不新增平台化对象，除非设计文档明确要求
 * `proxy_routes` 维持一条域名对应一条规则；规则内允许保存一个或多个上游地址用于负载均衡，但不引入独立 `origin_pool`
-* 生成 named `upstream` 时必须区分可静态解析与依赖运行时 resolver 的主机名；禁止在无 `OpenRestyResolvers` 的情况下为多主机名上游生成会导致 OpenResty 启动失败的配置
+* `proxy_routes` 的上游统一使用 named `upstream` + keepalive；单上游如带 base path 或 query，应在 `proxy_pass` 上补回 URI，多上游仅允许纯 `scheme://host[:port]`
 * `proxy_routes.origin_host` 为可选字段，仅用于覆盖回源 `Host` 请求头，不引入新的平台化对象
 * `config_versions` 必须保存完整快照与渲染结果
 * 全局同时只能有一个激活版本

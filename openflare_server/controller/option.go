@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/gin-gonic/gin"
-	"net"
 	"net/http"
 	"openflare/common"
 	"openflare/model"
@@ -115,15 +114,7 @@ func validateOpenRestyOption(key string, value string) error {
 			return fmt.Errorf("%s 仅支持 epoll、kqueue、poll、select、rtsig、/dev/poll、eventport 或留空", key)
 		}
 	case "OpenRestyResolvers":
-		if trimmed == "" {
-			return nil
-		}
-		for _, token := range splitOpenRestyResolvers(trimmed) {
-			if net.ParseIP(token) == nil {
-				return fmt.Errorf("%s only supports IP resolver entries, invalid value %q", key, token)
-			}
-		}
-		return nil
+		return fmt.Errorf("%s 已废弃，不再支持配置 resolver", key)
 	case "OpenRestyEventsMultiAcceptEnabled",
 		"OpenRestyWebsocketEnabled",
 		"OpenRestyProxyRequestBufferingEnabled",
@@ -185,12 +176,6 @@ func validateOpenRestyOption(key string, value string) error {
 	default:
 		return nil
 	}
-}
-
-func splitOpenRestyResolvers(value string) []string {
-	return strings.FieldsFunc(value, func(r rune) bool {
-		return r == ',' || r == '\n' || r == '\r' || r == '\t' || r == ' '
-	})
 }
 
 // GetOptions godoc
