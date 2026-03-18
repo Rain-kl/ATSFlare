@@ -2,6 +2,15 @@ package model
 
 import "time"
 
+type ConfigVersionSummary struct {
+	ID        uint      `json:"id"`
+	Version   string    `json:"version"`
+	Checksum  string    `json:"checksum"`
+	IsActive  bool      `json:"is_active"`
+	CreatedBy string    `json:"created_by"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
 type ConfigVersion struct {
 	ID               uint      `json:"id" gorm:"primaryKey"`
 	Version          string    `json:"version" gorm:"uniqueIndex;size:32;not null"`
@@ -15,8 +24,11 @@ type ConfigVersion struct {
 	CreatedAt        time.Time `json:"created_at"`
 }
 
-func ListConfigVersions() (versions []*ConfigVersion, err error) {
-	err = DB.Order("id desc").Find(&versions).Error
+func ListConfigVersionSummaries() (versions []*ConfigVersionSummary, err error) {
+	err = DB.Model(&ConfigVersion{}).
+		Select("id", "version", "checksum", "is_active", "created_by", "created_at").
+		Order("id desc").
+		Find(&versions).Error
 	return versions, err
 }
 

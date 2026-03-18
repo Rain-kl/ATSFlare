@@ -1,10 +1,11 @@
 package controller
 
 import (
-	"github.com/gin-gonic/gin"
 	"net/http"
 	"openflare/service"
 	"strconv"
+
+	"github.com/gin-gonic/gin"
 )
 
 // GetConfigVersions godoc
@@ -27,6 +28,39 @@ func GetConfigVersions(c *gin.Context) {
 		"success": true,
 		"message": "",
 		"data":    versions,
+	})
+}
+
+// GetConfigVersion godoc
+// @Summary Get config version detail
+// @Tags ConfigVersions
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "Version ID"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Router /api/config-versions/{id} [get]
+func GetConfigVersion(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil || id == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"message": "invalid id",
+		})
+		return
+	}
+	version, err := service.GetConfigVersionDetail(uint(id))
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": err.Error(),
+		})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "",
+		"data":    version,
 	})
 }
 
@@ -137,7 +171,7 @@ func ActivateConfigVersion(c *gin.Context) {
 	if err != nil || id == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
-			"message": "无效的参数",
+			"message": "invalid id",
 		})
 		return
 	}

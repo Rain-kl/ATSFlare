@@ -108,6 +108,7 @@ func SetApiRouter(router *gin.Engine) {
 			configVersionRoute.GET("/active", controller.GetActiveConfigVersion)
 			configVersionRoute.GET("/preview", controller.PreviewConfigVersion)
 			configVersionRoute.GET("/diff", controller.DiffConfigVersion)
+			configVersionRoute.GET("/:id", controller.GetConfigVersion)
 			configVersionRoute.POST("/publish", controller.PublishConfigVersion)
 			configVersionRoute.POST("/:id/activate", controller.ActivateConfigVersion)
 		}

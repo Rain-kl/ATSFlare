@@ -3,11 +3,20 @@ import { apiRequest } from '@/lib/api/client';
 import type {
   ConfigDiffResult,
   ConfigPreviewResult,
-  ConfigVersionItem,
+  ConfigVersionDetail,
+  ConfigVersionSummary,
 } from '@/features/config-versions/types';
 
 export function getConfigVersions() {
-  return apiRequest<ConfigVersionItem[]>('/config-versions/');
+  return apiRequest<ConfigVersionSummary[]>('/config-versions/');
+}
+
+export function getConfigVersion(id: number) {
+  return apiRequest<ConfigVersionDetail>(`/config-versions/${id}`);
+}
+
+export function getActiveConfigVersion() {
+  return apiRequest<ConfigVersionDetail>('/config-versions/active');
 }
 
 export function getConfigVersionPreview() {
@@ -19,13 +28,13 @@ export function getConfigVersionDiff() {
 }
 
 export function publishConfigVersion() {
-  return apiRequest<ConfigVersionItem>('/config-versions/publish', {
+  return apiRequest<ConfigVersionDetail>('/config-versions/publish', {
     method: 'POST',
   });
 }
 
 export function activateConfigVersion(id: number) {
-  return apiRequest<ConfigVersionItem>(`/config-versions/${id}/activate`, {
+  return apiRequest<ConfigVersionDetail>(`/config-versions/${id}/activate`, {
     method: 'POST',
   });
 }

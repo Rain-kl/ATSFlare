@@ -12,6 +12,7 @@ import { AppCard } from '@/components/ui/app-card';
 import { StatusBadge } from '@/components/ui/status-badge';
 import {
   activateConfigVersion,
+  getActiveConfigVersion,
   getConfigVersionDiff,
   getConfigVersionPreview,
   getConfigVersions,
@@ -22,7 +23,8 @@ import type {
   ConfigOptionDiffItem,
   ConfigDiffResult,
   ConfigPreviewResult,
-  ConfigVersionItem,
+  ConfigVersionDetail,
+  ConfigVersionSummary,
   SupportFile,
 } from '@/features/config-versions/types';
 import {
@@ -168,14 +170,20 @@ function OptionDiffTable({ items }: { items: ConfigOptionDiffItem[] }) {
 function PublishPreviewCard({
   preview,
   diff,
-  activeVersion,
+  activeVersionMeta,
+  activeVersionDetail,
+  isActiveVersionDetailLoading,
+  activeVersionDetailError,
   isPublishing,
   onConfirm,
   onCancel,
 }: {
   preview: ConfigPreviewResult;
   diff: ConfigDiffResult;
-  activeVersion: ConfigVersionItem | null;
+  activeVersionMeta: ConfigVersionSummary | null;
+  activeVersionDetail: ConfigVersionDetail | null;
+  isActiveVersionDetailLoading: boolean;
+  activeVersionDetailError: string | null;
   isPublishing: boolean;
   onConfirm: () => void;
   onCancel: () => void;
@@ -263,18 +271,29 @@ function PublishPreviewCard({
           <OptionDiffTable items={diff.changed_option_details} />
         </div>
 
-        {diff.main_config_changed && activeVersion ? (
+        {diff.main_config_changed && activeVersionMeta ? (
           <div className="grid gap-5 xl:grid-cols-2">
             <div>
               <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
                 <p className="text-sm font-semibold text-[var(--foreground-primary)]">
                   Current Active Main Config
                 </p>
-                <StatusBadge label={activeVersion.version} variant="info" />
+                <StatusBadge label={activeVersionMeta.version} variant="info" />
               </div>
-              <CodeBlock className="max-h-[32rem] whitespace-pre-wrap">
-                {activeVersion.main_config}
-              </CodeBlock>
+              {isActiveVersionDetailLoading ? (
+                <LoadingState />
+              ) : activeVersionDetailError ? (
+                <InlineMessage tone="danger" message={activeVersionDetailError} />
+              ) : activeVersionDetail ? (
+                <CodeBlock className="max-h-[32rem] whitespace-pre-wrap">
+                  {activeVersionDetail.main_config}
+                </CodeBlock>
+              ) : (
+                <InlineMessage
+                  tone="info"
+                  message="当前激活版本详情暂不可用。"
+                />
+              )}
             </div>
             <div>
               <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
@@ -406,6 +425,14 @@ export function ConfigVersionsPage() {
     () => versions.find((item) => item.id === selectedVersionId) ?? null,
     [selectedVersionId, versions],
   );
+  const shouldLoadActiveVersionDetail = Boolean(
+    activeVersion?.id && publishPreview?.diff.main_config_changed,
+  );
+  const activeVersionDetailQuery = useQuery({
+    queryKey: ['config-versions', 'active-detail', activeVersion?.id ?? 0],
+    queryFn: getActiveConfigVersion,
+    enabled: shouldLoadActiveVersionDetail,
+  });
 
   const publishMutation = useMutation({
     mutationFn: publishConfigVersion,
@@ -455,7 +482,7 @@ export function ConfigVersionsPage() {
     }
   };
 
-  const handleActivate = (version: ConfigVersionItem) => {
+  const handleActivate = (version: ConfigVersionSummary) => {
     if (version.is_active) {
       return;
     }
@@ -493,7 +520,14 @@ export function ConfigVersionsPage() {
           <PublishPreviewCard
             preview={publishPreview.preview}
             diff={publishPreview.diff}
-            activeVersion={activeVersion}
+            activeVersionMeta={activeVersion}
+            activeVersionDetail={activeVersionDetailQuery.data ?? null}
+            isActiveVersionDetailLoading={activeVersionDetailQuery.isLoading}
+            activeVersionDetailError={
+              activeVersionDetailQuery.isError
+                ? getErrorMessage(activeVersionDetailQuery.error)
+                : null
+            }
             isPublishing={publishMutation.isPending}
             onConfirm={() => publishMutation.mutate()}
             onCancel={() => setPublishPreview(null)}

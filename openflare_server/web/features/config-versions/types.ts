@@ -1,14 +1,17 @@
-export interface ConfigVersionItem {
+export interface ConfigVersionSummary {
   id: number;
   version: string;
-  snapshot_json: string;
-  main_config: string;
-  rendered_config: string;
-  support_files_json: string;
   checksum: string;
   is_active: boolean;
   created_by: string;
   created_at: string;
+}
+
+export interface ConfigVersionDetail extends ConfigVersionSummary {
+  snapshot_json: string;
+  main_config: string;
+  rendered_config: string;
+  support_files_json: string;
 }
 
 export interface SupportFile {

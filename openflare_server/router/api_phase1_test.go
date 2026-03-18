@@ -127,10 +127,32 @@ func TestPhase1PublishLifecycle(t *testing.T) {
 	}
 
 	resp = performJSONRequest(t, engine, token, http.MethodGet, "/api/config-versions/", nil)
-	var versions []model.ConfigVersion
+	var versions []map[string]any
 	decodeResponseData(t, resp, &versions)
 	if len(versions) != 2 {
 		t.Fatalf("expected 2 versions, got %d", len(versions))
+	}
+	if _, ok := versions[0]["snapshot_json"]; ok {
+		t.Fatal("expected config version list to omit snapshot_json")
+	}
+	if _, ok := versions[0]["main_config"]; ok {
+		t.Fatal("expected config version list to omit main_config")
+	}
+	if _, ok := versions[0]["rendered_config"]; ok {
+		t.Fatal("expected config version list to omit rendered_config")
+	}
+	if _, ok := versions[0]["support_files_json"]; ok {
+		t.Fatal("expected config version list to omit support_files_json")
+	}
+
+	detailResp := performJSONRequest(t, engine, token, http.MethodGet, "/api/config-versions/"+toString(version2.ID), nil)
+	var versionDetail model.ConfigVersion
+	decodeResponseData(t, detailResp, &versionDetail)
+	if versionDetail.ID != version2.ID {
+		t.Fatalf("expected config version detail %d, got %d", version2.ID, versionDetail.ID)
+	}
+	if versionDetail.SnapshotJSON == "" || versionDetail.MainConfig == "" || versionDetail.RenderedConfig == "" {
+		t.Fatal("expected config version detail endpoint to include full payload")
 	}
 
 	activeResp := performJSONRequest(t, engine, token, http.MethodGet, "/api/config-versions/active", nil)

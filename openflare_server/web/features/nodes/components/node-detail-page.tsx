@@ -17,7 +17,7 @@ import { AppCard } from '@/components/ui/app-card';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { getConfigVersions } from '@/features/config-versions/api/config-versions';
 import { ConfigVersionSnapshotModal } from '@/features/config-versions/components/config-version-snapshot-modal';
-import type { ConfigVersionItem } from '@/features/config-versions/types';
+import type { ConfigVersionSummary } from '@/features/config-versions/types';
 import { getApplyLogs } from '@/features/apply-logs/api/apply-logs';
 import {
   deleteNode,
@@ -416,7 +416,7 @@ export function NodeDetailPage({ nodeId }: { nodeId: string }) {
     }
   };
 
-  const activeConfigVersion = useMemo<ConfigVersionItem | null>(() => {
+  const activeConfigVersion = useMemo<ConfigVersionSummary | null>(() => {
     return (
       (configVersionsQuery.data ?? []).find((item) => item.is_active) ?? null
     );

@@ -37,6 +37,10 @@ type ConfigPreviewResult struct {
 	RouteCount     int           `json:"route_count"`
 }
 
+type ConfigVersionSummary = model.ConfigVersionSummary
+
+type ConfigVersionDetail = model.ConfigVersion
+
 type ConfigDiffResult struct {
 	ActiveVersion        string                 `json:"active_version,omitempty"`
 	AddedDomains         []string               `json:"added_domains"`
@@ -158,11 +162,15 @@ var requiredMainConfigTemplatePlaceholders = []string{
 	"{{OpenRestyRouteConfigInclude}}",
 }
 
-func ListConfigVersions() ([]*model.ConfigVersion, error) {
-	return model.ListConfigVersions()
+func ListConfigVersions() ([]*ConfigVersionSummary, error) {
+	return model.ListConfigVersionSummaries()
 }
 
-func GetActiveConfigVersion() (*model.ConfigVersion, error) {
+func GetConfigVersionDetail(id uint) (*ConfigVersionDetail, error) {
+	return model.GetConfigVersionByID(id)
+}
+
+func GetActiveConfigVersion() (*ConfigVersionDetail, error) {
 	return model.GetActiveConfigVersion()
 }
 
