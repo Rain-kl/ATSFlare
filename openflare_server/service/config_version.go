@@ -83,8 +83,13 @@ type routeCacheConfig struct {
 type routeUpstreamConfig struct {
 	Name              string
 	Scheme            string
-	Addresses         []string
+	Servers           []routeUpstreamServer
 	UsesNamedUpstream bool
+}
+
+type routeUpstreamServer struct {
+	Address string
+	Resolve bool
 }
 
 type openRestyConfigSnapshot struct {
@@ -671,6 +676,9 @@ func renderRouteConfig(routes []*model.ProxyRoute, cfg openRestyConfigSnapshot) 
 		if err != nil {
 			return "", nil, fmt.Errorf("路由 %s 上游配置无效", route.Domain)
 		}
+		if err := validateRenderableUpstreams(route.Domain, upstreams, cfg); err != nil {
+			return "", nil, err
+		}
 		cacheRules, err := decodeStoredCacheRules(route.CacheRules)
 		if err != nil {
 			return "", nil, fmt.Errorf("路由 %s 缓存规则无效", route.Domain)
@@ -852,7 +860,7 @@ func renderHTTPRedirectServer(domain string) string {
 func renderHTTPSServer(domain string, originURL string, originHost string, certificateID uint, customHeaders []ProxyRouteCustomHeaderInput, cacheConfig routeCacheConfig, upstreamConfig routeUpstreamConfig, cfg openRestyConfigSnapshot) string {
 	certPath := fmt.Sprintf("%s/%s", nginxCertDirPlaceholder, certificateCertFileName(certificateID))
 	keyPath := fmt.Sprintf("%s/%s", nginxCertDirPlaceholder, certificateKeyFileName(certificateID))
-	return fmt.Sprintf("server {\n    listen 443 ssl http2 reuseport;\n    server_name %s;\n    ssl_certificate %s;\n    ssl_certificate_key %s;\n\n    location / {\n%s%s%s    }\n}\n\n", domain, certPath, keyPath, renderProxyHeaderBlock(originURL, originHost, customHeaders, upstreamConfig), renderRouteCacheBlock(cacheConfig, cfg), renderProxyPassBlock(originURL, upstreamConfig, cfg))
+	return fmt.Sprintf("server {\n    listen 443 ssl;\n    http2 on;\n    server_name %s;\n    ssl_certificate %s;\n    ssl_certificate_key %s;\n\n    location / {\n%s%s%s    }\n}\n\n", domain, certPath, keyPath, renderProxyHeaderBlock(originURL, originHost, customHeaders, upstreamConfig), renderRouteCacheBlock(cacheConfig, cfg), renderProxyPassBlock(originURL, upstreamConfig, cfg))
 }
 
 func renderConnectionUpgradeMap() string {
@@ -997,23 +1005,27 @@ func buildRouteUpstreamConfig(route *model.ProxyRoute, upstreams []string, cfg o
 		if err != nil || parsed.Host == "" || parsed.Scheme == "" {
 			return routeUpstreamConfig{}
 		}
-		if shouldUseRuntimeResolver(upstreams[0], cfg.Resolvers) {
-			return routeUpstreamConfig{}
-		}
 		if strings.TrimSpace(parsed.EscapedPath()) != "" && strings.TrimSpace(parsed.EscapedPath()) != "/" {
 			return routeUpstreamConfig{}
 		}
 		if parsed.RawQuery != "" {
 			return routeUpstreamConfig{}
 		}
+		server := routeUpstreamServer{Address: parsed.Host}
+		if !isIPAddressHostname(parsed.Hostname()) {
+			if strings.TrimSpace(cfg.Resolvers) == "" {
+				return routeUpstreamConfig{}
+			}
+			server.Resolve = true
+		}
 		return routeUpstreamConfig{
 			Name:              buildRouteUpstreamName(route),
 			Scheme:            parsed.Scheme,
-			Addresses:         []string{parsed.Host},
+			Servers:           []routeUpstreamServer{server},
 			UsesNamedUpstream: true,
 		}
 	}
-	addresses := make([]string, 0, len(upstreams))
+	servers := make([]routeUpstreamServer, 0, len(upstreams))
 	var scheme string
 	for _, upstream := range upstreams {
 		parsed, err := url.Parse(strings.TrimSpace(upstream))
@@ -1031,12 +1043,16 @@ func buildRouteUpstreamConfig(route *model.ProxyRoute, upstreams []string, cfg o
 		} else if scheme != parsed.Scheme {
 			return routeUpstreamConfig{}
 		}
-		addresses = append(addresses, parsed.Host)
+		server := routeUpstreamServer{Address: parsed.Host}
+		if !isIPAddressHostname(parsed.Hostname()) {
+			server.Resolve = true
+		}
+		servers = append(servers, server)
 	}
 	return routeUpstreamConfig{
 		Name:              buildRouteUpstreamName(route),
 		Scheme:            scheme,
-		Addresses:         addresses,
+		Servers:           servers,
 		UsesNamedUpstream: true,
 	}
 }
@@ -1064,11 +1080,38 @@ func buildRouteUpstreamName(route *model.ProxyRoute) string {
 func renderNamedUpstreamBlock(upstreamConfig routeUpstreamConfig) string {
 	var builder strings.Builder
 	builder.WriteString(fmt.Sprintf("upstream %s {\n", upstreamConfig.Name))
-	for _, address := range upstreamConfig.Addresses {
-		builder.WriteString(fmt.Sprintf("    server %s max_fails=3 fail_timeout=10s;\n", address))
+	for _, server := range upstreamConfig.Servers {
+		if server.Resolve {
+			builder.WriteString(fmt.Sprintf("    server %s resolve max_fails=3 fail_timeout=10s;\n", server.Address))
+			continue
+		}
+		builder.WriteString(fmt.Sprintf("    server %s max_fails=3 fail_timeout=10s;\n", server.Address))
 	}
 	builder.WriteString("    keepalive 128;\n}\n\n")
 	return builder.String()
+}
+
+func validateRenderableUpstreams(domain string, upstreams []string, cfg openRestyConfigSnapshot) error {
+	if len(upstreams) <= 1 {
+		return nil
+	}
+	if strings.TrimSpace(cfg.Resolvers) != "" {
+		return nil
+	}
+	for _, upstream := range upstreams {
+		parsed, err := url.Parse(strings.TrimSpace(upstream))
+		if err != nil || parsed.Hostname() == "" {
+			return fmt.Errorf("路由 %s 上游配置无效", domain)
+		}
+		if !isIPAddressHostname(parsed.Hostname()) {
+			return fmt.Errorf("路由 %s 的多上游主机名需要先配置 OpenRestyResolvers", domain)
+		}
+	}
+	return nil
+}
+
+func isIPAddressHostname(host string) bool {
+	return net.ParseIP(strings.TrimSpace(host)) != nil
 }
 
 func shouldUseRuntimeResolver(originURL string, resolvers string) bool {

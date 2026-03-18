@@ -81,8 +81,11 @@ func TestCreateTLSCertificateAndRenderHTTPSConfig(t *testing.T) {
 	if strings.Contains(result.Version.MainConfig, "allow 127.0.0.1;") {
 		t.Fatal("expected main config to avoid hard-coded allow rules on observability server")
 	}
-	if !strings.Contains(result.Version.RenderedConfig, "listen 443 ssl http2 reuseport;") {
-		t.Fatal("expected rendered config to include https server block with http2 and reuseport enabled")
+	if !strings.Contains(result.Version.RenderedConfig, "listen 443 ssl;") {
+		t.Fatal("expected rendered config to include https ssl listener")
+	}
+	if !strings.Contains(result.Version.RenderedConfig, "http2 on;") {
+		t.Fatal("expected rendered config to enable http2 with dedicated directive")
 	}
 	if strings.Contains(result.Version.RenderedConfig, `if ($host != "app.example.com") {`) {
 		t.Fatal("expected rendered config to avoid per-route host guard")
@@ -153,14 +156,8 @@ func TestPublishConfigVersionRendersCustomHeaders(t *testing.T) {
 	if !strings.Contains(result.Version.RenderedConfig, "proxy_set_header Connection $connection_upgrade;") {
 		t.Fatal("expected rendered config to use normalized websocket connection header")
 	}
-	if !strings.Contains(result.Version.RenderedConfig, "upstream backend_custom_example_com_1 {") {
-		t.Fatal("expected rendered config to define named upstream for simple origins")
-	}
-	if !strings.Contains(result.Version.RenderedConfig, "keepalive 128;") {
-		t.Fatal("expected rendered config to enable upstream keepalive")
-	}
-	if !strings.Contains(result.Version.RenderedConfig, "proxy_pass https://backend_custom_example_com_1;") {
-		t.Fatal("expected rendered config to proxy through named upstream when no resolver is required")
+	if !strings.Contains(result.Version.RenderedConfig, "proxy_pass https://origin.internal;") {
+		t.Fatal("expected hostname origin without resolver to keep direct proxy_pass")
 	}
 	if strings.Contains(result.Version.RenderedConfig, "proxy_pass $openflare_upstream$request_uri;") {
 		t.Fatal("expected rendered config to avoid runtime-resolved proxy_pass when no resolvers are configured")
@@ -242,8 +239,8 @@ func TestPublishConfigVersionRendersRouteLevelCachePolicy(t *testing.T) {
 	if strings.Count(result.Version.RenderedConfig, "proxy_cache openflare_cache;") != 1 {
 		t.Fatal("expected only cache-enabled route to include proxy_cache directive")
 	}
-	if !strings.Contains(result.Version.RenderedConfig, "proxy_pass https://backend_static_example_com_1;") {
-		t.Fatal("expected cache-enabled route to proxy through named upstream")
+	if !strings.Contains(result.Version.RenderedConfig, "proxy_pass https://origin.internal;") {
+		t.Fatal("expected cache-enabled hostname route without resolver to keep direct proxy_pass")
 	}
 	if !strings.Contains(result.Version.SnapshotJSON, `"cache_enabled":true`) {
 		t.Fatal("expected snapshot to include route cache toggle")
@@ -258,15 +255,15 @@ func TestPublishConfigVersionRendersMultipleUpstreams(t *testing.T) {
 
 	route, err := CreateProxyRoute(ProxyRouteInput{
 		Domain:     "lb.example.com",
-		OriginURL:  "http://c1:39010",
-		Upstreams:  []string{"http://c2:39010", "http://c3:39010"},
+		OriginURL:  "http://10.0.0.11:39010",
+		Upstreams:  []string{"http://10.0.0.12:39010", "http://10.0.0.13:39010"},
 		Enabled:    true,
 		OriginHost: "lb.example.com",
 	})
 	if err != nil {
 		t.Fatalf("CreateProxyRoute failed: %v", err)
 	}
-	if !strings.Contains(route.Upstreams, "c2:39010") {
+	if !strings.Contains(route.Upstreams, "10.0.0.12:39010") {
 		t.Fatalf("expected route upstreams to persist, got %s", route.Upstreams)
 	}
 
@@ -277,23 +274,42 @@ func TestPublishConfigVersionRendersMultipleUpstreams(t *testing.T) {
 	if !strings.Contains(result.Version.RenderedConfig, "upstream backend_lb_example_com_1 {") {
 		t.Fatal("expected rendered config to define upstream block for load balancing route")
 	}
-	if strings.Count(result.Version.RenderedConfig, "server c") < 3 {
+	if strings.Count(result.Version.RenderedConfig, "max_fails=3 fail_timeout=10s;") < 3 {
 		t.Fatal("expected rendered config to include every upstream server")
 	}
-	if !strings.Contains(result.Version.RenderedConfig, "server c1:39010 max_fails=3 fail_timeout=10s;") {
+	if !strings.Contains(result.Version.RenderedConfig, "server 10.0.0.11:39010 max_fails=3 fail_timeout=10s;") {
 		t.Fatal("expected rendered config to include primary upstream server")
 	}
-	if !strings.Contains(result.Version.RenderedConfig, "server c2:39010 max_fails=3 fail_timeout=10s;") {
+	if !strings.Contains(result.Version.RenderedConfig, "server 10.0.0.12:39010 max_fails=3 fail_timeout=10s;") {
 		t.Fatal("expected rendered config to include secondary upstream server")
 	}
-	if !strings.Contains(result.Version.RenderedConfig, "server c3:39010 max_fails=3 fail_timeout=10s;") {
+	if !strings.Contains(result.Version.RenderedConfig, "server 10.0.0.13:39010 max_fails=3 fail_timeout=10s;") {
 		t.Fatal("expected rendered config to include tertiary upstream server")
 	}
 	if !strings.Contains(result.Version.RenderedConfig, "proxy_pass http://backend_lb_example_com_1;") {
 		t.Fatal("expected rendered config to proxy through load balancing upstream")
 	}
-	if !strings.Contains(result.Version.SnapshotJSON, `"upstreams":["http://c1:39010","http://c2:39010","http://c3:39010"]`) {
+	if !strings.Contains(result.Version.SnapshotJSON, `"upstreams":["http://10.0.0.11:39010","http://10.0.0.12:39010","http://10.0.0.13:39010"]`) {
 		t.Fatal("expected snapshot to include upstream list")
+	}
+}
+
+func TestPublishConfigVersionRejectsHostnameLoadBalancingWithoutResolvers(t *testing.T) {
+	setupServiceTestDB(t)
+
+	_, err := CreateProxyRoute(ProxyRouteInput{
+		Domain:    "hostname-lb.example.com",
+		OriginURL: "http://c1:39010",
+		Upstreams: []string{"http://c2:39010"},
+		Enabled:   true,
+	})
+	if err != nil {
+		t.Fatalf("CreateProxyRoute failed: %v", err)
+	}
+
+	_, err = PublishConfigVersion("root")
+	if err == nil || !strings.Contains(err.Error(), "多上游主机名需要先配置 OpenRestyResolvers") {
+		t.Fatalf("expected hostname load balancing publish validation error, got %v", err)
 	}
 }
 
@@ -323,11 +339,8 @@ func TestPublishConfigVersionOverridesOriginHostHeader(t *testing.T) {
 	if !strings.Contains(result.Version.RenderedConfig, `proxy_ssl_name "git.arctel.net";`) {
 		t.Fatal("expected rendered config to set proxy ssl name from origin host override")
 	}
-	if !strings.Contains(result.Version.RenderedConfig, "upstream backend_git_arctel_de_1 {") {
-		t.Fatal("expected rendered config to define named upstream for static hostname origins")
-	}
-	if !strings.Contains(result.Version.RenderedConfig, "proxy_pass https://backend_git_arctel_de_1;") {
-		t.Fatal("expected rendered config to proxy through named upstream for hostname origin when resolvers are blank")
+	if !strings.Contains(result.Version.RenderedConfig, "proxy_pass https://git.arctel.net;") {
+		t.Fatal("expected rendered config to keep direct proxy_pass for hostname origin when resolvers are blank")
 	}
 	if !strings.Contains(result.Version.SnapshotJSON, `"origin_host":"git.arctel.net"`) {
 		t.Fatal("expected snapshot to include origin_host override")
@@ -342,7 +355,7 @@ func TestPublishConfigVersionUsesRuntimeResolverWhenConfigured(t *testing.T) {
 
 	_, err := CreateProxyRoute(ProxyRouteInput{
 		Domain:    "resolver.example.com",
-		OriginURL: "https://origin.internal",
+		OriginURL: "https://origin.internal/api",
 		Enabled:   true,
 	})
 	if err != nil {
@@ -357,13 +370,46 @@ func TestPublishConfigVersionUsesRuntimeResolverWhenConfigured(t *testing.T) {
 		t.Fatal("expected main config to render configured resolver directive")
 	}
 	if strings.Contains(result.Version.RenderedConfig, "upstream backend_resolver_example_com_1 {") {
-		t.Fatal("expected runtime-resolved origin to avoid named upstream block")
+		t.Fatal("expected hostname origin with base path to avoid named upstream block")
 	}
 	if !strings.Contains(result.Version.RenderedConfig, `set $openflare_upstream "https://origin.internal";`) {
 		t.Fatal("expected rendered config to use runtime upstream variable when resolvers are configured")
 	}
-	if !strings.Contains(result.Version.RenderedConfig, "proxy_pass $openflare_upstream$request_uri;") {
-		t.Fatal("expected rendered config to proxy via runtime-resolved upstream variable when resolvers are configured")
+	if !strings.Contains(result.Version.RenderedConfig, `set $openflare_upstream_base_path "/api";`) {
+		t.Fatal("expected rendered config to preserve origin base path for runtime-resolved origin")
+	}
+	if !strings.Contains(result.Version.RenderedConfig, "proxy_pass $openflare_upstream$openflare_upstream_base_path$request_uri;") {
+		t.Fatal("expected rendered config to proxy via runtime-resolved upstream variable and base path when resolvers are configured")
+	}
+}
+
+func TestPublishConfigVersionUsesNamedUpstreamForHostnameOriginsWhenResolversConfigured(t *testing.T) {
+	setupServiceTestDB(t)
+	if err := model.UpdateOption("OpenRestyResolvers", "1.1.1.1"); err != nil {
+		t.Fatalf("UpdateOption OpenRestyResolvers failed: %v", err)
+	}
+
+	_, err := CreateProxyRoute(ProxyRouteInput{
+		Domain:    "resolver-upstream.example.com",
+		OriginURL: "https://origin.internal",
+		Enabled:   true,
+	})
+	if err != nil {
+		t.Fatalf("CreateProxyRoute failed: %v", err)
+	}
+
+	result, err := PublishConfigVersion("root")
+	if err != nil {
+		t.Fatalf("PublishConfigVersion failed: %v", err)
+	}
+	if !strings.Contains(result.Version.RenderedConfig, "upstream backend_resolver_upstream_example_com_1 {") {
+		t.Fatal("expected rendered config to define named upstream for hostname origin when resolvers are configured")
+	}
+	if !strings.Contains(result.Version.RenderedConfig, "server origin.internal resolve max_fails=3 fail_timeout=10s;") {
+		t.Fatal("expected rendered config to mark hostname upstream server as resolve")
+	}
+	if !strings.Contains(result.Version.RenderedConfig, "proxy_pass https://backend_resolver_upstream_example_com_1;") {
+		t.Fatal("expected rendered config to proxy through named upstream when resolver-backed hostname upstream is safe")
 	}
 }
 
@@ -396,6 +442,9 @@ func TestPublishConfigVersionKeepsDirectProxyPassForIPOrigins(t *testing.T) {
 
 func TestPreviewConfigVersionCanDisableWebsocketHeaders(t *testing.T) {
 	setupServiceTestDB(t)
+	if err := model.UpdateOption("OpenRestyResolvers", ""); err != nil {
+		t.Fatalf("UpdateOption OpenRestyResolvers failed: %v", err)
+	}
 
 	_, err := CreateProxyRoute(ProxyRouteInput{
 		Domain:    "ws-off.example.com",

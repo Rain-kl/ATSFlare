@@ -17,7 +17,7 @@ type ApplyLog struct {
 	NodeID              string    `json:"node_id" gorm:"index;size:64;not null"`
 	Version             string    `json:"version" gorm:"size:32;not null"`
 	Result              string    `json:"result" gorm:"size:32;not null"`
-	Message             string    `json:"message" gorm:"size:1024"`
+	Message             string    `json:"message" gorm:"type:text"`
 	Checksum            string    `json:"checksum" gorm:"size:64;not null;default:''"`
 	MainConfigChecksum  string    `json:"main_config_checksum" gorm:"size:64;not null;default:''"`
 	RouteConfigChecksum string    `json:"route_config_checksum" gorm:"size:64;not null;default:''"`

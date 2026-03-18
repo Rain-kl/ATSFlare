@@ -418,9 +418,9 @@ func normalizeAgentNodePayload(payload AgentNodePayload) AgentNodePayload {
 	payload.AgentVersion = strings.TrimSpace(payload.AgentVersion)
 	payload.NginxVersion = strings.TrimSpace(payload.NginxVersion)
 	payload.CurrentVersion = strings.TrimSpace(payload.CurrentVersion)
-	payload.LastError = strings.TrimSpace(payload.LastError)
+	payload.LastError = truncateForDatabase(payload.LastError, 16000)
 	payload.OpenrestyStatus = normalizeOpenrestyStatus(payload.OpenrestyStatus)
-	payload.OpenrestyMessage = strings.TrimSpace(payload.OpenrestyMessage)
+	payload.OpenrestyMessage = truncateForDatabase(payload.OpenrestyMessage, 16000)
 	return payload
 }
 
@@ -444,11 +444,11 @@ func applyNodeRuntime(node *model.Node, payload AgentNodePayload, preserveName b
 	node.AgentVersion = strings.TrimSpace(payload.AgentVersion)
 	node.NginxVersion = strings.TrimSpace(payload.NginxVersion)
 	node.OpenrestyStatus = normalizeOpenrestyStatus(payload.OpenrestyStatus)
-	node.OpenrestyMessage = strings.TrimSpace(payload.OpenrestyMessage)
+	node.OpenrestyMessage = truncateForDatabase(payload.OpenrestyMessage, 16000)
 	node.Status = NodeStatusOnline
 	node.CurrentVersion = strings.TrimSpace(payload.CurrentVersion)
 	node.LastSeenAt = time.Now()
-	node.LastError = strings.TrimSpace(payload.LastError)
+	node.LastError = truncateForDatabase(payload.LastError, 16000)
 	if !node.GeoManualOverride {
 		applyGeoInfoFromIP(node, node.IP)
 	}

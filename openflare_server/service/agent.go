@@ -254,6 +254,7 @@ func ReportApplyLog(payload ApplyLogPayload) (*model.ApplyLog, error) {
 	payload.Checksum = strings.TrimSpace(payload.Checksum)
 	payload.MainConfigChecksum = strings.TrimSpace(payload.MainConfigChecksum)
 	payload.RouteConfigChecksum = strings.TrimSpace(payload.RouteConfigChecksum)
+	payload.Message = truncateForDatabase(payload.Message, 16000)
 	if payload.NodeID == "" {
 		return nil, errors.New("node_id 不能为空")
 	}
@@ -337,6 +338,17 @@ func ListNodeViews() ([]*NodeView, error) {
 		views = append(views, view)
 	}
 	return views, nil
+}
+
+func truncateForDatabase(value string, max int) string {
+	if max <= 0 {
+		return ""
+	}
+	runes := []rune(strings.TrimSpace(value))
+	if len(runes) <= max {
+		return string(runes)
+	}
+	return string(runes[:max])
 }
 
 const (

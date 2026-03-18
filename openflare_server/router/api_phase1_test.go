@@ -45,8 +45,8 @@ func TestPhase1PublishLifecycle(t *testing.T) {
 
 	createBody := map[string]any{
 		"domain":        "app.example.com",
-		"origin_url":    "https://origin-a.internal",
-		"upstreams":     []string{"https://origin-a-backup.internal"},
+		"origin_url":    "https://10.0.0.11:8443",
+		"upstreams":     []string{"https://10.0.0.12:8443"},
 		"origin_host":   "origin-a.internal",
 		"enabled":       true,
 		"cache_enabled": true,
@@ -66,7 +66,7 @@ func TestPhase1PublishLifecycle(t *testing.T) {
 	if !createdRoute.CacheEnabled || createdRoute.CachePolicy != "path_prefix" {
 		t.Fatalf("expected route cache settings to persist, got %+v", createdRoute)
 	}
-	if !strings.Contains(createdRoute.Upstreams, "origin-a-backup.internal") {
+	if !strings.Contains(createdRoute.Upstreams, "10.0.0.12:8443") {
 		t.Fatalf("expected route upstream list to persist, got %s", createdRoute.Upstreams)
 	}
 	if !strings.Contains(createdRoute.CacheRules, "/assets") {
@@ -117,8 +117,8 @@ func TestPhase1PublishLifecycle(t *testing.T) {
 
 	updateBody := map[string]any{
 		"domain":        "app.example.com",
-		"origin_url":    "https://origin-b.internal",
-		"upstreams":     []string{"https://origin-b-backup.internal"},
+		"origin_url":    "https://10.0.0.21:8443",
+		"upstreams":     []string{"https://10.0.0.22:8443"},
 		"origin_host":   "origin-b.internal",
 		"enabled":       true,
 		"cache_enabled": true,
@@ -129,7 +129,7 @@ func TestPhase1PublishLifecycle(t *testing.T) {
 	routePath := "/api/proxy-routes/" + toString(createdRoute.ID)
 	resp = performJSONRequest(t, engine, token, http.MethodPost, routePath+"/update", updateBody)
 	decodeResponseData(t, resp, &createdRoute)
-	if createdRoute.OriginURL != "https://origin-b.internal" {
+	if createdRoute.OriginURL != "https://10.0.0.21:8443" {
 		t.Fatalf("unexpected updated route origin: %s", createdRoute.OriginURL)
 	}
 	if createdRoute.OriginHost != "origin-b.internal" {
@@ -138,7 +138,7 @@ func TestPhase1PublishLifecycle(t *testing.T) {
 	if createdRoute.CachePolicy != "path_exact" || !strings.Contains(createdRoute.CacheRules, "/robots.txt") {
 		t.Fatalf("expected updated route cache rules to persist, got %+v", createdRoute)
 	}
-	if !strings.Contains(createdRoute.Upstreams, "origin-b-backup.internal") {
+	if !strings.Contains(createdRoute.Upstreams, "10.0.0.22:8443") {
 		t.Fatalf("expected updated route upstream list to persist, got %s", createdRoute.Upstreams)
 	}
 
@@ -349,8 +349,11 @@ func TestPhase1HTTPSAndCertificateImportLifecycle(t *testing.T) {
 	if !strings.Contains(version.MainConfig, "include __OPENFLARE_ROUTE_CONFIG__;") {
 		t.Fatal("expected active config to render managed main config")
 	}
-	if !strings.Contains(version.RenderedConfig, "listen 443 ssl http2 reuseport;") {
-		t.Fatal("expected active config to render https listener with http2, reuseport enabled")
+	if !strings.Contains(version.RenderedConfig, "listen 443 ssl;") {
+		t.Fatal("expected active config to render https ssl listener")
+	}
+	if !strings.Contains(version.RenderedConfig, "http2 on;") {
+		t.Fatal("expected active config to render dedicated http2 directive")
 	}
 	if !strings.Contains(version.RenderedConfig, "return 301 https://$host$request_uri;") {
 		t.Fatal("expected active config to render redirect server")

@@ -271,7 +271,7 @@ func reconcileNodeHealthEvents(tx *gorm.DB, nodeID string, events []AgentNodeHea
 		triggeredAt := timeFromUnix(event.TriggeredAtUnix, reportedAt)
 		if existing, ok := activeByType[eventType]; ok {
 			existing.Severity = event.Severity
-			existing.Message = strings.TrimSpace(event.Message)
+			existing.Message = normalizeHealthEventMessage(event.Message)
 			existing.LastTriggeredAt = triggeredAt
 			existing.ReportedAt = reportedAt
 			existing.RawJSON = marshalJSON(event)
@@ -286,7 +286,7 @@ func reconcileNodeHealthEvents(tx *gorm.DB, nodeID string, events []AgentNodeHea
 			EventType:        eventType,
 			Severity:         event.Severity,
 			Status:           NodeHealthEventStatusActive,
-			Message:          strings.TrimSpace(event.Message),
+			Message:          normalizeHealthEventMessage(event.Message),
 			FirstTriggeredAt: triggeredAt,
 			LastTriggeredAt:  triggeredAt,
 			ReportedAt:       reportedAt,
@@ -328,6 +328,10 @@ func normalizeHealthSeverity(severity string) string {
 	default:
 		return NodeHealthSeverityWarning
 	}
+}
+
+func normalizeHealthEventMessage(message string) string {
+	return truncateForDatabase(message, 4096)
 }
 
 func timeFromUnix(unixSeconds int64, fallback time.Time) time.Time {

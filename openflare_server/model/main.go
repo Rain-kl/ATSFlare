@@ -126,6 +126,33 @@ func autoMigrateAll(db *gorm.DB) error {
 	return nil
 }
 
+func migrateTextColumns(db *gorm.DB, backend string) error {
+	if backend != "postgres" {
+		return nil
+	}
+	type textColumn struct {
+		model  any
+		table  string
+		column string
+	}
+	columns := []textColumn{
+		{model: &Node{}, table: "nodes", column: "openresty_message"},
+		{model: &Node{}, table: "nodes", column: "last_error"},
+		{model: &ApplyLog{}, table: "apply_logs", column: "message"},
+		{model: &NodeHealthEvent{}, table: "node_health_events", column: "message"},
+	}
+	for _, item := range columns {
+		if !db.Migrator().HasTable(item.model) || !db.Migrator().HasColumn(item.model, item.column) {
+			continue
+		}
+		sql := fmt.Sprintf(`ALTER TABLE "%s" ALTER COLUMN "%s" TYPE text`, item.table, item.column)
+		if err := db.Exec(sql).Error; err != nil {
+			return fmt.Errorf("migrate column %s.%s to text failed: %w", item.table, item.column, err)
+		}
+	}
+	return nil
+}
+
 func isDatabaseEmpty(db *gorm.DB) (bool, error) {
 	for _, item := range registeredModels() {
 		var count int64
@@ -270,6 +297,9 @@ func InitDB() (err error) {
 		return err
 	}
 	if err = autoMigrateAll(db); err != nil {
+		return err
+	}
+	if err = migrateTextColumns(db, backend); err != nil {
 		return err
 	}
 	if err = migrateSQLiteDataIfNeeded(db, backend); err != nil {

@@ -8,7 +8,7 @@ type NodeHealthEvent struct {
 	EventType        string     `json:"event_type" gorm:"index;size:64;not null"`
 	Severity         string     `json:"severity" gorm:"size:16;not null"`
 	Status           string     `json:"status" gorm:"index;size:16;not null"`
-	Message          string     `json:"message" gorm:"size:2048"`
+	Message          string     `json:"message" gorm:"type:text"`
 	FirstTriggeredAt time.Time  `json:"first_triggered_at" gorm:"index"`
 	LastTriggeredAt  time.Time  `json:"last_triggered_at" gorm:"index"`
 	ReportedAt       time.Time  `json:"reported_at" gorm:"index"`

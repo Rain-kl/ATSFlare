@@ -20,11 +20,11 @@ type Node struct {
 	AgentVersion              string    `json:"agent_version" gorm:"size:64;not null"`
 	NginxVersion              string    `json:"nginx_version" gorm:"size:64"`
 	OpenrestyStatus           string    `json:"openresty_status" gorm:"size:16;not null;default:'unknown'"`
-	OpenrestyMessage          string    `json:"openresty_message" gorm:"size:2048"`
+	OpenrestyMessage          string    `json:"openresty_message" gorm:"type:text"`
 	Status                    string    `json:"status" gorm:"size:16;not null;default:'offline'"`
 	CurrentVersion            string    `json:"current_version" gorm:"size:32"`
 	LastSeenAt                time.Time `json:"last_seen_at"`
-	LastError                 string    `json:"last_error" gorm:"size:1024"`
+	LastError                 string    `json:"last_error" gorm:"type:text"`
 	CreatedAt                 time.Time `json:"created_at"`
 	UpdatedAt                 time.Time `json:"updated_at"`
 }
