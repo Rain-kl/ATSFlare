@@ -35,7 +35,7 @@ export function findManagedDomainForRoute(
 
   if (exactMatch) {
     return {
-      managedDomainId: String(exactMatch.id),
+      managedDomainId: exactMatch.domain,
       subdomainLabel: '',
     };
   }
@@ -64,7 +64,7 @@ export function findManagedDomainForRoute(
   }
 
   return {
-    managedDomainId: String(wildcardMatch.id),
+    managedDomainId: wildcardMatch.domain,
     subdomainLabel: normalizedRouteDomain.slice(
       0,
       normalizedRouteDomain.length - wildcardMatch.domain.slice(1).length,

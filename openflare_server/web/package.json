@@ -18,6 +18,8 @@
     "format:check": "prettier --check ."
   },
   "dependencies": {
+    "@heroui/input": "^2.4.33",
+    "@heroui/select": "^2.4.33",
     "@hookform/resolvers": "^4.1.3",
     "@tanstack/react-query": "^5.66.8",
     "clsx": "^2.1.1",

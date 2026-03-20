@@ -1,5 +1,7 @@
 'use client';
 
+import { Input, Textarea } from '@heroui/input';
+import { Select, SelectItem, SelectSection } from '@heroui/select';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -46,9 +48,6 @@ import {
   DangerButton,
   PrimaryButton,
   ResourceField,
-  ResourceInput,
-  ResourceSelect,
-  ResourceTextarea,
   SecondaryButton,
   ToggleField,
 } from '@/features/shared/components/resource-primitives';
@@ -275,6 +274,31 @@ type SectionIconProps = {
 const INPUT_CLASS_NAME = 'h-10 rounded-xl px-3 py-2 text-sm';
 const PANEL_CLASS_NAME =
   'rounded-2xl border border-[var(--border-default)] bg-[color:color-mix(in_srgb,var(--surface-elevated)_82%,white_18%)] p-4 shadow-[var(--shadow-soft)]';
+const HERO_INPUT_CLASS_NAMES = {
+  base: 'w-full',
+  mainWrapper: 'w-full',
+  inputWrapper:
+    'min-h-10 rounded-xl border border-[var(--border-default)] shadow-none',
+  input: 'text-sm',
+} as const;
+const HERO_TEXTAREA_CLASS_NAMES = {
+  base: 'w-full',
+  mainWrapper: 'w-full',
+  inputWrapper:
+    'min-h-28 rounded-xl border border-[var(--border-default)] shadow-none',
+  input: 'text-sm',
+} as const;
+const HERO_SELECT_CLASS_NAMES = {
+  base: 'w-full',
+  trigger: cn(
+    INPUT_CLASS_NAME,
+    'min-h-10 rounded-xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 shadow-none data-[hover=true]:bg-[var(--surface-elevated)] data-[open=true]:border-[var(--border-strong)]',
+  ),
+  value: 'text-sm text-[var(--foreground-primary)]',
+  popoverContent:
+    'rounded-2xl border border-[var(--border-default)] bg-[var(--surface-panel)] shadow-[var(--shadow-soft)]',
+  listboxWrapper: 'p-1',
+} as const;
 
 const defaultValues: ProxyRouteFormValues = {
   managed_domain_id: '',
@@ -645,21 +669,17 @@ function toFormValues(
   }
 
   const primaryOrigin = parseOriginUrl(route.origin_url);
-  const originRows: OriginRowFormValue[] = [
-    {
-      scheme: primaryOrigin.scheme,
-      address: primaryOrigin.address,
-      port: primaryOrigin.port,
-    },
-    ...upstreams.map((upstream) => {
-      const parsed = parseOriginUrl(upstream);
-      return {
-        scheme: parsed.scheme,
-        address: parsed.address,
-        port: parsed.port,
-      };
-    }),
-  ];
+  const normalizedOrigins = Array.from(
+    new Set([route.origin_url, ...upstreams].filter(Boolean)),
+  );
+  const originRows: OriginRowFormValue[] = normalizedOrigins.map((origin) => {
+    const parsed = parseOriginUrl(origin);
+    return {
+      scheme: parsed.scheme,
+      address: parsed.address,
+      port: parsed.port,
+    };
+  });
 
   return {
     managed_domain_id: managedDomainMatch.managedDomainId,
@@ -752,58 +772,68 @@ function ProxyRuleSection({
   );
 }
 
-function SearchableManagedDomainField({
-  value,
-  domains,
+type SearchOption = {
+  key: string;
+  label: string;
+  keywords?: string[];
+  selected?: boolean;
+  content?: React.ReactNode;
+  trailing?: React.ReactNode;
+};
+
+function SearchableSelectInput({
+  label,
+  hint,
   error,
+  showFieldMeta = true,
+  value,
+  placeholder,
+  emptyText,
+  options,
+  onValueChange,
   onSelect,
 }: {
-  value: string;
-  domains: ManagedDomainItem[];
+  label: string;
+  hint?: string;
   error?: string;
-  onSelect: (value: string) => void;
+  showFieldMeta?: boolean;
+  value: string;
+  placeholder: string;
+  emptyText: string;
+  options: SearchOption[];
+  onValueChange: (value: string) => void;
+  onSelect: (option: SearchOption) => void;
 }) {
-  const [inputValue, setInputValue] = useState('');
   const [isOpen, setIsOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
-  const selectedDomain =
-    domains.find((item) => item.domain === value)?.domain ?? value;
-  const filteredDomains = useMemo(() => {
-    const keyword = inputValue.trim().toLowerCase();
+  const filteredOptions = useMemo(() => {
+    const keyword = value.trim().toLowerCase();
     if (!keyword) {
-      return domains;
+      return options;
     }
 
-    return domains.filter((item) =>
-      item.domain.toLowerCase().includes(keyword),
-    );
-  }, [domains, inputValue]);
-  const highlightedDomain =
-    filteredDomains[Math.min(highlightedIndex, Math.max(filteredDomains.length - 1, 0))] ??
-    null;
+    return options.filter((option) => {
+      const haystacks = [option.label, ...(option.keywords ?? [])];
+      return haystacks.some((item) => item.toLowerCase().includes(keyword));
+    });
+  }, [options, value]);
 
-  useEffect(() => {
-    if (value) {
-      setInputValue(value);
-      return;
-    }
-
-    if (!isOpen) {
-      setInputValue('');
-    }
-  }, [isOpen, value]);
+  const highlightedOption =
+    filteredOptions[
+      Math.min(highlightedIndex, Math.max(filteredOptions.length - 1, 0))
+    ] ?? null;
 
   useEffect(() => {
     setHighlightedIndex(0);
-  }, [inputValue]);
+  }, [value]);
 
   useEffect(() => {
-    if (highlightedIndex > filteredDomains.length - 1) {
+    if (highlightedIndex > filteredOptions.length - 1) {
       setHighlightedIndex(0);
     }
-  }, [filteredDomains.length, highlightedIndex]);
+  }, [filteredOptions.length, highlightedIndex]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -822,126 +852,302 @@ function SearchableManagedDomainField({
     };
   }, [isOpen]);
 
+  const content = (
+    <div ref={containerRef} className="relative">
+      <div className="relative">
+        <SearchIcon className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-[var(--foreground-muted)]" />
+        <input
+          value={value}
+          placeholder={placeholder}
+          className={cn(
+            'w-full rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-3 text-sm text-[var(--foreground-primary)] outline-none transition placeholder:text-[var(--foreground-muted)] focus:border-[var(--border-strong)] focus:ring-2 focus:ring-[var(--accent-soft)]',
+            INPUT_CLASS_NAME,
+            'pl-9 pr-10',
+          )}
+          onFocus={() => setIsOpen(true)}
+          onChange={(event) => {
+            onValueChange(event.target.value);
+            setIsOpen(true);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'ArrowDown' && filteredOptions.length > 0) {
+              event.preventDefault();
+              setIsOpen(true);
+              setHighlightedIndex((current) =>
+                current >= filteredOptions.length - 1 ? 0 : current + 1,
+              );
+              return;
+            }
+
+            if (event.key === 'ArrowUp' && filteredOptions.length > 0) {
+              event.preventDefault();
+              setIsOpen(true);
+              setHighlightedIndex((current) =>
+                current <= 0 ? filteredOptions.length - 1 : current - 1,
+              );
+              return;
+            }
+
+            if (event.key === 'Enter' && highlightedOption) {
+              event.preventDefault();
+              onSelect(highlightedOption);
+              setIsOpen(false);
+              setHighlightedIndex(0);
+              return;
+            }
+
+            if (event.key === 'Escape') {
+              setIsOpen(false);
+            }
+          }}
+        />
+        <button
+          type="button"
+          onClick={() => setIsOpen((current) => !current)}
+          aria-label="切换候选列表"
+          className="absolute right-1.5 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-lg text-[var(--foreground-muted)] transition hover:bg-[var(--control-background-hover)]"
+        >
+          <ChevronIcon
+            expanded={isOpen}
+            className="h-4 w-4 text-[var(--foreground-muted)]"
+          />
+        </button>
+      </div>
+
+      {isOpen ? (
+        <div className="absolute inset-x-0 top-[calc(100%+8px)] z-20 rounded-2xl border border-[var(--border-default)] bg-[var(--surface-panel)] p-3 shadow-[var(--shadow-soft)]">
+          <div className="mb-2 flex items-center justify-between gap-3 px-1 text-xs text-[var(--foreground-secondary)]">
+            <span>
+              {highlightedOption
+                ? `按 Enter 选择 ${highlightedOption.label}`
+                : '继续输入以匹配候选项'}
+            </span>
+            <span>{`${filteredOptions.length} 个结果`}</span>
+          </div>
+          <div className="max-h-56 space-y-1 overflow-y-auto">
+            {filteredOptions.length > 0 ? (
+              filteredOptions.map((option, index) => (
+                  <button
+                    key={option.key}
+                  type="button"
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => {
+                    onSelect(option);
+                    setIsOpen(false);
+                    setHighlightedIndex(0);
+                  }}
+                  className={cn(
+                    'flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm transition hover:bg-[var(--control-background-hover)]',
+                    option.selected
+                      ? 'bg-[var(--accent-soft)] text-[var(--foreground-primary)]'
+                      : index === highlightedIndex
+                        ? 'bg-[var(--control-background)] text-[var(--foreground-primary)]'
+                        : 'text-[var(--foreground-secondary)]',
+                  )}
+                  >
+                    <span>{option.content ?? option.label}</span>
+                    <div className="flex items-center gap-2">
+                    {index === highlightedIndex ? (
+                      <span className="rounded-full bg-[var(--surface-elevated)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--foreground-muted)]">
+                        Enter
+                      </span>
+                    ) : null}
+                    {option.trailing}
+                  </div>
+                </button>
+              ))
+            ) : (
+              <p className="rounded-xl border border-dashed border-[var(--border-default)] px-3 py-4 text-sm text-[var(--foreground-secondary)]">
+                {emptyText}
+              </p>
+            )}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+
+  if (!showFieldMeta) {
+    return content;
+  }
+
   return (
-    <ResourceField
+    <ResourceField label={label} hint={hint} error={error}>
+      {content}
+    </ResourceField>
+  );
+}
+
+function SearchableManagedDomainField({
+  value,
+  domains,
+  error,
+  onSelect,
+}: {
+  value: string;
+  domains: ManagedDomainItem[];
+  error?: string;
+  onSelect: (value: string) => void;
+}) {
+  const [inputValue, setInputValue] = useState('');
+
+  useEffect(() => {
+    if (value) {
+      setInputValue(value);
+      return;
+    }
+
+    setInputValue('');
+  }, [value]);
+
+  return (
+    <SearchableSelectInput
       label="Select Target Domain"
       hint="直接输入域名关键字进行本地模糊匹配，按 Enter 选择当前匹配项。"
       error={error}
-    >
-      <div ref={containerRef} className="relative">
-        <div className="relative">
-          <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--foreground-muted)]" />
-          <ResourceInput
-            value={inputValue}
-            placeholder="输入并搜索目标域名"
-            className={cn(INPUT_CLASS_NAME, 'pl-9 pr-10')}
-            onFocus={() => setIsOpen(true)}
-            onChange={(event) => {
-              setInputValue(event.target.value);
-              setIsOpen(true);
-            }}
-            onKeyDown={(event) => {
-              if (event.key === 'ArrowDown' && filteredDomains.length > 0) {
-                event.preventDefault();
-                setIsOpen(true);
-                setHighlightedIndex((current) =>
-                  current >= filteredDomains.length - 1 ? 0 : current + 1,
-                );
-                return;
-              }
+      value={inputValue}
+      placeholder="输入并搜索目标域名"
+      emptyText="未发现匹配域名"
+      options={domains.map((domain) => ({
+        key: String(domain.id),
+        label: domain.domain,
+        keywords: [domain.domain],
+        selected: value === domain.domain,
+        trailing: domain.cert_id ? (
+          <span className="rounded-full bg-[var(--surface-elevated)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--foreground-muted)]">
+            TLS
+          </span>
+        ) : null,
+      }))}
+      onValueChange={setInputValue}
+      onSelect={(option) => {
+        onSelect(option.label);
+        setInputValue(option.label);
+      }}
+    />
+  );
+}
 
-              if (event.key === 'ArrowUp' && filteredDomains.length > 0) {
-                event.preventDefault();
-                setIsOpen(true);
-                setHighlightedIndex((current) =>
-                  current <= 0 ? filteredDomains.length - 1 : current - 1,
-                );
-                return;
-              }
-
-              if (event.key === 'Enter' && highlightedDomain) {
-                event.preventDefault();
-                onSelect(highlightedDomain.domain);
-                setInputValue(highlightedDomain.domain);
-                setIsOpen(false);
-                setHighlightedIndex(0);
-                return;
-              }
-
-              if (event.key === 'Escape') {
-                setIsOpen(false);
-              }
-            }}
-          />
-          <button
-            type="button"
-            onClick={() => setIsOpen((current) => !current)}
-            aria-label="切换域名候选列表"
-            className="absolute right-1.5 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-lg text-[var(--foreground-muted)] transition hover:bg-[var(--control-background-hover)]"
-          >
-            <ChevronIcon
-              expanded={isOpen}
-              className="h-4 w-4 text-[var(--foreground-muted)]"
-            />
-          </button>
-        </div>
-
-        {isOpen ? (
-          <div className="absolute inset-x-0 top-[calc(100%+8px)] z-20 rounded-2xl border border-[var(--border-default)] bg-[var(--surface-panel)] p-3 shadow-[var(--shadow-soft)]">
-            <div className="mb-2 flex items-center justify-between gap-3 px-1 text-xs text-[var(--foreground-secondary)]">
-              <span>
-                {highlightedDomain
-                  ? `按 Enter 选择 ${highlightedDomain.domain}`
-                  : '继续输入以匹配目标域名'}
+function SearchableOriginAddressField({
+  value,
+  origins,
+  onValueChange,
+}: {
+  value: string;
+  origins: OriginItem[];
+  onValueChange: (value: string) => void;
+}) {
+  return (
+    <SearchableSelectInput
+      label="源站地址"
+      showFieldMeta={false}
+      value={value}
+      placeholder="192.168.1.45"
+      emptyText="未发现匹配资产，请手动输入"
+      options={origins.map((origin) => ({
+        key: String(origin.id),
+        label: origin.address,
+        keywords: [origin.address, origin.name],
+        selected: value.trim().toLowerCase() === origin.address.toLowerCase(),
+        content: (
+          <span className="text-[var(--foreground-primary)]">
+            {origin.address}
+            {origin.name ? (
+              <span className="ml-1 text-[var(--foreground-muted)]">
+                ({origin.name})
               </span>
-              <span>{`${filteredDomains.length} 个结果`}</span>
-            </div>
-            <div className="max-h-56 space-y-1 overflow-y-auto">
-              {filteredDomains.length > 0 ? (
-                filteredDomains.map((domain, index) => (
-                  <button
-                    key={domain.id}
-                    type="button"
-                    onClick={() => {
-                      onSelect(domain.domain);
-                      setInputValue(domain.domain);
-                      setIsOpen(false);
-                      setHighlightedIndex(0);
-                    }}
-                    className={cn(
-                      'flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm transition hover:bg-[var(--control-background-hover)]',
-                      value === domain.domain
-                        ? 'bg-[var(--accent-soft)] text-[var(--foreground-primary)]'
-                        : index === highlightedIndex
-                          ? 'bg-[var(--control-background)] text-[var(--foreground-primary)]'
-                          : 'text-[var(--foreground-secondary)]',
-                    )}
-                  >
-                    <span>{domain.domain}</span>
-                    <div className="flex items-center gap-2">
-                      {index === highlightedIndex ? (
-                        <span className="rounded-full bg-[var(--surface-elevated)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--foreground-muted)]">
-                          Enter
-                        </span>
-                      ) : null}
-                      {domain.cert_id ? (
-                        <span className="rounded-full bg-[var(--surface-elevated)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--foreground-muted)]">
-                          TLS
-                        </span>
-                      ) : null}
-                    </div>
-                  </button>
-                ))
-              ) : (
-                <p className="rounded-xl border border-dashed border-[var(--border-default)] px-3 py-4 text-sm text-[var(--foreground-secondary)]">
-                  未发现匹配域名
-                </p>
-              )}
-            </div>
-          </div>
-        ) : null}
-      </div>
-    </ResourceField>
+            ) : null}
+          </span>
+        ),
+        trailing: isLocalOriginAddress(origin.address) ? (
+          <span className="rounded-md bg-[var(--accent-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--foreground-secondary)]">
+            Local
+          </span>
+        ) : null,
+      }))}
+      onValueChange={onValueChange}
+      onSelect={(option) => onValueChange(option.label)}
+    />
+  );
+}
+
+function HeroTextInput(
+  props: React.ComponentProps<typeof Input> & { className?: string },
+) {
+  const { className, ...restProps } = props;
+
+  return (
+    <Input
+      variant="bordered"
+      size="sm"
+      radius="lg"
+      classNames={{
+        ...HERO_INPUT_CLASS_NAMES,
+        base: cn(HERO_INPUT_CLASS_NAMES.base, className),
+      }}
+      {...restProps}
+    />
+  );
+}
+
+function HeroTextArea(
+  props: React.ComponentProps<typeof Textarea> & { className?: string },
+) {
+  const { className, ...restProps } = props;
+
+  return (
+    <Textarea
+      variant="bordered"
+      size="sm"
+      radius="lg"
+      classNames={{
+        ...HERO_TEXTAREA_CLASS_NAMES,
+        base: cn(HERO_TEXTAREA_CLASS_NAMES.base, className),
+      }}
+      {...restProps}
+    />
+  );
+}
+
+function getSelectedKeys(value: string) {
+  return value ? new Set([value]) : new Set<string>();
+}
+
+function HeroSelectField({
+  ariaLabel,
+  value,
+  disabled,
+  onChange,
+  children,
+}: {
+  ariaLabel: string;
+  value: string;
+  disabled?: boolean;
+  onChange: (value: string) => void;
+  children: React.ComponentProps<typeof Select>['children'];
+}) {
+  return (
+    <Select
+      aria-label={ariaLabel}
+      variant="bordered"
+      radius="lg"
+      disallowEmptySelection
+      selectedKeys={getSelectedKeys(value)}
+      isDisabled={disabled}
+      classNames={HERO_SELECT_CLASS_NAMES}
+      onSelectionChange={(keys) => {
+        if (keys === 'all') {
+          return;
+        }
+
+        const [nextValue] = Array.from(keys);
+        if (typeof nextValue === 'string') {
+          onChange(nextValue);
+        }
+      }}
+    >
+      {children}
+    </Select>
   );
 }
 
@@ -954,9 +1160,6 @@ export function ProxyRoutesPage() {
     useState<ManagedDomainMatchResult | null>(null);
   const [isMatching, setIsMatching] = useState(false);
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
-  const [activeOriginRowIndex, setActiveOriginRowIndex] = useState<
-    number | null
-  >(null);
 
   const form = useForm<ProxyRouteFormValues>({
     resolver: zodResolver(proxyRouteSchema),
@@ -1209,7 +1412,6 @@ export function ProxyRoutesPage() {
     setIsEditorOpen(false);
     setMatchResult(null);
     setIsAdvancedOpen(false);
-    setActiveOriginRowIndex(null);
     form.reset(defaultValues);
   };
 
@@ -1512,9 +1714,9 @@ export function ProxyRoutesPage() {
                     hint="当前选择的是通配符域名，仅输入最前面的前缀即可。"
                     error={form.formState.errors.subdomain_label?.message}
                   >
-                    <ResourceInput
+                    <HeroTextInput
+                      aria-label="Subdomain Prefix"
                       placeholder="e.g. ai"
-                      className={INPUT_CLASS_NAME}
                       {...form.register('subdomain_label')}
                     />
                   </ResourceField>
@@ -1547,29 +1749,18 @@ export function ProxyRoutesPage() {
               {originFields.map((field, index) => {
                 const currentRow =
                   watchedOriginRows?.[index] ?? defaultValues.origin_rows[0];
-                const keyword = currentRow.address.trim().toLowerCase();
-                const suggestions = origins.filter((origin) => {
-                  if (!keyword) {
-                    return false;
-                  }
-
-                  return (
-                    origin.address.toLowerCase().includes(keyword) ||
-                    origin.name.toLowerCase().includes(keyword)
-                  );
-                });
 
                 return (
                   <div key={field.id} className="space-y-2">
                     <div className="grid gap-3 md:grid-cols-[120px_minmax(0,1fr)_96px_44px]">
                       <div>
                         <span className="sr-only">{`协议 ${index + 1}`}</span>
-                        <ResourceSelect
+                        <HeroSelectField
+                          ariaLabel={`协议 ${index + 1}`}
                           value={currentRow.scheme}
-                          className={INPUT_CLASS_NAME}
-                          onChange={(event) => {
+                          onChange={(nextValue) => {
                             const nextScheme =
-                              event.target.value as OriginRowFormValue['scheme'];
+                              nextValue as OriginRowFormValue['scheme'];
                             form.setValue(
                               `origin_rows.${index}.scheme`,
                               nextScheme,
@@ -1598,71 +1789,27 @@ export function ProxyRoutesPage() {
                             }
                           }}
                         >
-                          <option value="https">HTTPS</option>
-                          <option value="http">HTTP</option>
-                        </ResourceSelect>
+                          <SelectItem key="https">HTTPS</SelectItem>
+                          <SelectItem key="http">HTTP</SelectItem>
+                        </HeroSelectField>
                       </div>
 
-                      <div className="relative">
-                        <span className="sr-only">{`源站地址 ${index + 1}`}</span>
-                        <ResourceInput
-                          placeholder="192.168.1.45"
-                          className={INPUT_CLASS_NAME}
-                          {...form.register(`origin_rows.${index}.address`)}
-                          onFocus={() => setActiveOriginRowIndex(index)}
-                        />
-                        {activeOriginRowIndex === index && keyword ? (
-                          <div className="absolute inset-x-0 top-[calc(100%+8px)] z-20 rounded-2xl border border-[var(--border-default)] bg-[var(--surface-panel)] p-2 shadow-[var(--shadow-soft)]">
-                            {suggestions.length > 0 ? (
-                              <div className="space-y-1">
-                                {suggestions.map((origin) => (
-                                  <button
-                                    key={origin.id}
-                                    type="button"
-                                    onMouseDown={(event) => event.preventDefault()}
-                                    onClick={() => {
-                                      form.setValue(
-                                        `origin_rows.${index}.address`,
-                                        origin.address,
-                                        {
-                                          shouldDirty: true,
-                                          shouldValidate: true,
-                                        },
-                                      );
-                                      setActiveOriginRowIndex(null);
-                                    }}
-                                    className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm transition hover:bg-[var(--control-background-hover)]"
-                                  >
-                                    <span className="text-[var(--foreground-primary)]">
-                                      {origin.address}
-                                      {origin.name ? (
-                                        <span className="ml-1 text-[var(--foreground-muted)]">
-                                          ({origin.name})
-                                        </span>
-                                      ) : null}
-                                    </span>
-                                    {isLocalOriginAddress(origin.address) ? (
-                                      <span className="rounded-md bg-[var(--accent-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--foreground-secondary)]">
-                                        Local
-                                      </span>
-                                    ) : null}
-                                  </button>
-                                ))}
-                              </div>
-                            ) : (
-                              <div className="rounded-xl border border-dashed border-[var(--border-default)] px-3 py-4 text-sm text-[var(--foreground-secondary)]">
-                                未发现匹配资产，请手动输入
-                              </div>
-                            )}
-                          </div>
-                        ) : null}
-                      </div>
+                      <SearchableOriginAddressField
+                        value={currentRow.address}
+                        origins={origins}
+                        onValueChange={(nextValue) =>
+                          form.setValue(`origin_rows.${index}.address`, nextValue, {
+                            shouldDirty: true,
+                            shouldValidate: true,
+                          })
+                        }
+                      />
 
                       <div>
                         <span className="sr-only">{`端口 ${index + 1}`}</span>
-                        <ResourceInput
+                        <HeroTextInput
+                          aria-label={`端口 ${index + 1}`}
                           placeholder="443"
-                          className={INPUT_CLASS_NAME}
                           {...form.register(`origin_rows.${index}.port`)}
                         />
                       </div>
@@ -1722,9 +1869,9 @@ export function ProxyRoutesPage() {
                   hint="保留原有高级能力，可选填写 /api 或 ?token=demo。"
                   error={form.formState.errors.origin_uri?.message}
                 >
-                  <ResourceInput
+                  <HeroTextInput
+                    aria-label="Origin Path / Query"
                     placeholder="/api"
-                    className={INPUT_CLASS_NAME}
                     {...form.register('origin_uri')}
                   />
                 </ResourceField>
@@ -1790,24 +1937,41 @@ export function ProxyRoutesPage() {
                     )}
                     error={form.formState.errors.cert_id?.message}
                   >
-                    <ResourceSelect
+                    <HeroSelectField
+                      ariaLabel="Select Certificate"
                       value={watchedCertId}
                       disabled={certificatesQuery.isLoading}
-                      className={INPUT_CLASS_NAME}
-                      onChange={(event) =>
-                        form.setValue('cert_id', event.target.value, {
+                      onChange={(nextValue) =>
+                        form.setValue('cert_id', nextValue, {
                           shouldDirty: true,
                           shouldValidate: true,
                         })
                       }
                     >
-                      <option value="">请选择证书</option>
-                      {certificates.map((certificate) => (
-                        <option key={certificate.id} value={certificate.id}>
-                          {buildCertificateLabel(certificate)}
-                        </option>
-                      ))}
-                    </ResourceSelect>
+                      {matchResult?.candidate ? (
+                        <SelectSection title="自动匹配">
+                          <SelectItem key={String(matchResult.candidate.certificate_id)}>
+                            {matchResult.candidate.certificate_name}
+                          </SelectItem>
+                        </SelectSection>
+                      ) : null}
+                      <SelectSection title="全部证书">
+                        {certificates
+                          .filter(
+                            (certificate) =>
+                              String(certificate.id) !==
+                              String(matchResult?.candidate?.certificate_id ?? ''),
+                          )
+                          .map((certificate) => (
+                            <SelectItem
+                              key={String(certificate.id)}
+                              textValue={buildCertificateLabel(certificate)}
+                            >
+                              {buildCertificateLabel(certificate)}
+                            </SelectItem>
+                          ))}
+                      </SelectSection>
+                    </HeroSelectField>
                   </ResourceField>
 
                   <ToggleField
@@ -1870,9 +2034,9 @@ export function ProxyRoutesPage() {
                       hint="留空则默认使用访问域名 $host。"
                       error={form.formState.errors.origin_host?.message}
                     >
-                      <ResourceInput
+                      <HeroTextInput
+                        aria-label="Origin Host Header"
                         placeholder="example.com"
-                        className={INPUT_CLASS_NAME}
                         {...form.register('origin_host')}
                       />
                     </ResourceField>
@@ -1902,14 +2066,14 @@ export function ProxyRoutesPage() {
                             key={field.id}
                             className="grid gap-3 md:grid-cols-[1fr_1fr_28px]"
                           >
-                            <ResourceInput
+                            <HeroTextInput
+                              aria-label={`Custom Header Key ${index + 1}`}
                               placeholder="X-Forwarded-For"
-                              className={INPUT_CLASS_NAME}
                               {...form.register(`custom_headers.${index}.key`)}
                             />
-                            <ResourceInput
+                            <HeroTextInput
+                              aria-label={`Custom Header Value ${index + 1}`}
                               placeholder="$remote_addr"
-                              className={INPUT_CLASS_NAME}
                               {...form.register(`custom_headers.${index}.value`)}
                             />
                             <button
@@ -1965,15 +2129,14 @@ export function ProxyRoutesPage() {
                       label="缓存策略"
                       hint="按 URL 会缓存所有符合安全条件的 URL；其余策略会先匹配规则再决定是否缓存。"
                     >
-                      <ResourceSelect
+                      <HeroSelectField
+                        ariaLabel="缓存策略"
                         value={watchedCachePolicy}
                         disabled={!watchedCacheEnabled}
-                        className={INPUT_CLASS_NAME}
-                        onChange={(event) =>
+                        onChange={(nextValue) =>
                           form.setValue(
                             'cache_policy',
-                            event.target
-                              .value as ProxyRouteFormValues['cache_policy'],
+                            nextValue as ProxyRouteFormValues['cache_policy'],
                             {
                               shouldDirty: true,
                               shouldValidate: true,
@@ -1981,11 +2144,11 @@ export function ProxyRoutesPage() {
                           )
                         }
                       >
-                        <option value="url">按 URL 缓存</option>
-                        <option value="suffix">按后缀匹配缓存</option>
-                        <option value="path_prefix">按路径前缀缓存</option>
-                        <option value="path_exact">按精确路径缓存</option>
-                      </ResourceSelect>
+                        <SelectItem key="url">按 URL 缓存</SelectItem>
+                        <SelectItem key="suffix">按后缀匹配缓存</SelectItem>
+                        <SelectItem key="path_prefix">按路径前缀缓存</SelectItem>
+                        <SelectItem key="path_exact">按精确路径缓存</SelectItem>
+                      </HeroSelectField>
                     </ResourceField>
 
                     <ResourceField
@@ -1993,7 +2156,8 @@ export function ProxyRoutesPage() {
                       hint={getCacheRulesHint(watchedCachePolicy)}
                       error={form.formState.errors.cache_rules_text?.message}
                     >
-                      <ResourceTextarea
+                      <HeroTextArea
+                        aria-label="缓存规则"
                         placeholder={
                           watchedCachePolicy === 'suffix'
                             ? 'jpg\ncss\njs'
@@ -2006,7 +2170,7 @@ export function ProxyRoutesPage() {
                         disabled={
                           !watchedCacheEnabled || watchedCachePolicy === 'url'
                         }
-                        className="min-h-32 rounded-xl"
+                        className="min-h-32"
                         {...form.register('cache_rules_text')}
                       />
                     </ResourceField>
@@ -2017,9 +2181,9 @@ export function ProxyRoutesPage() {
                   label="Remarks"
                   error={form.formState.errors.remark?.message}
                 >
-                  <ResourceTextarea
+                  <HeroTextArea
+                    aria-label="Remarks"
                     placeholder="Internal notes for this rule..."
-                    className="min-h-28 rounded-xl"
                     {...form.register('remark')}
                   />
                 </ResourceField>

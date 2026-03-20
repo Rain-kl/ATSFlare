@@ -41,11 +41,13 @@ describe('ProxyRoutesPage', () => {
   }
 
   function buildBaseFetchStub({
+    proxyRoutes = [],
     managedDomains,
     origins = [],
     certificates = [{ id: 1, name: 'example-cert', not_after: null }],
     matchResult,
   }: {
+    proxyRoutes?: Array<Record<string, unknown>>;
     managedDomains: Array<Record<string, unknown>>;
     origins?: Array<Record<string, unknown>>;
     certificates?: Array<Record<string, unknown>>;
@@ -56,7 +58,13 @@ describe('ProxyRoutesPage', () => {
 
       if (url.includes('/proxy-routes/')) {
         return Promise.resolve(
-          new Response(JSON.stringify({ success: true, message: '', data: [] })),
+          new Response(
+            JSON.stringify({
+              success: true,
+              message: '',
+              data: proxyRoutes,
+            }),
+          ),
         );
       }
 
@@ -343,5 +351,61 @@ describe('ProxyRoutesPage', () => {
 
     expect(domainInput).toHaveValue('app.example.com');
     expect(screen.queryByPlaceholderText('e.g. ai')).not.toBeInTheDocument();
+  });
+
+  it('prefills managed domain and origin rows correctly when editing an existing rule', async () => {
+    stubMatchMedia();
+
+    vi.stubGlobal(
+      'fetch',
+      buildBaseFetchStub({
+        proxyRoutes: [
+          {
+            id: 3,
+            domain: 'ai.example.com',
+            origin_id: 1,
+            origin_url: 'https://c2.internal:443',
+            origin_host: '',
+            upstreams: JSON.stringify(['https://c2.internal:443']),
+            enabled: true,
+            enable_https: true,
+            cert_id: 1,
+            redirect_http: false,
+            cache_enabled: false,
+            cache_policy: 'url',
+            cache_rules: '[]',
+            custom_headers: '[]',
+            remark: '',
+            created_at: '2026-03-20T08:00:00Z',
+            updated_at: '2026-03-20T08:00:00Z',
+          },
+        ],
+        managedDomains: [
+          {
+            id: 3,
+            domain: '*.example.com',
+            cert_id: 1,
+            enabled: true,
+            remark: '',
+            created_at: '2026-03-20T08:00:00Z',
+            updated_at: '2026-03-20T08:00:00Z',
+          },
+        ],
+      }),
+    );
+
+    renderProxyRoutesPage();
+
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: '编辑' }));
+    const dialog = await screen.findByRole('dialog', { name: '编辑规则' });
+
+    const domainInput = within(dialog).getByPlaceholderText('输入并搜索目标域名');
+    expect(domainInput).toHaveValue('*.example.com');
+    expect(within(dialog).getByPlaceholderText('e.g. ai')).toHaveValue('ai');
+    expect(within(dialog).getAllByPlaceholderText('192.168.1.45')).toHaveLength(1);
+    expect(within(dialog).getByPlaceholderText('192.168.1.45')).toHaveValue(
+      'c2.internal',
+    );
   });
 });
