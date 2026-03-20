@@ -1848,20 +1848,20 @@ export function ProxyRoutesPage() {
                             ?.message}
                       </p>
                     )}
-
-                    {index === 0 ? (
-                        <div>
-                          <span className="sr-only">Origin Path / Query</span>
-                          <HeroTextInput
-                              aria-label="Origin Path / Query"
-                              placeholder="/api"
-                              {...form.register('origin_uri')}
-                          />
-                        </div>
-                    ) : null}
                   </div>
                 );
               })}
+
+              <ResourceField
+                label="Origin Path / Query"
+                error={form.formState.errors.origin_uri?.message}
+              >
+                <HeroTextInput
+                  aria-label="Origin Path / Query"
+                  placeholder="/api"
+                  {...form.register('origin_uri')}
+                />
+              </ResourceField>
             </div>
           </ProxyRuleSection>
 
