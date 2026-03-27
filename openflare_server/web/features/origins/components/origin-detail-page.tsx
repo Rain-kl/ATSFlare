@@ -16,7 +16,6 @@ import { deleteOrigin, getOrigin } from '@/features/origins/api/origins';
 import { OriginEditorModal } from '@/features/origins/components/origin-editor-modal';
 import {
   DangerButton,
-  PrimaryButton,
   SecondaryButton,
 } from '@/features/shared/components/resource-primitives';
 import { formatDateTime } from '@/lib/utils/date';

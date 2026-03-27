@@ -1,6 +1,6 @@
 'use client';
 
-import { Select, SelectItem, SelectSection } from '@heroui/select';
+import { ListBox, Select } from '@heroui/react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -57,6 +57,8 @@ import {
 } from '@/features/shared/components/resource-primitives';
 import { cn } from '@/lib/utils/cn';
 import { formatDateTime } from '@/lib/utils/date';
+
+const SelectItem = ListBox.Item;
 
 const customHeaderSchema = z.object({
   key: z.string(),
@@ -278,17 +280,15 @@ type SectionIconProps = {
 const INPUT_CLASS_NAME = 'h-10 rounded-xl px-3 py-2 text-sm';
 const PANEL_CLASS_NAME =
   'rounded-2xl border border-[var(--border-default)] bg-[color:color-mix(in_srgb,var(--surface-elevated)_82%,white_18%)] p-4 shadow-[var(--shadow-soft)]';
-const HERO_SELECT_CLASS_NAMES = {
-  base: 'w-full',
-  trigger: cn(
-    INPUT_CLASS_NAME,
-    'min-h-10 rounded-xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 shadow-none data-[hover=true]:bg-[var(--surface-elevated)] data-[open=true]:border-[var(--border-strong)]',
-  ),
-  value: 'text-sm text-[var(--foreground-primary)]',
-  popoverContent:
-    'rounded-2xl border border-[var(--border-default)] bg-[var(--surface-panel)] shadow-[var(--shadow-soft)]',
-  listboxWrapper: 'p-1',
-} as const;
+const HERO_SELECT_TRIGGER_CLASS_NAME = cn(
+  INPUT_CLASS_NAME,
+  'flex min-h-10 w-full items-center justify-between rounded-xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 shadow-none transition-colors data-[hovered=true]:bg-[var(--surface-elevated)] data-[focus-visible=true]:border-[var(--border-strong)] data-[open=true]:border-[var(--border-strong)]',
+);
+const HERO_SELECT_VALUE_CLASS_NAME =
+  'truncate text-left text-sm text-[var(--foreground-primary)]';
+const HERO_SELECT_POPOVER_CLASS_NAME =
+  'rounded-2xl border border-[var(--border-default)] bg-[var(--surface-panel)] shadow-[var(--shadow-soft)]';
+const HERO_SELECT_LISTBOX_CLASS_NAME = 'p-1';
 
 const defaultValues: ProxyRouteFormValues = {
   managed_domain_id: '',
@@ -1074,10 +1074,6 @@ function HeroTextArea(
   );
 }
 
-function getSelectedKeys(value: string) {
-  return value ? new Set([value]) : new Set<string>();
-}
-
 function HeroSelectField({
   ariaLabel,
   value,
@@ -1089,29 +1085,29 @@ function HeroSelectField({
   value: string;
   disabled?: boolean;
   onChange: (value: string) => void;
-  children: React.ComponentProps<typeof Select>['children'];
+  children: React.ReactNode;
 }) {
   return (
     <Select
       aria-label={ariaLabel}
-      variant="bordered"
-      radius="lg"
-      disallowEmptySelection
-      selectedKeys={getSelectedKeys(value)}
+      variant="primary"
+      selectedKey={value || null}
       isDisabled={disabled}
-      classNames={HERO_SELECT_CLASS_NAMES}
-      onSelectionChange={(keys) => {
-        if (keys === 'all') {
+      className="w-full"
+      onSelectionChange={(key) => {
+        if (typeof key !== 'string') {
           return;
         }
-
-        const [nextValue] = Array.from(keys);
-        if (typeof nextValue === 'string') {
-          onChange(nextValue);
-        }
+        onChange(key);
       }}
     >
-      {children}
+      <Select.Trigger className={HERO_SELECT_TRIGGER_CLASS_NAME}>
+        <Select.Value className={HERO_SELECT_VALUE_CLASS_NAME} />
+        <Select.Indicator />
+      </Select.Trigger>
+      <Select.Popover className={HERO_SELECT_POPOVER_CLASS_NAME}>
+        <ListBox className={HERO_SELECT_LISTBOX_CLASS_NAME}>{children}</ListBox>
+      </Select.Popover>
     </Select>
   );
 }
@@ -1198,10 +1194,6 @@ export function ProxyRoutesPage() {
   const watchedOriginRows = useWatch({
     control: form.control,
     name: 'origin_rows',
-  });
-  const watchedOriginURI = useWatch({
-    control: form.control,
-    name: 'origin_uri',
   });
   const watchedEnabled = useWatch({ control: form.control, name: 'enabled' });
   const watchedEnableHttps = useWatch({
@@ -1885,28 +1877,35 @@ export function ProxyRoutesPage() {
                       }
                     >
                       {matchResult?.candidate ? (
-                        <SelectSection title="自动匹配">
-                          <SelectItem key={String(matchResult.candidate.certificate_id)}>
+                        <>
+                          <SelectItem key="__auto_match_label__" isDisabled textValue="自动匹配">
+                            自动匹配
+                          </SelectItem>
+                          <SelectItem
+                            key={String(matchResult.candidate.certificate_id)}
+                            textValue={matchResult.candidate.certificate_name}
+                          >
                             {matchResult.candidate.certificate_name}
                           </SelectItem>
-                        </SelectSection>
+                        </>
                       ) : null}
-                      <SelectSection title="全部证书">
-                        {certificates
-                          .filter(
-                            (certificate) =>
-                              String(certificate.id) !==
-                              String(matchResult?.candidate?.certificate_id ?? ''),
-                          )
-                          .map((certificate) => (
-                            <SelectItem
-                              key={String(certificate.id)}
-                              textValue={buildCertificateLabel(certificate)}
-                            >
-                              {buildCertificateLabel(certificate)}
-                            </SelectItem>
-                          ))}
-                      </SelectSection>
+                      <SelectItem key="__all_certificates_label__" isDisabled textValue="全部证书">
+                        全部证书
+                      </SelectItem>
+                      {certificates
+                        .filter(
+                          (certificate) =>
+                            String(certificate.id) !==
+                            String(matchResult?.candidate?.certificate_id ?? ''),
+                        )
+                        .map((certificate) => (
+                          <SelectItem
+                            key={String(certificate.id)}
+                            textValue={buildCertificateLabel(certificate)}
+                          >
+                            {buildCertificateLabel(certificate)}
+                          </SelectItem>
+                        ))}
                     </HeroSelectField>
                   </ResourceField>
 
